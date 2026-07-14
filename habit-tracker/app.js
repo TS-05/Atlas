@@ -244,6 +244,46 @@ function renderToday() {
   });
 }
 
+const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+function mondayOfWeek(dateObj) {
+  const d = new Date(dateObj);
+  const offset = (d.getDay() + 6) % 7; // Mo=0 ... So=6
+  d.setDate(d.getDate() - offset);
+  return d;
+}
+
+function renderWeekCircle() {
+  const wrap = document.getElementById("weekCircle");
+  wrap.innerHTML = "";
+  const today = new Date();
+  const monday = mondayOfWeek(today);
+  const todayKey = todayStr();
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    const isFuture = key > todayKey;
+    const isToday = key === todayKey;
+
+    const scheduled = state.habits.filter(h => new Date(h.createdAt) <= d && isScheduledToday(h, d));
+    const done = scheduled.filter(h => h.history[key]).length;
+    const pct = scheduled.length ? Math.round((done / scheduled.length) * 100) : null;
+
+    const el = document.createElement("div");
+    el.className = "week-circle-day" + (isToday ? " is-today" : "") + (isFuture ? " is-future" : "");
+    el.title = `${key}: ${scheduled.length ? done + "/" + scheduled.length + " Habits" : "keine Habits fällig"}`;
+    el.innerHTML = `
+      <div class="week-circle-ring" style="--pct:${pct === null ? 0 : pct}%">
+        <div class="week-circle-ring-inner">${pct === null ? "–" : pct + "%"}</div>
+      </div>
+      <div class="week-circle-label">${WEEKDAY_LABELS[i]}</div>
+    `;
+    wrap.appendChild(el);
+  }
+}
+
 function computeStreak(habit) {
   let streak = 0;
   let d = new Date();
@@ -296,6 +336,7 @@ function renderGoalCard(goal) {
         ${goal.dueDate ? `<div class="goal-due">Zieltermin: ${goal.dueDate}</div>` : ""}
       </div>
       <div>
+        <button class="icon-btn" data-decompose-goal="${goal.id}" title="Schritte vorschlagen (Prompt kopieren)">🧩</button>
         <button class="icon-btn" data-add-child="${goal.id}" title="Unterziel hinzufügen">${goal.level !== "short" ? "+" : ""}</button>
         <button class="icon-btn" data-del-goal="${goal.id}">✕</button>
       </div>
@@ -373,6 +414,71 @@ function renderOverview() {
   document.getElementById("punctualityFill").style.width = pct + "%";
   document.getElementById("punctualityText").textContent =
     completed.length ? `${onTime} von ${completed.length} erledigten Aufgaben pünktlich (${pct}%)` : "Noch keine erledigten Aufgaben mit Termin.";
+
+  renderLongTermStats();
+}
+
+function habitStatsWindow(habit, days) {
+  let total = 0, done = 0;
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    if (new Date(habit.createdAt) > d) continue;
+    if (!isScheduledToday(habit, d)) continue;
+    total++;
+    const key = d.toISOString().slice(0, 10);
+    if (habit.history[key]) done++;
+  }
+  return { total, done, rate: total ? done / total : null };
+}
+
+function weekdayDifficulty(days) {
+  const totals = Array.from({ length: 7 }, () => ({ total: 0, done: 0 }));
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const wd = (d.getDay() + 6) % 7;
+    const key = d.toISOString().slice(0, 10);
+    state.habits.forEach(h => {
+      if (new Date(h.createdAt) > d) return;
+      if (!isScheduledToday(h, d)) return;
+      totals[wd].total++;
+      if (h.history[key]) totals[wd].done++;
+    });
+  }
+  return totals.map((t, i) => ({
+    day: WEEKDAY_LABELS[i],
+    total: t.total,
+    rate: t.total ? t.done / t.total : null
+  }));
+}
+
+function renderLongTermStats(days = 60) {
+  const container = document.getElementById("longTermStats");
+  const habitStats = state.habits
+    .map(h => ({ habit: h, ...habitStatsWindow(h, days) }))
+    .filter(s => s.total > 0);
+  const weekdayStats = weekdayDifficulty(days).filter(w => w.total > 0);
+
+  if (habitStats.length === 0) {
+    container.innerHTML = `<div class="empty-hint">Noch nicht genug Daten (mind. 1 fälliger Habit-Tag in den letzten ${days} Tagen nötig).</div>`;
+    return;
+  }
+
+  const best = habitStats.reduce((a, b) => (b.rate > a.rate ? b : a));
+  const worst = habitStats.reduce((a, b) => (b.rate < a.rate ? b : a));
+
+  let hardestDayBox = "";
+  if (weekdayStats.length) {
+    const hardest = weekdayStats.reduce((a, b) => (b.rate < a.rate ? b : a));
+    hardestDayBox = `<div class="stat-box"><div class="stat-num">${hardest.day}</div><div class="stat-label">Schwierigster Wochentag (${Math.round(hardest.rate * 100)}%)</div></div>`;
+  }
+
+  container.innerHTML = `
+    <div class="stat-box"><div class="stat-num">${Math.round(best.rate * 100)}%</div><div class="stat-label">Bester Habit: ${escapeHtml(best.habit.title)}</div></div>
+    <div class="stat-box"><div class="stat-num">${Math.round(worst.rate * 100)}%</div><div class="stat-label">Schwierigster Habit: ${escapeHtml(worst.habit.title)}</div></div>
+    ${hardestDayBox}
+  `;
 }
 
 function isOnTime(task) {
@@ -385,6 +491,7 @@ function isOnTime(task) {
 
 // ---------- Render all ----------
 function renderAll() {
+  renderWeekCircle();
   renderToday();
   renderGoals();
   renderHabitsTab();
@@ -430,7 +537,64 @@ document.addEventListener("click", e => {
     const childLevel = parent.level === "long" ? "mid" : "short";
     openGoalModal(childLevel, parent.id);
   }
+  if (e.target.matches("[data-decompose-goal]")) {
+    copyDecomposePrompt(e.target.dataset.decomposeGoal, e.target);
+  }
 });
+
+// ---------- Projekt-Zerlegung: Copy-Prompt für Chat-Analyse ----------
+function buildDecomposePrompt(goal) {
+  const tasks = tasksForGoal(goal.id);
+  const habits = habitsForGoal(goal.id);
+  const pct = Math.round(goalProgress(goal) * 100);
+
+  let prompt = `Ich möchte mein Ziel "${goal.title}" (${levelLabel(goal.level)}) in konkrete, umsetzbare Teilschritte zerlegen.\n\n`;
+  prompt += `Aktueller Fortschritt: ${pct}%\n`;
+  if (goal.dueDate) prompt += `Zieltermin: ${goal.dueDate}\n`;
+  if (goal.priority) prompt += `Priorität: Nr. 1\n`;
+
+  if (tasks.length) {
+    prompt += `\nBereits verknüpfte Aufgaben:\n`;
+    tasks.forEach(t => { prompt += `- [${t.done ? "x" : " "}] ${t.title}${t.dueDate ? " (fällig " + t.dueDate + ")" : ""}\n`; });
+  }
+  if (habits.length) {
+    prompt += `\nBereits verknüpfte Gewohnheiten:\n`;
+    habits.forEach(h => { prompt += `- ${h.title} (${h.frequency === "weekdays" ? "Mo–Fr" : "täglich"})\n`; });
+  }
+
+  prompt += `\nSchlag mir bitte 3-6 konkrete nächste Schritte (Aufgaben oder Gewohnheiten) vor, die ich in den Tracker eintragen kann, um dieses Ziel voranzubringen.`;
+  return prompt;
+}
+
+async function copyDecomposePrompt(goalId, btn) {
+  const goal = goalById(goalId);
+  if (!goal) return;
+  const prompt = buildDecomposePrompt(goal);
+  try {
+    await navigator.clipboard.writeText(prompt);
+    flashButton(btn, "✅");
+  } catch (e) {
+    downloadText(prompt, `Zerlegen_${goal.title.replace(/[^a-z0-9]+/gi, "_")}.txt`);
+  }
+}
+
+function flashButton(btn, tempContent) {
+  const original = btn.textContent;
+  btn.textContent = tempContent;
+  setTimeout(() => { btn.textContent = original; }, 1200);
+}
+
+function downloadText(text, filename) {
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 function removeGoalCascade(goalId) {
   const children = state.goals.filter(g => g.parentId === goalId);
@@ -585,12 +749,13 @@ function openHabitModal() {
   });
 }
 
-// ---------- Wochenrückblick-Export (Obsidian-kompatibles Markdown) ----------
+// ---------- Vollständiger Export (Obsidian-kompatibles Markdown, für Vault & Chat-Analyse) ----------
 function exportWeekReview() {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - 6);
   const fmt = d => d.toISOString().slice(0, 10);
+  const longTermDays = 60;
 
   let md = `---\n`;
   md += `title: "Wochenrückblick ${fmt(start)} bis ${fmt(end)}"\n`;
@@ -598,8 +763,9 @@ function exportWeekReview() {
   md += `created: ${new Date().toISOString()}\n`;
   md += `tags:\n  - "wochenrueckblick"\n  - "habits"\n---\n\n`;
   md += `# Wochenrückblick ${fmt(start)} bis ${fmt(end)}\n\n`;
+  md += `> Vollständiger Export inkl. Rohdaten — zum Ablegen im Vault oder zum Einfügen in den Chat mit Claude für eine individuelle Analyse.\n\n`;
 
-  md += `## Gewohnheiten\n`;
+  md += `## Gewohnheiten (letzte 7 Tage)\n`;
   state.habits.forEach(h => {
     let doneCount = 0, scheduledCount = 0;
     for (let i = 0; i < 7; i++) {
@@ -613,7 +779,7 @@ function exportWeekReview() {
     md += `- **${h.title}**: ${doneCount}/${scheduledCount} Tage · Streak: ${streak} 🔥\n`;
   });
 
-  md += `\n## Aufgaben\n`;
+  md += `\n## Aufgaben (letzte 7 Tage)\n`;
   const weekTasks = state.tasks.filter(t => t.dueDate && t.dueDate >= fmt(start) && t.dueDate <= fmt(end));
   const doneWeekTasks = weekTasks.filter(t => t.done);
   const onTimeCount = doneWeekTasks.filter(isOnTime).length;
@@ -627,6 +793,23 @@ function exportWeekReview() {
   goalsByLevel("long", null).forEach(g => {
     md += `- **${g.title}**${g.priority ? " ★" : ""}: ${Math.round(goalProgress(g) * 100)}%\n`;
   });
+
+  md += `\n## Langzeit-Auswertung (letzte ${longTermDays} Tage)\n`;
+  const longTermHabitStats = state.habits
+    .map(h => ({ habit: h, ...habitStatsWindow(h, longTermDays) }))
+    .filter(s => s.total > 0)
+    .sort((a, b) => b.rate - a.rate);
+  longTermHabitStats.forEach(s => {
+    md += `- **${s.habit.title}**: ${Math.round(s.rate * 100)}% (${s.done}/${s.total} fällige Tage)\n`;
+  });
+  const weekdayStats = weekdayDifficulty(longTermDays).filter(w => w.total > 0);
+  if (weekdayStats.length) {
+    const hardest = weekdayStats.reduce((a, b) => (b.rate < a.rate ? b : a));
+    md += `- Schwierigster Wochentag: **${hardest.day}** (${Math.round(hardest.rate * 100)}% Erledigungsquote)\n`;
+  }
+
+  md += `\n## Rohdaten (vollständig, als JSON)\n`;
+  md += "```json\n" + JSON.stringify(state, null, 2) + "\n```\n";
 
   md += `\n---\nErstellt automatisch vom Ziel & Habit Tracker.\n`;
 

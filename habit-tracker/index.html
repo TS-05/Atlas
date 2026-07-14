@@ -24,6 +24,10 @@
   <main>
     <!-- HEUTE -->
     <section id="tab-today" class="tab-panel active">
+      <div class="card week-circle-card">
+        <h2>Wochenkreis</h2>
+        <div id="weekCircle" class="week-circle"></div>
+      </div>
       <div class="panel-grid">
         <div class="card">
           <h2>Aufgaben heute</h2>
@@ -60,14 +64,18 @@
       <h2>Übersicht</h2>
       <div class="stats-grid" id="statsGrid"></div>
       <div class="card">
+        <h3>Langzeit-Auswertung (60 Tage)</h3>
+        <div class="stats-grid" id="longTermStats"></div>
+      </div>
+      <div class="card">
         <h3>Pünktlichkeit erledigter Aufgaben</h3>
         <div id="punctualityBar" class="progress-outer"><div class="progress-inner" id="punctualityFill"></div></div>
         <div id="punctualityText" class="small-text"></div>
       </div>
       <div class="card">
-        <h3>Wochenrückblick</h3>
-        <p class="small-text">Erstellt eine Obsidian-kompatible Markdown-Zusammenfassung der letzten 7 Tage (Habit-Quoten, Streaks, erledigte Aufgaben, Zielfortschritt) und lädt sie als .md-Datei herunter — direkt ablegbar im Vault-Ordner <code>30_Projekte/Wochenrueckblicke</code>.</p>
-        <button class="add-btn" id="exportWeekBtn">📤 Wochenrückblick exportieren (.md)</button>
+        <h3>Wochenrückblick &amp; vollständiger Datenexport</h3>
+        <p class="small-text">Erstellt eine Obsidian-kompatible Markdown-Datei mit Wochenstatistik (7 Tage), Langzeit-Auswertung (60 Tage) und allen Rohdaten (Ziele, Aufgaben, komplette Habit-Historie als JSON). Direkt ablegbar im Vault-Ordner <code>30_Projekte/Wochenrueckblicke</code> oder zum Einfügen in den Chat, wenn du eine individuelle Analyse von Claude möchtest.</p>
+        <button class="add-btn" id="exportWeekBtn">📤 Vollständigen Export herunterladen (.md)</button>
       </div>
     </section>
   </main>
