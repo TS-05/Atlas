@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ziel & Habit Tracker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <h1>🎯 Ziel &amp; Habit Tracker</h1>
+    <div class="today" id="todayLabel"></div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="today">Heute</button>
+    <button class="tab-btn" data-tab="goals">Ziele</button>
+    <button class="tab-btn" data-tab="habits">Habits</button>
+    <button class="tab-btn" data-tab="overview">Übersicht</button>
+  </nav>
+
+  <main>
+    <!-- HEUTE -->
+    <section id="tab-today" class="tab-panel active">
+      <div class="panel-grid">
+        <div class="card">
+          <h2>Aufgaben heute</h2>
+          <div id="dayRule" class="day-rule"></div>
+          <div id="todayTasks" class="list"></div>
+          <button class="add-btn" id="addTaskBtn">+ Aufgabe hinzufügen</button>
+        </div>
+        <div class="card">
+          <h2>Gewohnheiten heute</h2>
+          <div id="todayHabits" class="list"></div>
+          <button class="add-btn" id="addHabitBtn">+ Gewohnheit hinzufügen</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ZIELE -->
+    <section id="tab-goals" class="tab-panel">
+      <div class="goals-header">
+        <h2>Ziel-Hierarchie</h2>
+        <button class="add-btn" id="addGoalBtn">+ Neues Ziel</button>
+      </div>
+      <p class="hint">Langfristige Ziele bestehen aus mittelfristigen Meilensteinen, die wiederum aus kurzfristigen Aufgaben/Gewohnheiten bestehen. Fortschritt wird automatisch von unten nach oben berechnet.</p>
+      <div id="goalsTree" class="goals-tree"></div>
+    </section>
+
+    <!-- HABITS -->
+    <section id="tab-habits" class="tab-panel">
+      <h2>Alle Gewohnheiten &amp; Streaks</h2>
+      <div id="habitsList" class="list"></div>
+    </section>
+
+    <!-- ÜBERSICHT -->
+    <section id="tab-overview" class="tab-panel">
+      <h2>Übersicht</h2>
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="card">
+        <h3>Pünktlichkeit erledigter Aufgaben</h3>
+        <div id="punctualityBar" class="progress-outer"><div class="progress-inner" id="punctualityFill"></div></div>
+        <div id="punctualityText" class="small-text"></div>
+      </div>
+      <div class="card">
+        <h3>Wochenrückblick</h3>
+        <p class="small-text">Erstellt eine Obsidian-kompatible Markdown-Zusammenfassung der letzten 7 Tage (Habit-Quoten, Streaks, erledigte Aufgaben, Zielfortschritt) und lädt sie als .md-Datei herunter — direkt ablegbar im Vault-Ordner <code>30_Projekte/Wochenrueckblicke</code>.</p>
+        <button class="add-btn" id="exportWeekBtn">📤 Wochenrückblick exportieren (.md)</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
