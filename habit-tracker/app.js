@@ -13,12 +13,6 @@ function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-let state = loadData();
-state.subjects = state.subjects || [];
-state.exams = state.exams || [];
-state.workShifts = state.workShifts || [];
-saveData();
-
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -29,55 +23,138 @@ function todayStr(offsetDays = 0) {
   return d.toISOString().slice(0, 10);
 }
 
+// ---------- Migration: alte Ziel-Hierarchie (goals) -> flache Zielbereiche (categories) ----------
+function migrateGoalsToCategories(data) {
+  if (data.categories || !data.goals) return;
+
+  const GOAL_TITLE_TO_CATEGORY = {
+    "Glaube": "Glaube",
+    "Schule & Studium": "Schule",
+    "Fitness & Gesundheit": "Gesundheit",
+    "Struktur & Routine": "Allgemein",
+    "Charakter & Integrität": "Allgemein",
+    "Wissen & Weiterbildung": "Bildung"
+  };
+
+  data.categories = [];
+  const categoryByTitle = {};
+  const ensureCategory = (title, priority = false) => {
+    if (!categoryByTitle[title]) {
+      const cat = { id: uid(), title, priority };
+      data.categories.push(cat);
+      categoryByTitle[title] = cat;
+    } else if (priority) {
+      categoryByTitle[title].priority = true;
+    }
+    return categoryByTitle[title];
+  };
+
+  const goals = data.goals || [];
+  const findGoal = id => goals.find(g => g.id === id);
+  const goalIdToCategoryId = {};
+
+  goals.filter(g => g.level === "long").forEach(g => {
+    const catTitle = GOAL_TITLE_TO_CATEGORY[g.title] || g.title;
+    const cat = ensureCategory(catTitle, g.priority);
+    goalIdToCategoryId[g.id] = cat.id;
+  });
+
+  function categoryIdForGoal(g) {
+    let cur = g;
+    while (cur && cur.level !== "long") cur = findGoal(cur.parentId);
+    return cur ? goalIdToCategoryId[cur.id] : null;
+  }
+
+  // Mid/short goals become plain tasks under the resolved category
+  goals.filter(g => g.level !== "long").forEach(g => {
+    const categoryId = categoryIdForGoal(g);
+    if (!categoryId) return;
+    data.tasks.push({
+      id: uid(), title: g.title, categoryId, dueDate: g.dueDate || null, dueTime: null,
+      done: false, completedAt: null, createdAt: new Date().toISOString(), size: "klein", priority: "normal",
+      source: "category"
+    });
+  });
+
+  (data.tasks || []).forEach(t => {
+    if (t.categoryId !== undefined) return;
+    const g = findGoal(t.goalId);
+    t.categoryId = g ? categoryIdForGoal(g) : null;
+    delete t.goalId;
+    if (t.priority === undefined) t.priority = "normal";
+    if (t.source === undefined) t.source = "category";
+  });
+
+  (data.habits || []).forEach(h => {
+    if (h.categoryId !== undefined) return;
+    const g = findGoal(h.goalId);
+    h.categoryId = g ? categoryIdForGoal(g) : null;
+    delete h.goalId;
+  });
+
+  delete data.goals;
+}
+
+let state = loadData();
+migrateGoalsToCategories(state);
+state.subjects = state.subjects || [];
+state.exams = state.exams || [];
+state.workShifts = state.workShifts || [];
+state.deviations = state.deviations || [];
+state.weeklyReflection = state.weeklyReflection || {};
+saveData();
+
 // ---------- Seed data (aus Obsidian-Vault: Ziele.md, Präferenzen.md, Habit_und_Zielsystem.md) ----------
 function seedData() {
-  const data = { goals: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [] };
-  const g = (title, priority = false) => {
+  const data = { categories: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {} };
+  const c = (title, priority = false) => {
     const id = uid();
-    data.goals.push({ id, title, level: "long", parentId: null, dueDate: null, manualProgress: 0, priority });
+    data.categories.push({ id, title, priority });
     return id;
   };
-  const h = (title, goalId, frequency = "daily", extra = {}) => {
+  const h = (title, categoryId, frequency = "daily", extra = {}) => {
     data.habits.push({
-      id: uid(), title, goalId, history: {}, createdAt: new Date().toISOString(), frequency,
+      id: uid(), title, categoryId, history: {}, createdAt: new Date().toISOString(), frequency,
       routineOrder: extra.routineOrder ?? null,
       type: extra.type || "check"
     });
   };
-  const t = (title, goalId, dueDate, size = "klein") => {
-    data.tasks.push({ id: uid(), title, goalId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size });
+  const t = (title, categoryId, dueDate, size = "klein", priority = "normal") => {
+    data.tasks.push({ id: uid(), title, categoryId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source: "category" });
   };
   const s = (title) => { data.subjects.push({ id: uid(), title }); };
 
-  const glaube = g("Glaube", true);
+  const glaube = c("Glaube", true);
   h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
   h("Abendlektüre 30 Min. vor dem Schlafen", glaube, "daily", { routineOrder: 7 });
-  t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, "gross");
+  t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, "gross", "hoch");
 
-  const schule = g("Schule & Studium");
+  const schule = c("Schule");
   h("Lernen / Schularbeit 60–90 Min.", schule, "weekdays", { routineOrder: 6 });
-  t("Bewerbungen duales Studium abschicken", schule, "2026-07-13", "gross");
+  t("Bewerbungen duales Studium abschicken", schule, "2026-07-13", "gross", "hoch");
   t("Seminararbeit Physik in Filmen fertigstellen", schule, null, "gross");
   s("Englisch");
   s("Deutsch");
   s("BWL");
   s("Mathe");
 
-  const fitness = g("Fitness & Gesundheit");
-  h("Joggen 5,5 km", fitness, "daily", { routineOrder: 5 });
-  h("Ernährung im Rahmen (max. 2.000 kcal)", fitness, "daily", { routineOrder: 10 });
+  const gesundheit = c("Gesundheit");
+  h("Joggen 5,5 km", gesundheit, "daily", { routineOrder: 5 });
+  h("Ernährung im Rahmen (max. 2.000 kcal)", gesundheit, "daily", { routineOrder: 10 });
 
-  const struktur = g("Struktur & Routine");
-  h("Pünktlich aufstehen", struktur, "daily", { routineOrder: 1 });
-  h("Bett gemacht & Gewicht", struktur, "daily", { routineOrder: 2, type: "weight" });
-  h("Handy weglegen 21:30", struktur, "daily", { routineOrder: 8 });
-  h("Skin Care & Anziehen", struktur, "daily", { routineOrder: 3 });
+  const allgemein = c("Allgemein");
+  h("Pünktlich aufstehen", allgemein, "daily", { routineOrder: 1 });
+  h("Bett gemacht & Gewicht", allgemein, "daily", { routineOrder: 2, type: "weight" });
+  h("Handy weglegen 21:30", allgemein, "daily", { routineOrder: 8 });
+  h("Skin Care & Anziehen", allgemein, "daily", { routineOrder: 3 });
+  h("Tag im Griff", allgemein, "daily", { routineOrder: 9 });
 
-  const charakter = g("Charakter & Integrität");
-  h("Tag im Griff", charakter, "daily", { routineOrder: 9 });
+  const bildung = c("Bildung");
+  h("Lesen (ca. 1 Buch/Monat)", bildung, "daily");
+  t("Die Anatomie des menschlichen Körpers lesen", bildung, null, "gross");
 
-  const wissen = g("Wissen & Weiterbildung");
-  h("Lesen (ca. 1 Buch/Monat)", wissen, "daily");
+  c("Zukunft");
+  c("Beziehung");
 
   return data;
 }
@@ -89,9 +166,11 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    document.body.dataset.tab = btn.dataset.tab;
     renderAll();
   });
 });
+document.body.dataset.tab = "heute";
 
 document.getElementById("todayLabel").textContent = new Date().toLocaleDateString("de-DE", {
   weekday: "long", day: "2-digit", month: "long", year: "numeric"
@@ -112,30 +191,31 @@ function closeModal() {
 }
 overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
 
-// ---------- Goal helpers ----------
-function goalsByLevel(level, parentId) {
-  return state.goals.filter(g => g.level === level && (parentId === undefined || g.parentId === parentId));
+// ---------- Category helpers ----------
+function categoryById(id) {
+  return state.categories.find(c => c.id === id);
 }
-
-function tasksForGoal(goalId) {
-  return state.tasks.filter(t => t.goalId === goalId);
+function tasksForCategory(categoryId) {
+  return state.tasks.filter(t => t.categoryId === categoryId);
 }
-function habitsForGoal(goalId) {
-  return state.habits.filter(h => h.goalId === goalId);
+function habitsForCategory(categoryId) {
+  return state.habits.filter(h => h.categoryId === categoryId);
 }
-
-function goalById(id) {
-  return state.goals.find(g => g.id === id);
+function isPriority(categoryId) {
+  const cat = categoryById(categoryId);
+  return !!(cat && cat.priority);
 }
-
-// true if a linked goal (or any ancestor) is flagged priority
-function isPriority(goalId) {
-  let g = goalById(goalId);
-  while (g) {
-    if (g.priority) return true;
-    g = g.parentId ? goalById(g.parentId) : null;
+function categoryProgress(category) {
+  const tasks = tasksForCategory(category.id);
+  const habits = habitsForCategory(category.id);
+  const parts = [];
+  if (tasks.length) parts.push(tasks.filter(t => t.done).length / tasks.length);
+  if (habits.length) {
+    const rates = habits.map(h => habitCompletionRate(h));
+    parts.push(rates.reduce((a, b) => a + b, 0) / rates.length);
   }
-  return false;
+  if (parts.length === 0) return 0;
+  return parts.reduce((a, b) => a + b, 0) / parts.length;
 }
 
 function isScheduledToday(habit, dateObj = new Date()) {
@@ -160,201 +240,88 @@ function habitCompletionRate(habit, days = 30) {
   return total === 0 ? 0 : done / total;
 }
 
-function goalProgress(goal) {
-  const tasks = tasksForGoal(goal.id);
-  const habits = habitsForGoal(goal.id);
-  const parts = [];
-  if (tasks.length) parts.push(tasks.filter(t => t.done).length / tasks.length);
-  if (habits.length) {
-    const rates = habits.map(h => habitCompletionRate(h));
-    parts.push(rates.reduce((a, b) => a + b, 0) / rates.length);
+function computeStreak(habit) {
+  let streak = 0;
+  let d = new Date();
+  if (!habit.history[todayStr()] && isScheduledToday(habit, d)) {
+    d.setDate(d.getDate() - 1);
   }
-  const childLevel = goal.level === "long" ? "mid" : goal.level === "mid" ? "short" : null;
-  if (childLevel) {
-    const children = goalsByLevel(childLevel, goal.id);
-    if (children.length) {
-      const progresses = children.map(goalProgress);
-      parts.push(progresses.reduce((a, b) => a + b, 0) / progresses.length);
+  while (true) {
+    if (!isScheduledToday(habit, d)) {
+      d.setDate(d.getDate() - 1);
+      continue;
     }
+    const key = d.toISOString().slice(0, 10);
+    if (habit.history[key]) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else break;
   }
-  if (parts.length === 0) return goal.manualProgress || 0;
-  return parts.reduce((a, b) => a + b, 0) / parts.length;
+  return streak;
 }
 
-function allGoalsFlat() {
-  const result = [];
-  function walk(level, parentId, depth) {
-    goalsByLevel(level, parentId).forEach(g => {
-      result.push({ goal: g, depth });
-      if (g.level !== "short") walk(g.level === "long" ? "mid" : "short", g.id, depth + 1);
-    });
-  }
-  walk("long", null, 0);
-  return result;
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
 }
 
-// ---------- Rendering: Today ----------
-function renderToday() {
+const CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+const PENCIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1 10-10-3-3L5 16l-1 4z"/></svg>';
+
+// ---------- Rendering: ToDo ----------
+function renderTaskItem(t) {
   const today = todayStr();
-  const now = new Date();
+  const overdue = !t.done && t.dueDate && t.dueDate < today;
+  const category = categoryById(t.categoryId);
+  const el = document.createElement("div");
+  el.className = "item" + (t.done ? " done" : "");
+  el.innerHTML = `
+    <input type="checkbox" ${t.done ? "checked" : ""} data-task="${t.id}">
+    <div class="item-body">
+      <div class="item-title">${escapeHtml(t.title)}</div>
+      <div class="item-meta">${t.size === "gross" ? "Groß" : "Klein"}${t.dueDate ? " · fällig " + t.dueDate : ""}${t.dueTime ? " " + t.dueTime : ""}${category ? " · " + escapeHtml(category.title) : ""}</div>
+    </div>
+    ${t.priority === "hoch" ? '<span class="item-tag priority">Priorität</span>' : ""}
+    ${overdue ? '<span class="item-tag late">Überfällig</span>' : ""}
+    <button class="icon-btn" data-del-task="${t.id}">✕</button>
+  `;
+  return el;
+}
 
-  const taskWrap = document.getElementById("todayTasks");
-  const todaysTasks = state.tasks
-    .filter(t => t.dueDate === today || (!t.done && t.dueDate && t.dueDate < today))
-    .sort((a, b) => (a.dueTime || "99:99").localeCompare(b.dueTime || "99:99"));
+function renderTodo() {
+  const wrap = document.getElementById("todoList");
+  wrap.innerHTML = "";
 
-  taskWrap.innerHTML = "";
-  if (todaysTasks.length === 0) {
-    taskWrap.innerHTML = '<div class="empty-hint">Keine Aufgaben für heute. 🎉</div>';
-  }
-  todaysTasks.forEach(t => {
-    const overdue = !t.done && t.dueDate < today;
-    const priority = isPriority(t.goalId);
-    const el = document.createElement("div");
-    el.className = "item" + (t.done ? " done" : "");
-    el.innerHTML = `
-      <input type="checkbox" ${t.done ? "checked" : ""} data-task="${t.id}">
-      <div class="item-body">
-        <div class="item-title">${escapeHtml(t.title)}</div>
-        <div class="item-meta">${t.size === "gross" ? "🟦 groß" : "🟨 klein"} ${t.dueTime ? " · ⏰ " + t.dueTime : ""}${overdue ? " · überfällig seit " + t.dueDate : ""}</div>
-      </div>
-      ${priority ? '<span class="item-tag priority">★ Priorität</span>' : ""}
-      ${overdue ? '<span class="item-tag late">überfällig</span>' : ""}
-      <button class="icon-btn" data-del-task="${t.id}">✕</button>
-    `;
-    taskWrap.appendChild(el);
-  });
+  const todoTasks = state.tasks.filter(t => (t.source || "todo") !== "category");
 
-  // Tagesregel: 2 kleine oder 1 große Aufgabe pro Tag (offene Aufgaben mit Fälligkeit heute)
-  const openTodayTasks = state.tasks.filter(t => t.dueDate === today && !t.done);
+  const today = todayStr();
+  const openTodayTasks = todoTasks.filter(t => t.dueDate === today && !t.done);
   const budgetUsed = openTodayTasks.reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
   const ruleEl = document.getElementById("dayRule");
-  ruleEl.textContent = `Regel: 2 kleine oder 1 große Aufgabe/Tag · heute offen: ${openTodayTasks.length} (Budget ${budgetUsed}/2)`;
+  ruleEl.textContent = `Regel: 2 kleine oder 1 große Aufgabe/Tag · heute fällig: ${openTodayTasks.length} (Budget ${budgetUsed}/2)`;
   ruleEl.classList.toggle("over", budgetUsed > 2);
 
-  const habitWrap = document.getElementById("todayHabits");
-  habitWrap.innerHTML = "";
-  const dueHabits = state.habits.filter(h => isScheduledToday(h, now) && h.routineOrder == null);
-  if (dueHabits.length === 0) {
-    habitWrap.innerHTML = '<div class="empty-hint">Keine weiteren Gewohnheiten heute fällig.</div>';
-  }
-  dueHabits.forEach(h => {
-    const doneToday = !!h.history[today];
-    const streak = computeStreak(h);
-    const priority = isPriority(h.goalId);
-    const el = document.createElement("div");
-    el.className = "item" + (doneToday ? " done" : "");
-    el.innerHTML = `
-      <input type="checkbox" ${doneToday ? "checked" : ""} data-habit="${h.id}">
-      <div class="item-body">
-        <div class="item-title">${escapeHtml(h.title)}</div>
-        <div class="item-meta">${h.frequency === "weekdays" ? "Mo–Fr" : "täglich"}</div>
-      </div>
-      ${priority ? '<span class="item-tag priority">★</span>' : ""}
-      <span class="item-tag streak">🔥 ${streak}</span>
-      <button class="icon-btn" data-del-habit="${h.id}">✕</button>
-    `;
-    habitWrap.appendChild(el);
-  });
-}
+  const openTasks = todoTasks
+    .filter(t => !t.done)
+    .sort((a, b) => {
+      const ad = a.dueDate || "9999-99-99", bd = b.dueDate || "9999-99-99";
+      if (ad !== bd) return ad.localeCompare(bd);
+      const ap = a.priority === "hoch" ? 0 : 1;
+      const bp = b.priority === "hoch" ? 0 : 1;
+      return ap - bp;
+    });
+  const doneTasks = todoTasks.filter(t => t.done);
 
-// ---------- Tagesroutine-Kette, Lern-Rotation, Klassenarbeits-Modus, Arbeitsschichten ----------
-const LEARNING_ROUTINE_ORDER = 6;
-const SUBJECT_ROTATION_EPOCH = new Date(2026, 0, 1);
-
-function dateFromKey(key) {
-  return new Date(key + "T00:00:00");
-}
-
-function subjectOfDay(dateObj) {
-  if (!state.subjects.length) return null;
-  const diffDays = Math.floor((dateObj - SUBJECT_ROTATION_EPOCH) / 86400000);
-  const idx = ((diffDays % state.subjects.length) + state.subjects.length) % state.subjects.length;
-  return state.subjects[idx];
-}
-
-function examOverride(dateObj) {
-  const todayMidnight = dateFromKey(dateObj.toISOString().slice(0, 10));
-  const upcoming = state.exams
-    .map(e => ({ ...e, subject: state.subjects.find(s => s.id === e.subjectId) }))
-    .filter(e => e.subject)
-    .map(e => ({ ...e, daysUntil: Math.round((dateFromKey(e.date) - todayMidnight) / 86400000) }))
-    .filter(e => e.daysUntil >= 0 && e.daysUntil <= 4)
-    .sort((a, b) => a.daysUntil - b.daysUntil);
-  return upcoming[0] || null;
-}
-
-function renderRoutineChain() {
-  const wrap = document.getElementById("routineChain");
-  wrap.innerHTML = "";
-  const today = todayStr();
-  const now = new Date();
-
-  const chainHabits = state.habits
-    .filter(h => h.routineOrder != null && isScheduledToday(h, now))
-    .sort((a, b) => a.routineOrder - b.routineOrder);
-
-  if (chainHabits.length === 0) {
-    wrap.innerHTML = '<div class="empty-hint">Keine Routine-Schritte für heute konfiguriert.</div>';
+  if (openTasks.length === 0 && doneTasks.length === 0) {
+    wrap.innerHTML = '<div class="empty-hint">Noch keine Aufgaben angelegt.</div>';
     return;
   }
-
-  chainHabits.forEach((h, idx) => {
-    const rawValue = h.history[today];
-    const doneToday = h.type === "weight" ? (rawValue !== undefined && rawValue !== null) : !!rawValue;
-
-    let noteHtml = "";
-    if (h.routineOrder === LEARNING_ROUTINE_ORDER) {
-      const override = examOverride(now);
-      if (override) {
-        noteHtml = `<div class="routine-step-note">Ganztägig lernen für <strong>${escapeHtml(override.subject.title)}</strong> — Klassenarbeit am ${override.date}</div>`;
-      } else {
-        const subj = subjectOfDay(now);
-        if (subj) {
-          noteHtml = `<div class="routine-step-note">Heutiges Hauptfach: <strong>${escapeHtml(subj.title)}</strong></div>`;
-        }
-      }
-    }
-
-    const controlHtml = h.type === "weight"
-      ? `<input type="number" step="0.1" inputmode="decimal" class="routine-weight-input" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
-      : `<input type="checkbox" ${doneToday ? "checked" : ""} data-habit="${h.id}">`;
-
-    const el = document.createElement("div");
-    el.className = "routine-step" + (doneToday ? " done" : "");
-    el.innerHTML = `
-      <div class="routine-step-num">${idx + 1}</div>
-      <div class="routine-step-body">
-        <div class="item-title">${escapeHtml(h.title)}</div>
-        ${noteHtml}
-      </div>
-      ${controlHtml}
-    `;
-    wrap.appendChild(el);
-  });
+  openTasks.forEach(t => wrap.appendChild(renderTaskItem(t)));
+  doneTasks.forEach(t => wrap.appendChild(renderTaskItem(t)));
 }
 
-function shiftForDate(dateKey) {
-  return state.workShifts.find(s => s.date === dateKey) || null;
-}
-
-function renderWorkShiftBanner() {
-  const wrap = document.getElementById("workShiftBanner");
-  const shift = shiftForDate(todayStr());
-  if (!shift) {
-    wrap.innerHTML = `<button class="add-btn" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
-  } else {
-    wrap.innerHTML = `
-      <div class="day-rule shift-banner">
-        <span>💼 Arbeit heute: ${shift.start}–${shift.end}${shift.label ? " · " + escapeHtml(shift.label) : ""}</span>
-        <button class="icon-btn" data-del-shift="${shift.id}">✕</button>
-      </div>
-    `;
-  }
-  const addBtn = document.getElementById("addWorkShiftBtn");
-  if (addBtn) addBtn.addEventListener("click", () => openWorkShiftModal(todayStr()));
-}
-
+// ---------- Rendering: Heute (Wochenkreis, Abweichung, Routine, weitere Habits) ----------
 const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
 function mondayOfWeek(dateObj) {
@@ -395,127 +362,216 @@ function renderWeekCircle() {
   }
 }
 
-function computeStreak(habit) {
-  let streak = 0;
-  let d = new Date();
-  if (!habit.history[todayStr()] && isScheduledToday(habit, d)) {
-    d.setDate(d.getDate() - 1);
-  }
-  while (true) {
-    if (!isScheduledToday(habit, d)) {
-      d.setDate(d.getDate() - 1);
-      continue;
-    }
-    const key = d.toISOString().slice(0, 10);
-    if (habit.history[key]) {
-      streak++;
-      d.setDate(d.getDate() - 1);
-    } else break;
-  }
-  return streak;
+function renderDeviationLog() {
+  const listWrap = document.getElementById("deviationList");
+  const today = todayStr();
+  const todays = state.deviations.filter(d => d.date === today).sort((a, b) => a.time.localeCompare(b.time));
+  listWrap.innerHTML = todays.length
+    ? todays.map(d => `
+        <div class="deviation-entry">
+          <span class="deviation-time">${d.time}</span>
+          <span class="deviation-text">${escapeHtml(d.text)}</span>
+          <button class="icon-btn" data-del-deviation="${d.id}">✕</button>
+        </div>
+      `).join("")
+    : '<div class="empty-hint">Heute noch keine Abweichung eingetragen.</div>';
 }
 
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
+function addDeviation(text) {
+  if (!text.trim()) return;
+  const now = new Date();
+  state.deviations.push({
+    id: uid(),
+    date: todayStr(),
+    time: now.toTimeString().slice(0, 5),
+    text: text.trim()
+  });
+  saveData();
+  renderAll();
 }
 
-// ---------- Rendering: Goals ----------
-function renderGoals() {
-  const tree = document.getElementById("goalsTree");
-  tree.innerHTML = "";
-  const longGoals = goalsByLevel("long", null)
-    .slice()
-    .sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0));
-  if (longGoals.length === 0) {
-    tree.innerHTML = '<div class="empty-hint">Noch keine Ziele angelegt. Starte mit einem langfristigen Ziel.</div>';
-    return;
-  }
-  longGoals.forEach(lg => tree.appendChild(renderGoalCard(lg)));
+const LEARNING_ROUTINE_ORDER = 6;
+const SUBJECT_ROTATION_EPOCH = new Date(2026, 0, 1);
+
+function dateFromKey(key) {
+  return new Date(key + "T00:00:00");
 }
 
-function renderGoalCard(goal) {
-  const pct = Math.round(goalProgress(goal) * 100);
-  const wrap = document.createElement("div");
-  wrap.className = "goal-card " + goal.level;
-  const titleClass = goal.level === "mid" ? "mid-title" : goal.level === "short" ? "short-title" : "";
-  wrap.innerHTML = `
-    <div class="goal-head">
-      <div>
-        <div class="goal-title ${titleClass}">${levelIcon(goal.level)} ${escapeHtml(goal.title)} ${goal.priority ? '<span class="item-tag priority">★ Priorität 1</span>' : ""}</div>
-        ${goal.dueDate ? `<div class="goal-due">Zieltermin: ${goal.dueDate}</div>` : ""}
-      </div>
-      <div>
-        <button class="icon-btn" data-decompose-goal="${goal.id}" title="Schritte vorschlagen (Prompt kopieren)">🧩</button>
-        <button class="icon-btn" data-add-child="${goal.id}" title="Unterziel hinzufügen">${goal.level !== "short" ? "+" : ""}</button>
-        <button class="icon-btn" data-del-goal="${goal.id}">✕</button>
-      </div>
-    </div>
-    <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
-    <div class="progress-pct">${pct}% erledigt (30-Tage-Schnitt Habits, Aufgabenquote, Unterziele)</div>
-    <div class="goal-children" data-children-of="${goal.id}"></div>
-  `;
-  const childrenWrap = wrap.querySelector(`[data-children-of="${goal.id}"]`);
-  const childLevel = goal.level === "long" ? "mid" : goal.level === "mid" ? "short" : null;
-  if (childLevel) {
-    const children = goalsByLevel(childLevel, goal.id);
-    children.forEach(c => childrenWrap.appendChild(renderGoalCard(c)));
-  }
-  const tasks = tasksForGoal(goal.id);
-  const habits = habitsForGoal(goal.id);
-  if (tasks.length || habits.length) {
-    const info = document.createElement("div");
-    info.className = "small-text";
-    info.textContent = `${tasks.length} Aufgabe(n), ${habits.length} Gewohnheit(en) direkt verknüpft`;
-    childrenWrap.appendChild(info);
-  }
-  return wrap;
+function subjectOfDay(dateObj) {
+  if (!state.subjects.length) return null;
+  const diffDays = Math.floor((dateObj - SUBJECT_ROTATION_EPOCH) / 86400000);
+  const idx = ((diffDays % state.subjects.length) + state.subjects.length) % state.subjects.length;
+  return state.subjects[idx];
 }
 
-function levelIcon(level) {
-  return level === "long" ? "🏔️" : level === "mid" ? "🚩" : "✅";
+function examOverride(dateObj) {
+  const todayMidnight = dateFromKey(dateObj.toISOString().slice(0, 10));
+  const upcoming = state.exams
+    .map(e => ({ ...e, subject: state.subjects.find(s => s.id === e.subjectId) }))
+    .filter(e => e.subject)
+    .map(e => ({ ...e, daysUntil: Math.round((dateFromKey(e.date) - todayMidnight) / 86400000) }))
+    .filter(e => e.daysUntil >= 0 && e.daysUntil <= 4)
+    .sort((a, b) => a.daysUntil - b.daysUntil);
+  return upcoming[0] || null;
 }
 
-// ---------- Rendering: Habits tab ----------
-function renderHabitsTab() {
-  const wrap = document.getElementById("habitsList");
+function renderRoutineChain() {
+  const wrap = document.getElementById("routineChain");
   wrap.innerHTML = "";
-  if (state.habits.length === 0) {
-    wrap.innerHTML = '<div class="empty-hint">Noch keine Gewohnheiten angelegt.</div>';
+  const today = todayStr();
+  const now = new Date();
+
+  const chainHabits = state.habits
+    .filter(h => h.routineOrder != null && isScheduledToday(h, now))
+    .sort((a, b) => a.routineOrder - b.routineOrder);
+
+  if (chainHabits.length === 0) {
+    wrap.innerHTML = '<div class="empty-hint">Keine Routine-Schritte für heute konfiguriert.</div>';
     return;
   }
-  state.habits.forEach(h => {
-    const rate = Math.round(habitCompletionRate(h) * 100);
-    const streak = computeStreak(h);
-    const goal = goalById(h.goalId);
+
+  chainHabits.forEach(h => {
+    const rawValue = h.history[today];
+    const doneToday = h.type === "weight" ? (rawValue !== undefined && rawValue !== null) : !!rawValue;
+
+    let noteHtml = "";
+    if (h.routineOrder === LEARNING_ROUTINE_ORDER) {
+      const override = examOverride(now);
+      if (override) {
+        noteHtml = `<div class="routine-step-note">Ganztägig lernen für <strong>${escapeHtml(override.subject.title)}</strong> — Klassenarbeit am ${override.date}</div>`;
+      } else {
+        const subj = subjectOfDay(now);
+        if (subj) {
+          noteHtml = `<div class="routine-step-note">Heutiges Hauptfach: <strong>${escapeHtml(subj.title)}</strong></div>`;
+        }
+      }
+    }
+
+    const controlHtml = h.type === "weight"
+      ? `<input type="number" step="0.1" inputmode="decimal" class="routine-weight-input" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
+      : `<input type="checkbox" ${doneToday ? "checked" : ""} data-habit="${h.id}">`;
+
     const el = document.createElement("div");
-    el.className = "item";
+    el.className = "routine-step" + (doneToday ? " done" : "");
+    el.dataset.type = h.type;
     el.innerHTML = `
-      <div class="item-body">
+      <div class="routine-step-num">${h.type === "weight" ? PENCIL_ICON : CHECK_ICON}</div>
+      <div class="routine-step-body">
         <div class="item-title">${escapeHtml(h.title)}</div>
-        <div class="item-meta">${h.frequency === "weekdays" ? "Mo–Fr" : "täglich"} · 30-Tage-Rate: ${rate}% ${goal ? " · Ziel: " + escapeHtml(goal.title) : ""}</div>
+        ${noteHtml}
       </div>
-      <span class="item-tag streak">🔥 ${streak}</span>
-      <button class="icon-btn" data-del-habit="${h.id}">✕</button>
+      ${controlHtml}
     `;
     wrap.appendChild(el);
   });
 }
 
-// ---------- Rendering: Overview ----------
-function renderOverview() {
+function shiftForDate(dateKey) {
+  return state.workShifts.find(s => s.date === dateKey) || null;
+}
+
+function renderWorkShiftBanner() {
+  const wrap = document.getElementById("workShiftBanner");
+  const shift = shiftForDate(todayStr());
+  if (!shift) {
+    wrap.innerHTML = `<button class="add-btn" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
+  } else {
+    wrap.innerHTML = `
+      <div class="day-rule shift-banner">
+        <span>Arbeit heute: ${shift.start}–${shift.end}${shift.label ? " · " + escapeHtml(shift.label) : ""}</span>
+        <button class="icon-btn" data-del-shift="${shift.id}">✕</button>
+      </div>
+    `;
+  }
+  const addBtn = document.getElementById("addWorkShiftBtn");
+  if (addBtn) addBtn.addEventListener("click", () => openWorkShiftModal(todayStr()));
+}
+
+function renderOtherHabits() {
+  const habitWrap = document.getElementById("todayHabits");
+  habitWrap.innerHTML = "";
+  const now = new Date();
+  const dueHabits = state.habits.filter(h => isScheduledToday(h, now) && h.routineOrder == null);
+  const today = todayStr();
+  if (dueHabits.length === 0) {
+    habitWrap.innerHTML = '<div class="empty-hint">Keine weiteren Gewohnheiten heute fällig.</div>';
+  }
+  dueHabits.forEach(h => {
+    const doneToday = !!h.history[today];
+    const streak = computeStreak(h);
+    const priority = isPriority(h.categoryId);
+    const el = document.createElement("div");
+    el.className = "item" + (doneToday ? " done" : "");
+    el.innerHTML = `
+      <input type="checkbox" ${doneToday ? "checked" : ""} data-habit="${h.id}">
+      <div class="item-body">
+        <div class="item-title">${escapeHtml(h.title)}</div>
+        <div class="item-meta">${h.frequency === "weekdays" ? "Mo–Fr" : "täglich"} · Serie: ${streak}</div>
+      </div>
+      ${priority ? '<span class="item-tag priority">Priorität</span>' : ""}
+      <button class="icon-btn" data-del-habit="${h.id}">✕</button>
+    `;
+    habitWrap.appendChild(el);
+  });
+}
+
+// ---------- Rendering: Zielbereiche ----------
+function renderCategories() {
+  const tree = document.getElementById("categoriesList");
+  tree.innerHTML = "";
+  const sorted = state.categories.slice().sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0));
+  if (sorted.length === 0) {
+    tree.innerHTML = '<div class="empty-hint">Noch keine Zielbereiche angelegt.</div>';
+    return;
+  }
+  sorted.forEach(cat => tree.appendChild(renderCategoryCard(cat)));
+}
+
+function renderCategoryCard(category) {
+  const pct = Math.round(categoryProgress(category) * 100);
+  const tasks = tasksForCategory(category.id);
+  const habits = habitsForCategory(category.id);
+  const wrap = document.createElement("div");
+  wrap.className = "card category-card";
+  wrap.innerHTML = `
+    <div class="goal-head">
+      <div class="goal-title">${escapeHtml(category.title)} ${category.priority ? '<span class="item-tag priority">Priorität</span>' : ""}</div>
+      <div>
+        <button class="icon-btn" data-decompose-category="${category.id}" title="Aufgaben vorschlagen (Prompt kopieren)">···</button>
+        <button class="icon-btn" data-edit-category="${category.id}" title="Umbenennen">✎</button>
+        <button class="icon-btn" data-del-category="${category.id}">✕</button>
+      </div>
+    </div>
+    <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
+    <div class="progress-pct">${pct}% · ${tasks.length} Aufgabe(n), ${habits.length} Gewohnheit(en)</div>
+    <div class="list category-tasks" data-tasks-of="${category.id}"></div>
+    <button class="add-btn" data-add-task-category="${category.id}">+ Aufgabe in diesem Bereich</button>
+  `;
+  const tasksWrap = wrap.querySelector(`[data-tasks-of="${category.id}"]`);
+  if (tasks.length === 0) {
+    tasksWrap.innerHTML = '<div class="empty-hint">Noch keine Aufgaben in diesem Bereich.</div>';
+  } else {
+    tasks.forEach(t => tasksWrap.appendChild(renderTaskItem(t)));
+  }
+  return wrap;
+}
+
+function categoryOptionsHtml() {
+  return state.categories.map(cat => `<option value="${cat.id}">${escapeHtml(cat.title)}</option>`).join("");
+}
+
+// ---------- Rendering: Woche ----------
+function renderWeekStats() {
   const grid = document.getElementById("statsGrid");
   const totalTasks = state.tasks.length;
   const doneTasks = state.tasks.filter(t => t.done).length;
   const longestStreak = state.habits.reduce((max, h) => Math.max(max, computeStreak(h)), 0);
-  const activeGoals = state.goals.length;
 
   grid.innerHTML = `
-    <div class="stat-box"><div class="stat-num">${activeGoals}</div><div class="stat-label">Ziele gesamt</div></div>
+    <div class="stat-box"><div class="stat-num">${state.categories.length}</div><div class="stat-label">Zielbereiche</div></div>
     <div class="stat-box"><div class="stat-num">${doneTasks}/${totalTasks}</div><div class="stat-label">Aufgaben erledigt</div></div>
     <div class="stat-box"><div class="stat-num">${state.habits.length}</div><div class="stat-label">Gewohnheiten</div></div>
-    <div class="stat-box"><div class="stat-num">${longestStreak}</div><div class="stat-label">Längster Streak</div></div>
+    <div class="stat-box"><div class="stat-num">${longestStreak}</div><div class="stat-label">Längste Serie</div></div>
   `;
 
   const completed = state.tasks.filter(t => t.done && t.completedAt);
@@ -527,6 +583,7 @@ function renderOverview() {
     completed.length ? `${onTime} von ${completed.length} erledigten Aufgaben pünktlich (${pct}%)` : "Noch keine erledigten Aufgaben mit Termin.";
 
   renderLongTermStats();
+  renderReflection();
 }
 
 function habitStatsWindow(habit, days) {
@@ -592,6 +649,19 @@ function renderLongTermStats(days = 60) {
   `;
 }
 
+function weekStartKey(dateObj = new Date()) {
+  return mondayOfWeek(dateObj).toISOString().slice(0, 10);
+}
+
+function renderReflection() {
+  const textarea = document.getElementById("reflectionText");
+  const key = weekStartKey();
+  textarea.dataset.weekKey = key;
+  if (document.activeElement !== textarea) {
+    textarea.value = state.weeklyReflection[key] || "";
+  }
+}
+
 function isOnTime(task) {
   if (!task.completedAt) return true;
   if (!task.dueDate) return true;
@@ -603,13 +673,14 @@ function isOnTime(task) {
 // ---------- Render all ----------
 function renderAll() {
   renderWeekCircle();
+  renderDeviationLog();
   renderRoutineChain();
   renderWorkShiftBanner();
-  renderToday();
-  renderGoals();
-  renderHabitsTab();
+  renderOtherHabits();
+  renderTodo();
+  renderCategories();
   renderPlanning();
-  renderOverview();
+  renderWeekStats();
 }
 
 // ---------- Event delegation ----------
@@ -641,6 +712,11 @@ document.addEventListener("change", e => {
     saveData();
     renderAll();
   }
+  if (e.target.matches("#reflectionText")) {
+    const key = e.target.dataset.weekKey || weekStartKey();
+    state.weeklyReflection[key] = e.target.value;
+    saveData();
+  }
 });
 
 document.addEventListener("click", e => {
@@ -652,17 +728,18 @@ document.addEventListener("click", e => {
     state.habits = state.habits.filter(h => h.id !== e.target.dataset.delHabit);
     saveData(); renderAll();
   }
-  if (e.target.matches("[data-del-goal]")) {
-    removeGoalCascade(e.target.dataset.delGoal);
+  if (e.target.matches("[data-del-category]")) {
+    removeCategory(e.target.dataset.delCategory);
     saveData(); renderAll();
   }
-  if (e.target.matches("[data-add-child]")) {
-    const parent = state.goals.find(g => g.id === e.target.dataset.addChild);
-    const childLevel = parent.level === "long" ? "mid" : "short";
-    openGoalModal(childLevel, parent.id);
+  if (e.target.matches("[data-edit-category]")) {
+    openCategoryModal(categoryById(e.target.dataset.editCategory));
   }
-  if (e.target.matches("[data-decompose-goal]")) {
-    copyDecomposePrompt(e.target.dataset.decomposeGoal, e.target);
+  if (e.target.matches("[data-add-task-category]")) {
+    openTaskModal(e.target.dataset.addTaskCategory, "category");
+  }
+  if (e.target.matches("[data-decompose-category]")) {
+    copyDecomposePrompt(e.target.dataset.decomposeCategory, e.target);
   }
   if (e.target.matches("[data-del-shift]")) {
     state.workShifts = state.workShifts.filter(s => s.id !== e.target.dataset.delShift);
@@ -676,21 +753,24 @@ document.addEventListener("click", e => {
     state.exams = state.exams.filter(x => x.id !== e.target.dataset.delExam);
     saveData(); renderAll();
   }
+  if (e.target.matches("[data-del-deviation]")) {
+    state.deviations = state.deviations.filter(d => d.id !== e.target.dataset.delDeviation);
+    saveData(); renderAll();
+  }
 });
 
-// ---------- Projekt-Zerlegung: Copy-Prompt für Chat-Analyse ----------
-function buildDecomposePrompt(goal) {
-  const tasks = tasksForGoal(goal.id);
-  const habits = habitsForGoal(goal.id);
-  const pct = Math.round(goalProgress(goal) * 100);
+// ---------- Zielbereich-Zerlegung: Copy-Prompt für Chat-Analyse ----------
+function buildDecomposePrompt(category) {
+  const tasks = tasksForCategory(category.id);
+  const habits = habitsForCategory(category.id);
+  const pct = Math.round(categoryProgress(category) * 100);
 
-  let prompt = `Ich möchte mein Ziel "${goal.title}" (${levelLabel(goal.level)}) in konkrete, umsetzbare Teilschritte zerlegen.\n\n`;
+  let prompt = `Ich möchte im Zielbereich "${category.title}" konkrete, umsetzbare Aufgaben finden, die mich meinem Idealbild in diesem Bereich näherbringen.\n\n`;
   prompt += `Aktueller Fortschritt: ${pct}%\n`;
-  if (goal.dueDate) prompt += `Zieltermin: ${goal.dueDate}\n`;
-  if (goal.priority) prompt += `Priorität: Nr. 1\n`;
+  if (category.priority) prompt += `Priorität: ja\n`;
 
   if (tasks.length) {
-    prompt += `\nBereits verknüpfte Aufgaben:\n`;
+    prompt += `\nBereits vorhandene Aufgaben:\n`;
     tasks.forEach(t => { prompt += `- [${t.done ? "x" : " "}] ${t.title}${t.dueDate ? " (fällig " + t.dueDate + ")" : ""}\n`; });
   }
   if (habits.length) {
@@ -698,19 +778,19 @@ function buildDecomposePrompt(goal) {
     habits.forEach(h => { prompt += `- ${h.title} (${h.frequency === "weekdays" ? "Mo–Fr" : "täglich"})\n`; });
   }
 
-  prompt += `\nSchlag mir bitte 3-6 konkrete nächste Schritte (Aufgaben oder Gewohnheiten) vor, die ich in den Tracker eintragen kann, um dieses Ziel voranzubringen.`;
+  prompt += `\nSchlag mir bitte 3-6 konkrete neue Aufgaben oder Gewohnheiten für diesen Bereich vor.`;
   return prompt;
 }
 
-async function copyDecomposePrompt(goalId, btn) {
-  const goal = goalById(goalId);
-  if (!goal) return;
-  const prompt = buildDecomposePrompt(goal);
+async function copyDecomposePrompt(categoryId, btn) {
+  const category = categoryById(categoryId);
+  if (!category) return;
+  const prompt = buildDecomposePrompt(category);
   try {
     await navigator.clipboard.writeText(prompt);
-    flashButton(btn, "✅");
+    flashButton(btn, "✓");
   } catch (e) {
-    downloadText(prompt, `Zerlegen_${goal.title.replace(/[^a-z0-9]+/gi, "_")}.txt`);
+    downloadText(prompt, `Zielbereich_${category.title.replace(/[^a-z0-9]+/gi, "_")}.txt`);
   }
 }
 
@@ -732,62 +812,54 @@ function downloadText(text, filename) {
   URL.revokeObjectURL(url);
 }
 
-function removeGoalCascade(goalId) {
-  const children = state.goals.filter(g => g.parentId === goalId);
-  children.forEach(c => removeGoalCascade(c.id));
-  state.goals = state.goals.filter(g => g.id !== goalId);
-  state.tasks.forEach(t => { if (t.goalId === goalId) t.goalId = null; });
-  state.habits.forEach(h => { if (h.goalId === goalId) h.goalId = null; });
+function removeCategory(categoryId) {
+  state.categories = state.categories.filter(c => c.id !== categoryId);
+  state.tasks.forEach(t => { if (t.categoryId === categoryId) t.categoryId = null; });
+  state.habits.forEach(h => { if (h.categoryId === categoryId) h.categoryId = null; });
 }
 
 // ---------- Add buttons ----------
-document.getElementById("addGoalBtn").addEventListener("click", () => openGoalModal("long", null));
+document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal());
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
 document.getElementById("exportWeekBtn").addEventListener("click", exportWeekReview);
 document.getElementById("addSubjectBtn").addEventListener("click", () => openSubjectModal());
 document.getElementById("addExamBtn").addEventListener("click", () => openExamModal());
+document.getElementById("addDeviationBtn").addEventListener("click", () => {
+  const input = document.getElementById("deviationInput");
+  addDeviation(input.value);
+  input.value = "";
+});
 
-function levelLabel(level) {
-  return level === "long" ? "Langfristiges Ziel" : level === "mid" ? "Mittelfristiger Meilenstein" : "Kurzfristiges Ziel";
-}
-
-function goalOptionsHtml() {
-  return allGoalsFlat().map(({ goal, depth }) =>
-    `<option value="${goal.id}">${"　".repeat(depth)}${levelIcon(goal.level)} ${escapeHtml(goal.title)}</option>`
-  ).join("");
-}
-
-function openGoalModal(level, parentId) {
+function openCategoryModal(category) {
+  const isEdit = !!category;
   openModal(`
-    <h3>${levelLabel(level)} hinzufügen</h3>
+    <h3>${isEdit ? "Bereich bearbeiten" : "Zielbereich hinzufügen"}</h3>
     <div class="field">
       <label>Titel</label>
-      <input type="text" id="mGoalTitle" placeholder="z.B. Marathon laufen">
+      <input type="text" id="mCategoryTitle" value="${isEdit ? escapeHtml(category.title) : ""}" placeholder="z.B. Kreativität">
     </div>
-    <div class="field">
-      <label>Zieltermin (optional)</label>
-      <input type="date" id="mGoalDate">
-    </div>
-    ${level === "long" ? `
     <div class="checkbox-row">
-      <input type="checkbox" id="mGoalPriority">
-      <label for="mGoalPriority">Priorität Nr. 1 (steht in der Zielübersicht oben)</label>
-    </div>` : ""}
+      <input type="checkbox" id="mCategoryPriority" ${isEdit && category.priority ? "checked" : ""}>
+      <label for="mCategoryPriority">Priorität (wird hervorgehoben)</label>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
       <button class="btn btn-primary" id="mSave">Speichern</button>
     </div>
   `, body => {
-    body.querySelector("#mGoalTitle").focus();
+    body.querySelector("#mCategoryTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mGoalTitle").value.trim();
+      const title = body.querySelector("#mCategoryTitle").value.trim();
       if (!title) return;
-      const dueDate = body.querySelector("#mGoalDate").value || null;
-      const priorityEl = body.querySelector("#mGoalPriority");
-      const priority = priorityEl ? priorityEl.checked : false;
-      state.goals.push({ id: uid(), title, level, parentId, dueDate, manualProgress: 0, priority });
+      const priority = body.querySelector("#mCategoryPriority").checked;
+      if (isEdit) {
+        category.title = title;
+        category.priority = priority;
+      } else {
+        state.categories.push({ id: uid(), title, priority });
+      }
       saveData();
       closeModal();
       renderAll();
@@ -795,9 +867,10 @@ function openGoalModal(level, parentId) {
   });
 }
 
-function openTaskModal() {
+function openTaskModal(defaultCategoryId, source = "todo") {
+  const category = defaultCategoryId ? categoryById(defaultCategoryId) : null;
   openModal(`
-    <h3>Aufgabe hinzufügen</h3>
+    <h3>${source === "category" ? "Aufgabe in " + escapeHtml(category ? category.title : "Bereich") : "Aufgabe hinzufügen"}</h3>
     <div class="field">
       <label>Titel</label>
       <input type="text" id="mTaskTitle" placeholder="z.B. Bericht abschicken">
@@ -818,12 +891,20 @@ function openTaskModal() {
       </select>
     </div>
     <div class="field">
-      <label>Verknüpftes Ziel (optional)</label>
-      <select id="mTaskGoal">
-        <option value="">– keins –</option>
-        ${goalOptionsHtml()}
+      <label>Priorität</label>
+      <select id="mTaskPriority">
+        <option value="normal">normal</option>
+        <option value="hoch">hoch</option>
       </select>
     </div>
+    ${source === "category" ? "" : `
+    <div class="field">
+      <label>Zielbereich (optional, ordnet die Aufgabe zusätzlich dort ein)</label>
+      <select id="mTaskCategory">
+        <option value="">– keiner –</option>
+        ${categoryOptionsHtml()}
+      </select>
+    </div>`}
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
       <button class="btn btn-primary" id="mSave">Speichern</button>
@@ -837,8 +918,10 @@ function openTaskModal() {
       const dueDate = body.querySelector("#mTaskDate").value || null;
       const dueTime = body.querySelector("#mTaskTime").value || null;
       const size = body.querySelector("#mTaskSize").value;
-      const goalId = body.querySelector("#mTaskGoal").value || null;
-      state.tasks.push({ id: uid(), title, dueDate, dueTime, goalId, done: false, completedAt: null, createdAt: new Date().toISOString(), size });
+      const priority = body.querySelector("#mTaskPriority").value;
+      const categorySelect = body.querySelector("#mTaskCategory");
+      const categoryId = source === "category" ? defaultCategoryId : (categorySelect ? categorySelect.value || null : null);
+      state.tasks.push({ id: uid(), title, dueDate, dueTime, categoryId, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source });
       saveData();
       closeModal();
       renderAll();
@@ -861,10 +944,10 @@ function openHabitModal() {
       </select>
     </div>
     <div class="field">
-      <label>Verknüpftes Ziel (optional)</label>
-      <select id="mHabitGoal">
-        <option value="">– keins –</option>
-        ${goalOptionsHtml()}
+      <label>Zielbereich (optional)</label>
+      <select id="mHabitCategory">
+        <option value="">– keiner –</option>
+        ${categoryOptionsHtml()}
       </select>
     </div>
     <div class="modal-actions">
@@ -877,9 +960,9 @@ function openHabitModal() {
     body.querySelector("#mSave").addEventListener("click", () => {
       const title = body.querySelector("#mHabitTitle").value.trim();
       if (!title) return;
-      const goalId = body.querySelector("#mHabitGoal").value || null;
+      const categoryId = body.querySelector("#mHabitCategory").value || null;
       const frequency = body.querySelector("#mHabitFrequency").value;
-      state.habits.push({ id: uid(), title, goalId, history: {}, createdAt: new Date().toISOString(), frequency });
+      state.habits.push({ id: uid(), title, categoryId, history: {}, createdAt: new Date().toISOString(), frequency, routineOrder: null, type: "check" });
       saveData();
       closeModal();
       renderAll();
@@ -1052,6 +1135,18 @@ function exportWeekReview() {
   md += `# Wochenrückblick ${fmt(start)} bis ${fmt(end)}\n\n`;
   md += `> Vollständiger Export inkl. Rohdaten — zum Ablegen im Vault oder zum Einfügen in den Chat mit Claude für eine individuelle Analyse.\n\n`;
 
+  const weekKey = weekStartKey(end);
+  if (state.weeklyReflection[weekKey]) {
+    md += `## Reflexion\n${state.weeklyReflection[weekKey]}\n\n`;
+  }
+
+  const weekDeviations = state.deviations.filter(d => d.date >= fmt(start) && d.date <= fmt(end));
+  if (weekDeviations.length) {
+    md += `## Abweichungen vom Plan\n`;
+    weekDeviations.forEach(d => { md += `- ${d.date} ${d.time}: ${d.text}\n`; });
+    md += `\n`;
+  }
+
   md += `## Gewohnheiten (letzte 7 Tage)\n`;
   state.habits.forEach(h => {
     let doneCount = 0, scheduledCount = 0;
@@ -1063,7 +1158,7 @@ function exportWeekReview() {
       if (h.history[fmt(d)]) doneCount++;
     }
     const streak = computeStreak(h);
-    md += `- **${h.title}**: ${doneCount}/${scheduledCount} Tage · Streak: ${streak} 🔥\n`;
+    md += `- **${h.title}**: ${doneCount}/${scheduledCount} Tage · Serie: ${streak}\n`;
   });
 
   md += `\n## Aufgaben (letzte 7 Tage)\n`;
@@ -1076,9 +1171,9 @@ function exportWeekReview() {
     md += `  - [${t.done ? "x" : " "}] ${t.title} (fällig ${t.dueDate})\n`;
   });
 
-  md += `\n## Zielfortschritt\n`;
-  goalsByLevel("long", null).forEach(g => {
-    md += `- **${g.title}**${g.priority ? " ★" : ""}: ${Math.round(goalProgress(g) * 100)}%\n`;
+  md += `\n## Zielbereiche\n`;
+  state.categories.forEach(cat => {
+    md += `- **${cat.title}**${cat.priority ? " (Priorität)" : ""}: ${Math.round(categoryProgress(cat) * 100)}%\n`;
   });
 
   md += `\n## Langzeit-Auswertung (letzte ${longTermDays} Tage)\n`;
