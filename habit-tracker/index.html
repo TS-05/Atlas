@@ -28,6 +28,11 @@
         <h2>Wochenkreis</h2>
         <div id="weekCircle" class="week-circle"></div>
       </div>
+      <div id="workShiftBanner" class="work-shift-wrap"></div>
+      <div class="card routine-card">
+        <h2>Tagesroutine</h2>
+        <div id="routineChain" class="routine-chain"></div>
+      </div>
       <div class="panel-grid">
         <div class="card">
           <h2>Aufgaben heute</h2>
@@ -36,7 +41,7 @@
           <button class="add-btn" id="addTaskBtn">+ Aufgabe hinzufügen</button>
         </div>
         <div class="card">
-          <h2>Gewohnheiten heute</h2>
+          <h2>Weitere Gewohnheiten</h2>
           <div id="todayHabits" class="list"></div>
           <button class="add-btn" id="addHabitBtn">+ Gewohnheit hinzufügen</button>
         </div>
@@ -57,6 +62,24 @@
     <section id="tab-habits" class="tab-panel">
       <h2>Alle Gewohnheiten &amp; Streaks</h2>
       <div id="habitsList" class="list"></div>
+
+      <div class="card planning-card">
+        <h3>Fächer</h3>
+        <div id="subjectsList" class="list"></div>
+        <button class="add-btn" id="addSubjectBtn">+ Fach hinzufügen</button>
+      </div>
+
+      <div class="card planning-card">
+        <h3>Klassenarbeiten</h3>
+        <div id="examsList" class="list"></div>
+        <button class="add-btn" id="addExamBtn">+ Klassenarbeit eintragen</button>
+      </div>
+
+      <div class="card planning-card">
+        <h3>Arbeitsschichten</h3>
+        <p class="small-text">Kein Zugriff auf deinen Kalender möglich — Schichten trägst du hier oder direkt auf "Heute" ein.</p>
+        <div id="shiftsList" class="list"></div>
+      </div>
     </section>
 
     <!-- ÜBERSICHT -->

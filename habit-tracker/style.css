@@ -329,3 +329,59 @@ body {
 }
 .week-circle-label { font-size: 0.7rem; color: var(--text-dim); }
 .week-circle-day.is-today .week-circle-label { color: var(--accent); font-weight: 600; }
+
+/* ---------- Tagesroutine-Kette ---------- */
+.routine-card { margin-bottom: 16px; }
+.routine-chain { display: flex; flex-direction: column; }
+.routine-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 4px 22px 0;
+}
+.routine-step:last-child { padding-bottom: 4px; }
+.routine-step-num {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  position: relative;
+  z-index: 1;
+}
+.routine-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 30px;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+.routine-step.done .routine-step-num { background: var(--accent); border-color: var(--accent); color: #10121a; }
+.routine-step-body { flex: 1; min-width: 0; padding-top: 2px; }
+.routine-step.done .item-title { text-decoration: line-through; opacity: 0.6; }
+.routine-step-note { font-size: 0.76rem; color: var(--text-dim); margin-top: 2px; }
+.routine-step input[type="checkbox"] {
+  width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer; margin-top: 2px;
+}
+.routine-weight-input {
+  width: 72px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+/* ---------- Arbeitsschicht-Banner ---------- */
+.work-shift-wrap { margin-bottom: 16px; }
+.shift-banner { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0; }
+
+.planning-card { margin-top: 16px; }
