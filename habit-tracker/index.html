@@ -4,13 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Atlas</title>
-<meta name="theme-color" content="#0a0b0d">
+<meta name="theme-color" content="#0a0906">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Atlas">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -23,45 +26,57 @@
 
   <main>
     <!-- HEUTE -->
-    <section id="tab-today" class="tab-panel active">
+    <section id="tab-heute" class="tab-panel active">
       <div class="card week-circle-card">
         <h2>Wochenkreis</h2>
         <div id="weekCircle" class="week-circle"></div>
       </div>
+
+      <div class="card deviation-card">
+        <h2>Abweichung vom Plan</h2>
+        <p class="hint">Wenn du heute etwas anderes gemacht hast als geplant, halte es hier kurz fest.</p>
+        <div class="deviation-input-row">
+          <input type="text" id="deviationInput" placeholder="z.B. länger gearbeitet, Termin dazwischengekommen …">
+          <button class="btn btn-primary" id="addDeviationBtn">Eintragen</button>
+        </div>
+        <div id="deviationList" class="deviation-list"></div>
+      </div>
+
       <div id="workShiftBanner" class="work-shift-wrap"></div>
+
       <div class="card routine-card">
         <h2>Tagesroutine</h2>
-        <div id="routineChain" class="routine-chain"></div>
+        <div class="routine-rope-layout">
+          <div class="routine-rope"></div>
+          <div id="routineChain" class="routine-chain"></div>
+        </div>
       </div>
-      <div class="panel-grid">
-        <div class="card">
-          <h2>Aufgaben heute</h2>
-          <div id="dayRule" class="day-rule"></div>
-          <div id="todayTasks" class="list"></div>
-          <button class="add-btn" id="addTaskBtn">+ Aufgabe hinzufügen</button>
-        </div>
-        <div class="card">
-          <h2>Weitere Gewohnheiten</h2>
-          <div id="todayHabits" class="list"></div>
-          <button class="add-btn" id="addHabitBtn">+ Gewohnheit hinzufügen</button>
-        </div>
+
+      <div class="card">
+        <h2>Weitere Gewohnheiten</h2>
+        <div id="todayHabits" class="list"></div>
+        <button class="add-btn" id="addHabitBtn">+ Gewohnheit hinzufügen</button>
       </div>
     </section>
 
-    <!-- ZIELE -->
-    <section id="tab-goals" class="tab-panel">
+    <!-- TODO -->
+    <section id="tab-todo" class="tab-panel">
       <div class="goals-header">
-        <h2>Ziel-Hierarchie</h2>
-        <button class="add-btn" id="addGoalBtn">+ Neues Ziel</button>
+        <h2>ToDo</h2>
+        <button class="add-btn" id="addTaskBtn">+ Aufgabe hinzufügen</button>
       </div>
-      <p class="hint">Langfristige Ziele bestehen aus mittelfristigen Meilensteinen, die wiederum aus kurzfristigen Aufgaben/Gewohnheiten bestehen. Fortschritt wird automatisch von unten nach oben berechnet.</p>
-      <div id="goalsTree" class="goals-tree"></div>
+      <div id="dayRule" class="day-rule"></div>
+      <div id="todoList" class="list"></div>
     </section>
 
-    <!-- HABITS -->
-    <section id="tab-habits" class="tab-panel">
-      <h2>Alle Gewohnheiten &amp; Streaks</h2>
-      <div id="habitsList" class="list"></div>
+    <!-- ZIELBEREICHE -->
+    <section id="tab-zielbereiche" class="tab-panel">
+      <div class="goals-header">
+        <h2>Zielbereiche</h2>
+        <button class="add-btn" id="addCategoryBtn">+ Bereich hinzufügen</button>
+      </div>
+      <p class="hint">Jeder Bereich enthält Aufgaben, die dich deinem Idealbild in diesem Lebensbereich näherbringen.</p>
+      <div id="categoriesList" class="goals-tree"></div>
 
       <div class="card planning-card">
         <h3>Fächer</h3>
@@ -77,14 +92,14 @@
 
       <div class="card planning-card">
         <h3>Arbeitsschichten</h3>
-        <p class="small-text">Kein Zugriff auf deinen Kalender möglich — Schichten trägst du hier oder direkt auf "Heute" ein.</p>
+        <p class="small-text">Kein Zugriff auf deinen Kalender möglich — Schichten trägst du hier oder direkt im "Heute"-Tab ein.</p>
         <div id="shiftsList" class="list"></div>
       </div>
     </section>
 
-    <!-- ÜBERSICHT -->
-    <section id="tab-overview" class="tab-panel">
-      <h2>Übersicht</h2>
+    <!-- WOCHE -->
+    <section id="tab-woche" class="tab-panel">
+      <h2>Woche</h2>
       <div class="stats-grid" id="statsGrid"></div>
       <div class="card">
         <h3>Langzeit-Auswertung (60 Tage)</h3>
@@ -96,29 +111,33 @@
         <div id="punctualityText" class="small-text"></div>
       </div>
       <div class="card">
+        <h3>Reflexion dieser Woche</h3>
+        <textarea id="reflectionText" class="reflection-textarea" placeholder="Wie lief die Woche? Was nimmst du mit?"></textarea>
+      </div>
+      <div class="card">
         <h3>Wochenrückblick &amp; vollständiger Datenexport</h3>
-        <p class="small-text">Erstellt eine Obsidian-kompatible Markdown-Datei mit Wochenstatistik (7 Tage), Langzeit-Auswertung (60 Tage) und allen Rohdaten (Ziele, Aufgaben, komplette Habit-Historie als JSON). Direkt ablegbar im Vault-Ordner <code>30_Projekte/Wochenrueckblicke</code> oder zum Einfügen in den Chat, wenn du eine individuelle Analyse von Claude möchtest.</p>
-        <button class="add-btn" id="exportWeekBtn">📤 Vollständigen Export herunterladen (.md)</button>
+        <p class="small-text">Lädt eine Obsidian-kompatible Markdown-Datei mit Wochenstatistik, Langzeit-Auswertung, Reflexion, Abweichungs-Log und allen Rohdaten herunter — zum Ablegen im Vault-Ordner <code>30_Projekte/Wochenrueckblicke</code> oder zum Einfügen in den Chat.</p>
+        <button class="add-btn" id="exportWeekBtn">Vollständigen Export herunterladen</button>
       </div>
     </section>
   </main>
 
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="today">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/></svg>
+    <button class="tab-btn active" data-tab="heute">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/></svg>
       <span>Heute</span>
     </button>
-    <button class="tab-btn" data-tab="goals">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>
-      <span>Ziele</span>
+    <button class="tab-btn" data-tab="todo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6l.75.75L6.5 5.5"/><path d="M4.5 12l.75.75 1.25-1.25"/><path d="M4.5 18l.75.75 1.25-1.25"/></svg>
+      <span>ToDo</span>
     </button>
-    <button class="tab-btn" data-tab="habits">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 4v3h-3M6 20v-3h3"/></svg>
-      <span>Habits</span>
+    <button class="tab-btn" data-tab="zielbereiche">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>
+      <span>Bereiche</span>
     </button>
-    <button class="tab-btn" data-tab="overview">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V10M12 19V5M19 19v-7"/></svg>
-      <span>Übersicht</span>
+    <button class="tab-btn" data-tab="woche">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V10M12 19V5M19 19v-7"/></svg>
+      <span>Woche</span>
     </button>
   </nav>
 </div>
