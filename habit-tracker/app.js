@@ -71,7 +71,8 @@ function migrateGoalsToCategories(data) {
     if (!categoryId) return;
     data.tasks.push({
       id: uid(), title: g.title, categoryId, dueDate: g.dueDate || null, dueTime: null,
-      done: false, completedAt: null, createdAt: new Date().toISOString(), size: "klein", priority: "normal"
+      done: false, completedAt: null, createdAt: new Date().toISOString(), size: "klein", priority: "normal",
+      source: "category"
     });
   });
 
@@ -81,6 +82,7 @@ function migrateGoalsToCategories(data) {
     t.categoryId = g ? categoryIdForGoal(g) : null;
     delete t.goalId;
     if (t.priority === undefined) t.priority = "normal";
+    if (t.source === undefined) t.source = "category";
   });
 
   (data.habits || []).forEach(h => {
@@ -118,7 +120,7 @@ function seedData() {
     });
   };
   const t = (title, categoryId, dueDate, size = "klein", priority = "normal") => {
-    data.tasks.push({ id: uid(), title, categoryId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority });
+    data.tasks.push({ id: uid(), title, categoryId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source: "category" });
   };
   const s = (title) => { data.subjects.push({ id: uid(), title }); };
 
@@ -291,14 +293,16 @@ function renderTodo() {
   const wrap = document.getElementById("todoList");
   wrap.innerHTML = "";
 
+  const todoTasks = state.tasks.filter(t => (t.source || "todo") !== "category");
+
   const today = todayStr();
-  const openTodayTasks = state.tasks.filter(t => t.dueDate === today && !t.done);
+  const openTodayTasks = todoTasks.filter(t => t.dueDate === today && !t.done);
   const budgetUsed = openTodayTasks.reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
   const ruleEl = document.getElementById("dayRule");
   ruleEl.textContent = `Regel: 2 kleine oder 1 große Aufgabe/Tag · heute fällig: ${openTodayTasks.length} (Budget ${budgetUsed}/2)`;
   ruleEl.classList.toggle("over", budgetUsed > 2);
 
-  const openTasks = state.tasks
+  const openTasks = todoTasks
     .filter(t => !t.done)
     .sort((a, b) => {
       const ad = a.dueDate || "9999-99-99", bd = b.dueDate || "9999-99-99";
@@ -307,7 +311,7 @@ function renderTodo() {
       const bp = b.priority === "hoch" ? 0 : 1;
       return ap - bp;
     });
-  const doneTasks = state.tasks.filter(t => t.done);
+  const doneTasks = todoTasks.filter(t => t.done);
 
   if (openTasks.length === 0 && doneTasks.length === 0) {
     wrap.innerHTML = '<div class="empty-hint">Noch keine Aufgaben angelegt.</div>';
@@ -732,7 +736,7 @@ document.addEventListener("click", e => {
     openCategoryModal(categoryById(e.target.dataset.editCategory));
   }
   if (e.target.matches("[data-add-task-category]")) {
-    openTaskModal(e.target.dataset.addTaskCategory);
+    openTaskModal(e.target.dataset.addTaskCategory, "category");
   }
   if (e.target.matches("[data-decompose-category]")) {
     copyDecomposePrompt(e.target.dataset.decomposeCategory, e.target);
@@ -863,9 +867,10 @@ function openCategoryModal(category) {
   });
 }
 
-function openTaskModal(defaultCategoryId) {
+function openTaskModal(defaultCategoryId, source = "todo") {
+  const category = defaultCategoryId ? categoryById(defaultCategoryId) : null;
   openModal(`
-    <h3>Aufgabe hinzufügen</h3>
+    <h3>${source === "category" ? "Aufgabe in " + escapeHtml(category ? category.title : "Bereich") : "Aufgabe hinzufügen"}</h3>
     <div class="field">
       <label>Titel</label>
       <input type="text" id="mTaskTitle" placeholder="z.B. Bericht abschicken">
@@ -892,20 +897,20 @@ function openTaskModal(defaultCategoryId) {
         <option value="hoch">hoch</option>
       </select>
     </div>
+    ${source === "category" ? "" : `
     <div class="field">
-      <label>Zielbereich (optional)</label>
+      <label>Zielbereich (optional, ordnet die Aufgabe zusätzlich dort ein)</label>
       <select id="mTaskCategory">
         <option value="">– keiner –</option>
         ${categoryOptionsHtml()}
       </select>
-    </div>
+    </div>`}
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
       <button class="btn btn-primary" id="mSave">Speichern</button>
     </div>
   `, body => {
     body.querySelector("#mTaskTitle").focus();
-    if (defaultCategoryId) body.querySelector("#mTaskCategory").value = defaultCategoryId;
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     body.querySelector("#mSave").addEventListener("click", () => {
       const title = body.querySelector("#mTaskTitle").value.trim();
@@ -914,8 +919,9 @@ function openTaskModal(defaultCategoryId) {
       const dueTime = body.querySelector("#mTaskTime").value || null;
       const size = body.querySelector("#mTaskSize").value;
       const priority = body.querySelector("#mTaskPriority").value;
-      const categoryId = body.querySelector("#mTaskCategory").value || null;
-      state.tasks.push({ id: uid(), title, dueDate, dueTime, categoryId, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority });
+      const categorySelect = body.querySelector("#mTaskCategory");
+      const categoryId = source === "category" ? defaultCategoryId : (categorySelect ? categorySelect.value || null : null);
+      state.tasks.push({ id: uid(), title, dueDate, dueTime, categoryId, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source });
       saveData();
       closeModal();
       renderAll();
