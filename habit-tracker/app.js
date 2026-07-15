@@ -14,6 +14,9 @@ function saveData() {
 }
 
 let state = loadData();
+state.subjects = state.subjects || [];
+state.exams = state.exams || [];
+state.workShifts = state.workShifts || [];
 saveData();
 
 function uid() {
@@ -28,39 +31,50 @@ function todayStr(offsetDays = 0) {
 
 // ---------- Seed data (aus Obsidian-Vault: Ziele.md, Präferenzen.md, Habit_und_Zielsystem.md) ----------
 function seedData() {
-  const data = { goals: [], tasks: [], habits: [] };
+  const data = { goals: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [] };
   const g = (title, priority = false) => {
     const id = uid();
     data.goals.push({ id, title, level: "long", parentId: null, dueDate: null, manualProgress: 0, priority });
     return id;
   };
-  const h = (title, goalId, frequency = "daily") => {
-    data.habits.push({ id: uid(), title, goalId, history: {}, createdAt: new Date().toISOString(), frequency });
+  const h = (title, goalId, frequency = "daily", extra = {}) => {
+    data.habits.push({
+      id: uid(), title, goalId, history: {}, createdAt: new Date().toISOString(), frequency,
+      routineOrder: extra.routineOrder ?? null,
+      type: extra.type || "check"
+    });
   };
   const t = (title, goalId, dueDate, size = "klein") => {
     data.tasks.push({ id: uid(), title, goalId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size });
   };
+  const s = (title) => { data.subjects.push({ id: uid(), title }); };
 
   const glaube = g("Glaube", true);
-  h("Bibellese / stille Zeit", glaube, "daily");
-  h("Abendlektüre 30 Min. vor dem Schlafen", glaube, "daily");
+  h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
+  h("Abendlektüre 30 Min. vor dem Schlafen", glaube, "daily", { routineOrder: 7 });
   t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, "gross");
 
   const schule = g("Schule & Studium");
-  h("Lernen / Schularbeit 60–90 Min.", schule, "weekdays");
+  h("Lernen / Schularbeit 60–90 Min.", schule, "weekdays", { routineOrder: 6 });
   t("Bewerbungen duales Studium abschicken", schule, "2026-07-13", "gross");
   t("Seminararbeit Physik in Filmen fertigstellen", schule, null, "gross");
+  s("Englisch");
+  s("Deutsch");
+  s("BWL");
+  s("Mathe");
 
   const fitness = g("Fitness & Gesundheit");
-  h("Joggen 5,5 km", fitness, "daily");
-  h("Ernährung im Rahmen (max. 2.000 kcal)", fitness, "daily");
+  h("Joggen 5,5 km", fitness, "daily", { routineOrder: 5 });
+  h("Ernährung im Rahmen (max. 2.000 kcal)", fitness, "daily", { routineOrder: 10 });
 
   const struktur = g("Struktur & Routine");
-  h("Handy weglegen 21:30", struktur, "daily");
-  h("Skin Care", struktur, "daily");
+  h("Pünktlich aufstehen", struktur, "daily", { routineOrder: 1 });
+  h("Bett gemacht & Gewicht", struktur, "daily", { routineOrder: 2, type: "weight" });
+  h("Handy weglegen 21:30", struktur, "daily", { routineOrder: 8 });
+  h("Skin Care & Anziehen", struktur, "daily", { routineOrder: 3 });
 
   const charakter = g("Charakter & Integrität");
-  h("Tag im Griff", charakter, "daily");
+  h("Tag im Griff", charakter, "daily", { routineOrder: 9 });
 
   const wissen = g("Wissen & Weiterbildung");
   h("Lesen (ca. 1 Buch/Monat)", wissen, "daily");
@@ -220,9 +234,9 @@ function renderToday() {
 
   const habitWrap = document.getElementById("todayHabits");
   habitWrap.innerHTML = "";
-  const dueHabits = state.habits.filter(h => isScheduledToday(h, now));
+  const dueHabits = state.habits.filter(h => isScheduledToday(h, now) && h.routineOrder == null);
   if (dueHabits.length === 0) {
-    habitWrap.innerHTML = '<div class="empty-hint">Heute sind keine Gewohnheiten fällig.</div>';
+    habitWrap.innerHTML = '<div class="empty-hint">Keine weiteren Gewohnheiten heute fällig.</div>';
   }
   dueHabits.forEach(h => {
     const doneToday = !!h.history[today];
@@ -242,6 +256,103 @@ function renderToday() {
     `;
     habitWrap.appendChild(el);
   });
+}
+
+// ---------- Tagesroutine-Kette, Lern-Rotation, Klassenarbeits-Modus, Arbeitsschichten ----------
+const LEARNING_ROUTINE_ORDER = 6;
+const SUBJECT_ROTATION_EPOCH = new Date(2026, 0, 1);
+
+function dateFromKey(key) {
+  return new Date(key + "T00:00:00");
+}
+
+function subjectOfDay(dateObj) {
+  if (!state.subjects.length) return null;
+  const diffDays = Math.floor((dateObj - SUBJECT_ROTATION_EPOCH) / 86400000);
+  const idx = ((diffDays % state.subjects.length) + state.subjects.length) % state.subjects.length;
+  return state.subjects[idx];
+}
+
+function examOverride(dateObj) {
+  const todayMidnight = dateFromKey(dateObj.toISOString().slice(0, 10));
+  const upcoming = state.exams
+    .map(e => ({ ...e, subject: state.subjects.find(s => s.id === e.subjectId) }))
+    .filter(e => e.subject)
+    .map(e => ({ ...e, daysUntil: Math.round((dateFromKey(e.date) - todayMidnight) / 86400000) }))
+    .filter(e => e.daysUntil >= 0 && e.daysUntil <= 4)
+    .sort((a, b) => a.daysUntil - b.daysUntil);
+  return upcoming[0] || null;
+}
+
+function renderRoutineChain() {
+  const wrap = document.getElementById("routineChain");
+  wrap.innerHTML = "";
+  const today = todayStr();
+  const now = new Date();
+
+  const chainHabits = state.habits
+    .filter(h => h.routineOrder != null && isScheduledToday(h, now))
+    .sort((a, b) => a.routineOrder - b.routineOrder);
+
+  if (chainHabits.length === 0) {
+    wrap.innerHTML = '<div class="empty-hint">Keine Routine-Schritte für heute konfiguriert.</div>';
+    return;
+  }
+
+  chainHabits.forEach((h, idx) => {
+    const rawValue = h.history[today];
+    const doneToday = h.type === "weight" ? (rawValue !== undefined && rawValue !== null) : !!rawValue;
+
+    let noteHtml = "";
+    if (h.routineOrder === LEARNING_ROUTINE_ORDER) {
+      const override = examOverride(now);
+      if (override) {
+        noteHtml = `<div class="routine-step-note">Ganztägig lernen für <strong>${escapeHtml(override.subject.title)}</strong> — Klassenarbeit am ${override.date}</div>`;
+      } else {
+        const subj = subjectOfDay(now);
+        if (subj) {
+          noteHtml = `<div class="routine-step-note">Heutiges Hauptfach: <strong>${escapeHtml(subj.title)}</strong></div>`;
+        }
+      }
+    }
+
+    const controlHtml = h.type === "weight"
+      ? `<input type="number" step="0.1" inputmode="decimal" class="routine-weight-input" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
+      : `<input type="checkbox" ${doneToday ? "checked" : ""} data-habit="${h.id}">`;
+
+    const el = document.createElement("div");
+    el.className = "routine-step" + (doneToday ? " done" : "");
+    el.innerHTML = `
+      <div class="routine-step-num">${idx + 1}</div>
+      <div class="routine-step-body">
+        <div class="item-title">${escapeHtml(h.title)}</div>
+        ${noteHtml}
+      </div>
+      ${controlHtml}
+    `;
+    wrap.appendChild(el);
+  });
+}
+
+function shiftForDate(dateKey) {
+  return state.workShifts.find(s => s.date === dateKey) || null;
+}
+
+function renderWorkShiftBanner() {
+  const wrap = document.getElementById("workShiftBanner");
+  const shift = shiftForDate(todayStr());
+  if (!shift) {
+    wrap.innerHTML = `<button class="add-btn" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
+  } else {
+    wrap.innerHTML = `
+      <div class="day-rule shift-banner">
+        <span>💼 Arbeit heute: ${shift.start}–${shift.end}${shift.label ? " · " + escapeHtml(shift.label) : ""}</span>
+        <button class="icon-btn" data-del-shift="${shift.id}">✕</button>
+      </div>
+    `;
+  }
+  const addBtn = document.getElementById("addWorkShiftBtn");
+  if (addBtn) addBtn.addEventListener("click", () => openWorkShiftModal(todayStr()));
 }
 
 const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -492,9 +603,12 @@ function isOnTime(task) {
 // ---------- Render all ----------
 function renderAll() {
   renderWeekCircle();
+  renderRoutineChain();
+  renderWorkShiftBanner();
   renderToday();
   renderGoals();
   renderHabitsTab();
+  renderPlanning();
   renderOverview();
 }
 
@@ -514,6 +628,16 @@ document.addEventListener("change", e => {
     const key = todayStr();
     if (e.target.checked) habit.history[key] = true;
     else delete habit.history[key];
+    saveData();
+    renderAll();
+  }
+  if (e.target.matches("[data-weight-habit]")) {
+    const id = e.target.dataset.weightHabit;
+    const habit = state.habits.find(h => h.id === id);
+    const key = todayStr();
+    const val = e.target.value === "" ? null : parseFloat(e.target.value);
+    if (val === null || isNaN(val)) delete habit.history[key];
+    else habit.history[key] = val;
     saveData();
     renderAll();
   }
@@ -539,6 +663,18 @@ document.addEventListener("click", e => {
   }
   if (e.target.matches("[data-decompose-goal]")) {
     copyDecomposePrompt(e.target.dataset.decomposeGoal, e.target);
+  }
+  if (e.target.matches("[data-del-shift]")) {
+    state.workShifts = state.workShifts.filter(s => s.id !== e.target.dataset.delShift);
+    saveData(); renderAll();
+  }
+  if (e.target.matches("[data-del-subject]")) {
+    state.subjects = state.subjects.filter(s => s.id !== e.target.dataset.delSubject);
+    saveData(); renderAll();
+  }
+  if (e.target.matches("[data-del-exam]")) {
+    state.exams = state.exams.filter(x => x.id !== e.target.dataset.delExam);
+    saveData(); renderAll();
   }
 });
 
@@ -609,6 +745,8 @@ document.getElementById("addGoalBtn").addEventListener("click", () => openGoalMo
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
 document.getElementById("exportWeekBtn").addEventListener("click", exportWeekReview);
+document.getElementById("addSubjectBtn").addEventListener("click", () => openSubjectModal());
+document.getElementById("addExamBtn").addEventListener("click", () => openExamModal());
 
 function levelLabel(level) {
   return level === "long" ? "Langfristiges Ziel" : level === "mid" ? "Mittelfristiger Meilenstein" : "Kurzfristiges Ziel";
@@ -747,6 +885,155 @@ function openHabitModal() {
       renderAll();
     });
   });
+}
+
+function openWorkShiftModal(defaultDate) {
+  openModal(`
+    <h3>Arbeitsschicht eintragen</h3>
+    <div class="field">
+      <label>Datum</label>
+      <input type="date" id="mShiftDate" value="${defaultDate || todayStr()}">
+    </div>
+    <div class="field">
+      <label>Beginn</label>
+      <input type="time" id="mShiftStart" value="16:45">
+    </div>
+    <div class="field">
+      <label>Ende (Richtwert, kann abweichen)</label>
+      <input type="time" id="mShiftEnd" value="23:00">
+    </div>
+    <div class="field">
+      <label>Label (optional)</label>
+      <input type="text" id="mShiftLabel" placeholder="z.B. Ochsen Arbeiten">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const date = body.querySelector("#mShiftDate").value;
+      const start = body.querySelector("#mShiftStart").value;
+      const end = body.querySelector("#mShiftEnd").value;
+      const label = body.querySelector("#mShiftLabel").value.trim() || null;
+      if (!date || !start || !end) return;
+      state.workShifts = state.workShifts.filter(s => s.date !== date);
+      state.workShifts.push({ id: uid(), date, start, end, label });
+      saveData();
+      closeModal();
+      renderAll();
+    });
+  });
+}
+
+function openSubjectModal() {
+  openModal(`
+    <h3>Fach hinzufügen</h3>
+    <div class="field">
+      <label>Titel</label>
+      <input type="text" id="mSubjectTitle" placeholder="z.B. Physik">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mSubjectTitle").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const title = body.querySelector("#mSubjectTitle").value.trim();
+      if (!title) return;
+      state.subjects.push({ id: uid(), title });
+      saveData();
+      closeModal();
+      renderAll();
+    });
+  });
+}
+
+function openExamModal() {
+  if (state.subjects.length === 0) {
+    openSubjectModal();
+    return;
+  }
+  openModal(`
+    <h3>Klassenarbeit eintragen</h3>
+    <div class="field">
+      <label>Fach</label>
+      <select id="mExamSubject">
+        ${state.subjects.map(s => `<option value="${s.id}">${escapeHtml(s.title)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="field">
+      <label>Datum</label>
+      <input type="date" id="mExamDate" value="${todayStr()}">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const subjectId = body.querySelector("#mExamSubject").value;
+      const date = body.querySelector("#mExamDate").value;
+      if (!subjectId || !date) return;
+      state.exams.push({ id: uid(), subjectId, date });
+      saveData();
+      closeModal();
+      renderAll();
+    });
+  });
+}
+
+function renderPlanning() {
+  const subjectsWrap = document.getElementById("subjectsList");
+  if (subjectsWrap) {
+    subjectsWrap.innerHTML = state.subjects.length
+      ? state.subjects.map(s => `
+          <div class="item">
+            <div class="item-body"><div class="item-title">${escapeHtml(s.title)}</div></div>
+            <button class="icon-btn" data-del-subject="${s.id}">✕</button>
+          </div>
+        `).join("")
+      : '<div class="empty-hint">Noch keine Fächer angelegt.</div>';
+  }
+
+  const examsWrap = document.getElementById("examsList");
+  if (examsWrap) {
+    const sorted = state.exams.slice().sort((a, b) => a.date.localeCompare(b.date));
+    examsWrap.innerHTML = sorted.length
+      ? sorted.map(e => {
+          const subject = state.subjects.find(s => s.id === e.subjectId);
+          return `
+            <div class="item">
+              <div class="item-body">
+                <div class="item-title">${subject ? escapeHtml(subject.title) : "Unbekanntes Fach"}</div>
+                <div class="item-meta">${e.date}</div>
+              </div>
+              <button class="icon-btn" data-del-exam="${e.id}">✕</button>
+            </div>
+          `;
+        }).join("")
+      : '<div class="empty-hint">Noch keine Klassenarbeiten eingetragen.</div>';
+  }
+
+  const shiftsWrap = document.getElementById("shiftsList");
+  if (shiftsWrap) {
+    const sorted = state.workShifts.slice().sort((a, b) => b.date.localeCompare(a.date));
+    shiftsWrap.innerHTML = sorted.length
+      ? sorted.map(s => `
+          <div class="item">
+            <div class="item-body">
+              <div class="item-title">${s.date}${s.label ? " · " + escapeHtml(s.label) : ""}</div>
+              <div class="item-meta">${s.start}–${s.end}</div>
+            </div>
+            <button class="icon-btn" data-del-shift="${s.id}">✕</button>
+          </div>
+        `).join("")
+      : '<div class="empty-hint">Noch keine Arbeitsschichten eingetragen.</div>';
+  }
 }
 
 // ---------- Vollständiger Export (Obsidian-kompatibles Markdown, für Vault & Chat-Analyse) ----------
