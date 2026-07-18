@@ -13,14 +13,40 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Pinyon+Script&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="app">
 
   <header class="topbar">
-    <h1>Atlas</h1>
+    <div class="logo-mark" aria-label="Atlas">
+      <svg viewBox="0 0 100 100" class="logo-ring">
+        <g stroke="#cbb27a" fill="none" stroke-linecap="round" stroke-width="2.6">
+          <line x1="50" y1="10" x2="42" y2="34" transform="rotate(0 50 50)"/>
+          <line x1="50" y1="9" x2="60" y2="33" transform="rotate(30 50 50)"/>
+          <line x1="48" y1="11" x2="58" y2="30" transform="rotate(60 50 50)"/>
+          <line x1="51" y1="8" x2="41" y2="32" transform="rotate(90 50 50)"/>
+          <line x1="49" y1="10" x2="61" y2="31" transform="rotate(120 50 50)"/>
+          <line x1="50" y1="9" x2="44" y2="35" transform="rotate(150 50 50)"/>
+          <line x1="50" y1="10" x2="42" y2="34" transform="rotate(180 50 50)"/>
+          <line x1="50" y1="9" x2="60" y2="33" transform="rotate(210 50 50)"/>
+          <line x1="48" y1="11" x2="58" y2="30" transform="rotate(240 50 50)"/>
+          <line x1="51" y1="8" x2="41" y2="32" transform="rotate(270 50 50)"/>
+          <line x1="49" y1="10" x2="61" y2="31" transform="rotate(300 50 50)"/>
+          <line x1="50" y1="9" x2="44" y2="35" transform="rotate(330 50 50)"/>
+        </g>
+        <g stroke="#8a7a54" fill="none" stroke-linecap="round" stroke-width="2.2">
+          <line x1="50" y1="6" x2="53" y2="30" transform="rotate(15 50 50)"/>
+          <line x1="50" y1="7" x2="38" y2="28" transform="rotate(75 50 50)"/>
+          <line x1="49" y1="6" x2="56" y2="29" transform="rotate(135 50 50)"/>
+          <line x1="50" y1="7" x2="40" y2="27" transform="rotate(195 50 50)"/>
+          <line x1="50" y1="6" x2="53" y2="30" transform="rotate(255 50 50)"/>
+          <line x1="49" y1="7" x2="38" y2="28" transform="rotate(315 50 50)"/>
+        </g>
+      </svg>
+      <span class="logo-text">Atlas</span>
+    </div>
     <div class="today" id="todayLabel"></div>
   </header>
 
@@ -72,27 +98,14 @@
     <section id="tab-zielbereiche" class="tab-panel">
       <div class="goals-header">
         <h2>Bereiche</h2>
-        <button class="add-btn" id="addCategoryBtn">+ Bereich hinzufügen</button>
+        <button class="add-btn" id="addCategoryBtn">+ Neu</button>
       </div>
-      <p class="hint">Themenfelder fürs Leben — jeder Unterordner arbeitet auf das übergeordnete Thema hin, beliebig tief verschachtelbar. Ein Fortschrittsbalken zeigt, wie viel du in jedem Bereich schon erledigt/gelernt hast.</p>
       <div id="goalTree" class="goal-tree"></div>
-
-      <div class="card planning-card">
-        <h3>Fächer</h3>
-        <div id="subjectsList" class="list"></div>
-        <button class="add-btn" id="addSubjectBtn">+ Fach hinzufügen</button>
-      </div>
 
       <div class="card planning-card">
         <h3>Klassenarbeiten</h3>
         <div id="examsList" class="list"></div>
         <button class="add-btn" id="addExamBtn">+ Klassenarbeit eintragen</button>
-      </div>
-
-      <div class="card planning-card">
-        <h3>Arbeitsschichten</h3>
-        <p class="small-text">Kein Zugriff auf deinen Kalender möglich — Schichten trägst du hier oder direkt im "Heute"-Tab ein.</p>
-        <div id="shiftsList" class="list"></div>
       </div>
     </section>
 
@@ -114,11 +127,11 @@
     <!-- ANALYSE -->
     <section id="tab-analyse" class="tab-panel">
       <h2>Analyse</h2>
-      <div class="stats-grid" id="statsGrid"></div>
       <div class="card">
-        <h3>Langzeit-Auswertung (60 Tage)</h3>
-        <div class="stats-grid" id="longTermStats"></div>
+        <h3>Reflexion dieser Woche</h3>
+        <textarea id="reflectionText" class="reflection-textarea" placeholder="Wie lief die Woche? Was nimmst du mit?"></textarea>
       </div>
+      <div class="stats-grid" id="statsGrid"></div>
       <div class="card">
         <h3>Weitere Kennzahlen</h3>
         <div class="stats-grid" id="moreStats"></div>
@@ -129,12 +142,6 @@
         <div id="punctualityText" class="small-text"></div>
       </div>
       <div class="card">
-        <h3>Reflexion dieser Woche</h3>
-        <textarea id="reflectionText" class="reflection-textarea" placeholder="Wie lief die Woche? Was nimmst du mit?"></textarea>
-      </div>
-      <div class="card">
-        <h3>Wochenrückblick &amp; vollständiger Datenexport</h3>
-        <p class="small-text">Lädt eine Obsidian-kompatible Markdown-Datei mit Wochenstatistik, Langzeit-Auswertung, Reflexion, Abweichungs-Log und allen Rohdaten herunter — zum Ablegen im Vault-Ordner <code>30_Projekte/Wochenrueckblicke</code> oder zum Einfügen in den Chat.</p>
         <button class="add-btn" id="exportWeekBtn">Vollständigen Export herunterladen</button>
       </div>
     </section>
