@@ -23,11 +23,23 @@ function todayStr(offsetDays = 0) {
   return d.toISOString().slice(0, 10);
 }
 
-// ---------- Migration: alte Ziel-Hierarchie (goals) -> flache Zielbereiche (categories) ----------
-function migrateGoalsToCategories(data) {
-  if (data.categories || !data.goals) return;
+// ---------- Migration: alte Ziel-Strukturen -> verschachtelte goalNodes ----------
+function migrateToGoalNodes(data) {
+  if (data.goalNodes) return;
 
-  const GOAL_TITLE_TO_CATEGORY = {
+  // Phase-3-Zwischenstand (flache "categories") -> Wurzel-Knoten
+  if (data.categories) {
+    data.goalNodes = data.categories.map(c => ({ id: c.id, parentId: null, title: c.title, priority: !!c.priority }));
+    delete data.categories;
+    (data.tasks || []).forEach(t => { if (t.categoryId !== undefined) { t.nodeId = t.categoryId; delete t.categoryId; } });
+    (data.habits || []).forEach(h => { if (h.categoryId !== undefined) { h.nodeId = h.categoryId; delete h.categoryId; } });
+    return;
+  }
+
+  if (!data.goals) { data.goalNodes = []; return; }
+
+  // Ursprüngliche verschachtelte Ziel-Hierarchie (lang/mittel/kurz) -> generische verschachtelte Knoten
+  const GOAL_TITLE_MAP = {
     "Glaube": "Glaube",
     "Schule & Studium": "Schule",
     "Fitness & Gesundheit": "Gesundheit",
@@ -36,59 +48,28 @@ function migrateGoalsToCategories(data) {
     "Wissen & Weiterbildung": "Bildung"
   };
 
-  data.categories = [];
-  const categoryByTitle = {};
-  const ensureCategory = (title, priority = false) => {
-    if (!categoryByTitle[title]) {
-      const cat = { id: uid(), title, priority };
-      data.categories.push(cat);
-      categoryByTitle[title] = cat;
-    } else if (priority) {
-      categoryByTitle[title].priority = true;
-    }
-    return categoryByTitle[title];
-  };
+  const goals = data.goals;
+  const idMap = {};
+  goals.forEach(g => { idMap[g.id] = uid(); });
 
-  const goals = data.goals || [];
-  const findGoal = id => goals.find(g => g.id === id);
-  const goalIdToCategoryId = {};
-
-  goals.filter(g => g.level === "long").forEach(g => {
-    const catTitle = GOAL_TITLE_TO_CATEGORY[g.title] || g.title;
-    const cat = ensureCategory(catTitle, g.priority);
-    goalIdToCategoryId[g.id] = cat.id;
-  });
-
-  function categoryIdForGoal(g) {
-    let cur = g;
-    while (cur && cur.level !== "long") cur = findGoal(cur.parentId);
-    return cur ? goalIdToCategoryId[cur.id] : null;
-  }
-
-  // Mid/short goals become plain tasks under the resolved category
-  goals.filter(g => g.level !== "long").forEach(g => {
-    const categoryId = categoryIdForGoal(g);
-    if (!categoryId) return;
-    data.tasks.push({
-      id: uid(), title: g.title, categoryId, dueDate: g.dueDate || null, dueTime: null,
-      done: false, completedAt: null, createdAt: new Date().toISOString(), size: "klein", priority: "normal",
-      source: "category"
-    });
-  });
+  data.goalNodes = goals.map(g => ({
+    id: idMap[g.id],
+    parentId: g.parentId ? (idMap[g.parentId] || null) : null,
+    title: g.level === "long" ? (GOAL_TITLE_MAP[g.title] || g.title) : g.title,
+    priority: !!g.priority
+  }));
 
   (data.tasks || []).forEach(t => {
-    if (t.categoryId !== undefined) return;
-    const g = findGoal(t.goalId);
-    t.categoryId = g ? categoryIdForGoal(g) : null;
+    if (t.nodeId !== undefined) return;
+    t.nodeId = t.goalId ? (idMap[t.goalId] || null) : null;
     delete t.goalId;
     if (t.priority === undefined) t.priority = "normal";
     if (t.source === undefined) t.source = "category";
   });
 
   (data.habits || []).forEach(h => {
-    if (h.categoryId !== undefined) return;
-    const g = findGoal(h.goalId);
-    h.categoryId = g ? categoryIdForGoal(g) : null;
+    if (h.nodeId !== undefined) return;
+    h.nodeId = h.goalId ? (idMap[h.goalId] || null) : null;
     delete h.goalId;
   });
 
@@ -96,35 +77,38 @@ function migrateGoalsToCategories(data) {
 }
 
 let state = loadData();
-migrateGoalsToCategories(state);
+migrateToGoalNodes(state);
 state.subjects = state.subjects || [];
 state.exams = state.exams || [];
 state.workShifts = state.workShifts || [];
 state.deviations = state.deviations || [];
 state.weeklyReflection = state.weeklyReflection || {};
+state.prayers = state.prayers || [];
 saveData();
+
+let currentFolderId = null; // Laufzeit-Status des Ordner-Browsers (nicht persistiert)
 
 // ---------- Seed data (aus Obsidian-Vault: Ziele.md, Präferenzen.md, Habit_und_Zielsystem.md) ----------
 function seedData() {
-  const data = { categories: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {} };
-  const c = (title, priority = false) => {
+  const data = { goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [] };
+  const c = (title, parentId = null, priority = false) => {
     const id = uid();
-    data.categories.push({ id, title, priority });
+    data.goalNodes.push({ id, parentId, title, priority });
     return id;
   };
-  const h = (title, categoryId, frequency = "daily", extra = {}) => {
+  const h = (title, nodeId, frequency = "daily", extra = {}) => {
     data.habits.push({
-      id: uid(), title, categoryId, history: {}, createdAt: new Date().toISOString(), frequency,
+      id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency,
       routineOrder: extra.routineOrder ?? null,
       type: extra.type || "check"
     });
   };
-  const t = (title, categoryId, dueDate, size = "klein", priority = "normal") => {
-    data.tasks.push({ id: uid(), title, categoryId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source: "category" });
+  const t = (title, nodeId, dueDate, size = "klein", priority = "normal") => {
+    data.tasks.push({ id: uid(), title, nodeId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source: "category" });
   };
   const s = (title) => { data.subjects.push({ id: uid(), title }); };
 
-  const glaube = c("Glaube", true);
+  const glaube = c("Glaube", null, true);
   h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
   h("Abendlektüre 30 Min. vor dem Schlafen", glaube, "daily", { routineOrder: 7 });
   t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, "gross", "hoch");
@@ -141,6 +125,13 @@ function seedData() {
   const gesundheit = c("Gesundheit");
   h("Joggen 5,5 km", gesundheit, "daily", { routineOrder: 5 });
   h("Ernährung im Rahmen (max. 2.000 kcal)", gesundheit, "daily", { routineOrder: 10 });
+  const traumkoerper = c("Traumkörper", gesundheit);
+  const wissenKoerper = c("Wissen über den Körper", traumkoerper);
+  const anatomieBuch = c("Anatomie-Buch lesen", wissenKoerper);
+  t("Kapitel 1 lesen", anatomieBuch, null, "klein");
+  t("Kapitel 1 verstehen", anatomieBuch, null, "klein");
+  const training = c("Tägliches Training", traumkoerper);
+  t("Trainingsplan erstellen", training, null, "klein");
 
   const allgemein = c("Allgemein");
   h("Pünktlich aufstehen", allgemein, "daily", { routineOrder: 1 });
@@ -191,31 +182,78 @@ function closeModal() {
 }
 overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
 
-// ---------- Category helpers ----------
-function categoryById(id) {
-  return state.categories.find(c => c.id === id);
+// ---------- Zielbereiche: verschachtelte Knoten-Helfer ----------
+function nodeById(id) {
+  return state.goalNodes.find(n => n.id === id);
 }
-function tasksForCategory(categoryId) {
-  return state.tasks.filter(t => t.categoryId === categoryId);
+function childNodes(parentId) {
+  return state.goalNodes.filter(n => n.parentId === parentId);
 }
-function habitsForCategory(categoryId) {
-  return state.habits.filter(h => h.categoryId === categoryId);
+function tasksForNode(nodeId) {
+  return state.tasks.filter(t => t.nodeId === nodeId);
 }
-function isPriority(categoryId) {
-  const cat = categoryById(categoryId);
-  return !!(cat && cat.priority);
+function habitsForNode(nodeId) {
+  return state.habits.filter(h => h.nodeId === nodeId);
 }
-function categoryProgress(category) {
-  const tasks = tasksForCategory(category.id);
-  const habits = habitsForCategory(category.id);
+function isPriority(nodeId) {
+  let n = nodeById(nodeId);
+  while (n) {
+    if (n.priority) return true;
+    n = n.parentId ? nodeById(n.parentId) : null;
+  }
+  return false;
+}
+function nodeProgress(node) {
+  const tasks = tasksForNode(node.id);
+  const habits = habitsForNode(node.id);
+  const children = childNodes(node.id);
   const parts = [];
   if (tasks.length) parts.push(tasks.filter(t => t.done).length / tasks.length);
   if (habits.length) {
     const rates = habits.map(h => habitCompletionRate(h));
     parts.push(rates.reduce((a, b) => a + b, 0) / rates.length);
   }
+  if (children.length) {
+    const progresses = children.map(nodeProgress);
+    parts.push(progresses.reduce((a, b) => a + b, 0) / progresses.length);
+  }
   if (parts.length === 0) return 0;
   return parts.reduce((a, b) => a + b, 0) / parts.length;
+}
+function nodePath(nodeId) {
+  const path = [];
+  let n = nodeById(nodeId);
+  while (n) {
+    path.unshift(n);
+    n = n.parentId ? nodeById(n.parentId) : null;
+  }
+  return path;
+}
+function allNodesFlat() {
+  const result = [];
+  function walk(parentId, depth) {
+    childNodes(parentId).forEach(n => {
+      result.push({ node: n, depth });
+      walk(n.id, depth + 1);
+    });
+  }
+  walk(null, 0);
+  return result;
+}
+function nodeOptionsHtml() {
+  return allNodesFlat().map(({ node, depth }) =>
+    `<option value="${node.id}">${"　".repeat(depth)}${escapeHtml(node.title)}</option>`
+  ).join("");
+}
+function removeNode(nodeId) {
+  const wasCurrent = currentFolderId === nodeId;
+  const node = nodeById(nodeId);
+  const parentId = node ? node.parentId : null;
+  childNodes(nodeId).forEach(c => removeNode(c.id));
+  state.goalNodes = state.goalNodes.filter(n => n.id !== nodeId);
+  state.tasks.forEach(t => { if (t.nodeId === nodeId) t.nodeId = null; });
+  state.habits.forEach(h => { if (h.nodeId === nodeId) h.nodeId = null; });
+  if (wasCurrent) currentFolderId = parentId;
 }
 
 function isScheduledToday(habit, dateObj = new Date()) {
@@ -273,14 +311,14 @@ const PENCIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 function renderTaskItem(t) {
   const today = todayStr();
   const overdue = !t.done && t.dueDate && t.dueDate < today;
-  const category = categoryById(t.categoryId);
+  const node = nodeById(t.nodeId);
   const el = document.createElement("div");
   el.className = "item" + (t.done ? " done" : "");
   el.innerHTML = `
     <input type="checkbox" ${t.done ? "checked" : ""} data-task="${t.id}">
     <div class="item-body">
       <div class="item-title">${escapeHtml(t.title)}</div>
-      <div class="item-meta">${t.size === "gross" ? "Groß" : "Klein"}${t.dueDate ? " · fällig " + t.dueDate : ""}${t.dueTime ? " " + t.dueTime : ""}${category ? " · " + escapeHtml(category.title) : ""}</div>
+      <div class="item-meta">${t.size === "gross" ? "Groß" : "Klein"}${t.dueDate ? " · fällig " + t.dueDate : ""}${t.dueTime ? " " + t.dueTime : ""}${node ? " · " + escapeHtml(node.title) : ""}</div>
     </div>
     ${t.priority === "hoch" ? '<span class="item-tag priority">Priorität</span>' : ""}
     ${overdue ? '<span class="item-tag late">Überfällig</span>' : ""}
@@ -499,7 +537,7 @@ function renderOtherHabits() {
   dueHabits.forEach(h => {
     const doneToday = !!h.history[today];
     const streak = computeStreak(h);
-    const priority = isPriority(h.categoryId);
+    const priority = isPriority(h.nodeId);
     const el = document.createElement("div");
     el.className = "item" + (doneToday ? " done" : "");
     el.innerHTML = `
@@ -515,49 +553,54 @@ function renderOtherHabits() {
   });
 }
 
-// ---------- Rendering: Zielbereiche ----------
-function renderCategories() {
-  const tree = document.getElementById("categoriesList");
-  tree.innerHTML = "";
-  const sorted = state.categories.slice().sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0));
-  if (sorted.length === 0) {
-    tree.innerHTML = '<div class="empty-hint">Noch keine Zielbereiche angelegt.</div>';
-    return;
+// ---------- Rendering: Zielbereiche (verschachtelter Ordner-Browser) ----------
+function renderGoalBrowser() {
+  const breadcrumbWrap = document.getElementById("goalBreadcrumb");
+  const path = nodePath(currentFolderId);
+  let crumbHtml = `<button class="breadcrumb-item" data-open-node="">Zielbereiche</button>`;
+  path.forEach(n => {
+    crumbHtml += `<span class="breadcrumb-sep">/</span><button class="breadcrumb-item" data-open-node="${n.id}">${escapeHtml(n.title)}</button>`;
+  });
+  breadcrumbWrap.innerHTML = crumbHtml;
+  breadcrumbWrap.querySelectorAll(".breadcrumb-item").forEach((btn, i) => {
+    if (i === path.length) btn.classList.add("current");
+  });
+
+  const foldersWrap = document.getElementById("goalFolders");
+  const folders = childNodes(currentFolderId);
+  foldersWrap.innerHTML = "";
+  folders.forEach(node => foldersWrap.appendChild(renderFolderCard(node)));
+
+  const tasksWrap = document.getElementById("goalDirectTasks");
+  const tasks = tasksForNode(currentFolderId);
+  tasksWrap.innerHTML = "";
+  if (folders.length === 0 && tasks.length === 0) {
+    tasksWrap.innerHTML = '<div class="empty-hint">Noch leer — leg einen Unterordner oder eine Aufgabe an.</div>';
+  } else {
+    tasks.forEach(t => tasksWrap.appendChild(renderTaskItem(t)));
   }
-  sorted.forEach(cat => tree.appendChild(renderCategoryCard(cat)));
 }
 
-function renderCategoryCard(category) {
-  const pct = Math.round(categoryProgress(category) * 100);
-  const tasks = tasksForCategory(category.id);
-  const habits = habitsForCategory(category.id);
+function renderFolderCard(node) {
+  const pct = Math.round(nodeProgress(node) * 100);
+  const subCount = childNodes(node.id).length;
+  const taskCount = tasksForNode(node.id).length;
+  const habitCount = habitsForNode(node.id).length;
   const wrap = document.createElement("div");
   wrap.className = "card category-card";
   wrap.innerHTML = `
     <div class="goal-head">
-      <div class="goal-title">${escapeHtml(category.title)} ${category.priority ? '<span class="item-tag priority">Priorität</span>' : ""}</div>
+      <button class="goal-title folder-open" data-open-node="${node.id}">${escapeHtml(node.title)} ${node.priority ? '<span class="item-tag priority">Priorität</span>' : ""}</button>
       <div>
-        <button class="icon-btn" data-decompose-category="${category.id}" title="Aufgaben vorschlagen (Prompt kopieren)">···</button>
-        <button class="icon-btn" data-edit-category="${category.id}" title="Umbenennen">✎</button>
-        <button class="icon-btn" data-del-category="${category.id}">✕</button>
+        <button class="icon-btn" data-decompose-category="${node.id}" title="Aufgaben vorschlagen (Prompt kopieren)">···</button>
+        <button class="icon-btn" data-edit-category="${node.id}" title="Umbenennen">✎</button>
+        <button class="icon-btn" data-del-category="${node.id}">✕</button>
       </div>
     </div>
     <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
-    <div class="progress-pct">${pct}% · ${tasks.length} Aufgabe(n), ${habits.length} Gewohnheit(en)</div>
-    <div class="list category-tasks" data-tasks-of="${category.id}"></div>
-    <button class="add-btn" data-add-task-category="${category.id}">+ Aufgabe in diesem Bereich</button>
+    <div class="progress-pct">${pct}% · ${subCount} Unterordner, ${taskCount} Aufgabe(n), ${habitCount} Gewohnheit(en)</div>
   `;
-  const tasksWrap = wrap.querySelector(`[data-tasks-of="${category.id}"]`);
-  if (tasks.length === 0) {
-    tasksWrap.innerHTML = '<div class="empty-hint">Noch keine Aufgaben in diesem Bereich.</div>';
-  } else {
-    tasks.forEach(t => tasksWrap.appendChild(renderTaskItem(t)));
-  }
   return wrap;
-}
-
-function categoryOptionsHtml() {
-  return state.categories.map(cat => `<option value="${cat.id}">${escapeHtml(cat.title)}</option>`).join("");
 }
 
 // ---------- Rendering: Woche ----------
@@ -568,7 +611,7 @@ function renderWeekStats() {
   const longestStreak = state.habits.reduce((max, h) => Math.max(max, computeStreak(h)), 0);
 
   grid.innerHTML = `
-    <div class="stat-box"><div class="stat-num">${state.categories.length}</div><div class="stat-label">Zielbereiche</div></div>
+    <div class="stat-box"><div class="stat-num">${childNodes(null).length}</div><div class="stat-label">Zielbereiche</div></div>
     <div class="stat-box"><div class="stat-num">${doneTasks}/${totalTasks}</div><div class="stat-label">Aufgaben erledigt</div></div>
     <div class="stat-box"><div class="stat-num">${state.habits.length}</div><div class="stat-label">Gewohnheiten</div></div>
     <div class="stat-box"><div class="stat-num">${longestStreak}</div><div class="stat-label">Längste Serie</div></div>
@@ -678,8 +721,9 @@ function renderAll() {
   renderWorkShiftBanner();
   renderOtherHabits();
   renderTodo();
-  renderCategories();
+  renderGoalBrowser();
   renderPlanning();
+  renderPrayers();
   renderWeekStats();
 }
 
@@ -729,17 +773,21 @@ document.addEventListener("click", e => {
     saveData(); renderAll();
   }
   if (e.target.matches("[data-del-category]")) {
-    removeCategory(e.target.dataset.delCategory);
+    removeNode(e.target.dataset.delCategory);
     saveData(); renderAll();
   }
   if (e.target.matches("[data-edit-category]")) {
-    openCategoryModal(categoryById(e.target.dataset.editCategory));
+    openCategoryModal(nodeById(e.target.dataset.editCategory));
   }
   if (e.target.matches("[data-add-task-category]")) {
     openTaskModal(e.target.dataset.addTaskCategory, "category");
   }
   if (e.target.matches("[data-decompose-category]")) {
     copyDecomposePrompt(e.target.dataset.decomposeCategory, e.target);
+  }
+  if (e.target.matches("[data-open-node]")) {
+    currentFolderId = e.target.dataset.openNode || null;
+    renderGoalBrowser();
   }
   if (e.target.matches("[data-del-shift]")) {
     state.workShifts = state.workShifts.filter(s => s.id !== e.target.dataset.delShift);
@@ -757,17 +805,33 @@ document.addEventListener("click", e => {
     state.deviations = state.deviations.filter(d => d.id !== e.target.dataset.delDeviation);
     saveData(); renderAll();
   }
+  const fulfilledBtn = e.target.closest("[data-prayer-fulfilled]");
+  if (fulfilledBtn) {
+    openPrayerFulfillModal(fulfilledBtn.dataset.prayerFulfilled);
+  }
+  const deferBtn = e.target.closest("[data-prayer-defer]");
+  if (deferBtn) {
+    const prayer = state.prayers.find(p => p.id === deferBtn.dataset.prayerDefer);
+    if (prayer) prayer.deferredCount = (prayer.deferredCount || 0) + 1;
+    saveData(); renderAll();
+  }
+  const irrelevantBtn = e.target.closest("[data-prayer-irrelevant]");
+  if (irrelevantBtn) {
+    state.prayers = state.prayers.filter(p => p.id !== irrelevantBtn.dataset.prayerIrrelevant);
+    saveData(); renderAll();
+  }
 });
 
 // ---------- Zielbereich-Zerlegung: Copy-Prompt für Chat-Analyse ----------
-function buildDecomposePrompt(category) {
-  const tasks = tasksForCategory(category.id);
-  const habits = habitsForCategory(category.id);
-  const pct = Math.round(categoryProgress(category) * 100);
+function buildDecomposePrompt(node) {
+  const tasks = tasksForNode(node.id);
+  const habits = habitsForNode(node.id);
+  const pct = Math.round(nodeProgress(node) * 100);
+  const path = nodePath(node.id).map(n => n.title).join(" / ");
 
-  let prompt = `Ich möchte im Zielbereich "${category.title}" konkrete, umsetzbare Aufgaben finden, die mich meinem Idealbild in diesem Bereich näherbringen.\n\n`;
+  let prompt = `Ich möchte im Zielordner "${path}" konkrete, umsetzbare Aufgaben finden, die mich meinem übergeordneten Ziel näherbringen.\n\n`;
   prompt += `Aktueller Fortschritt: ${pct}%\n`;
-  if (category.priority) prompt += `Priorität: ja\n`;
+  if (node.priority) prompt += `Priorität: ja\n`;
 
   if (tasks.length) {
     prompt += `\nBereits vorhandene Aufgaben:\n`;
@@ -778,19 +842,19 @@ function buildDecomposePrompt(category) {
     habits.forEach(h => { prompt += `- ${h.title} (${h.frequency === "weekdays" ? "Mo–Fr" : "täglich"})\n`; });
   }
 
-  prompt += `\nSchlag mir bitte 3-6 konkrete neue Aufgaben oder Gewohnheiten für diesen Bereich vor.`;
+  prompt += `\nSchlag mir bitte 3-6 konkrete neue Aufgaben oder Unterordner für diesen Zweig vor.`;
   return prompt;
 }
 
-async function copyDecomposePrompt(categoryId, btn) {
-  const category = categoryById(categoryId);
-  if (!category) return;
-  const prompt = buildDecomposePrompt(category);
+async function copyDecomposePrompt(nodeId, btn) {
+  const node = nodeById(nodeId);
+  if (!node) return;
+  const prompt = buildDecomposePrompt(node);
   try {
     await navigator.clipboard.writeText(prompt);
     flashButton(btn, "✓");
   } catch (e) {
-    downloadText(prompt, `Zielbereich_${category.title.replace(/[^a-z0-9]+/gi, "_")}.txt`);
+    downloadText(prompt, `Zielbereich_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`);
   }
 }
 
@@ -812,35 +876,31 @@ function downloadText(text, filename) {
   URL.revokeObjectURL(url);
 }
 
-function removeCategory(categoryId) {
-  state.categories = state.categories.filter(c => c.id !== categoryId);
-  state.tasks.forEach(t => { if (t.categoryId === categoryId) t.categoryId = null; });
-  state.habits.forEach(h => { if (h.categoryId === categoryId) h.categoryId = null; });
-}
-
 // ---------- Add buttons ----------
-document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal());
+document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal(null, currentFolderId));
+document.getElementById("addGoalTaskBtn").addEventListener("click", () => openTaskModal(currentFolderId, "category"));
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
 document.getElementById("exportWeekBtn").addEventListener("click", exportWeekReview);
 document.getElementById("addSubjectBtn").addEventListener("click", () => openSubjectModal());
 document.getElementById("addExamBtn").addEventListener("click", () => openExamModal());
+document.getElementById("addPrayerBtn").addEventListener("click", () => openPrayerModal());
 document.getElementById("addDeviationBtn").addEventListener("click", () => {
   const input = document.getElementById("deviationInput");
   addDeviation(input.value);
   input.value = "";
 });
 
-function openCategoryModal(category) {
-  const isEdit = !!category;
+function openCategoryModal(node, parentId = null) {
+  const isEdit = !!node;
   openModal(`
-    <h3>${isEdit ? "Bereich bearbeiten" : "Zielbereich hinzufügen"}</h3>
+    <h3>${isEdit ? "Ordner bearbeiten" : "Unterordner hinzufügen"}</h3>
     <div class="field">
       <label>Titel</label>
-      <input type="text" id="mCategoryTitle" value="${isEdit ? escapeHtml(category.title) : ""}" placeholder="z.B. Kreativität">
+      <input type="text" id="mCategoryTitle" value="${isEdit ? escapeHtml(node.title) : ""}" placeholder="z.B. Kreativität">
     </div>
     <div class="checkbox-row">
-      <input type="checkbox" id="mCategoryPriority" ${isEdit && category.priority ? "checked" : ""}>
+      <input type="checkbox" id="mCategoryPriority" ${isEdit && node.priority ? "checked" : ""}>
       <label for="mCategoryPriority">Priorität (wird hervorgehoben)</label>
     </div>
     <div class="modal-actions">
@@ -855,10 +915,10 @@ function openCategoryModal(category) {
       if (!title) return;
       const priority = body.querySelector("#mCategoryPriority").checked;
       if (isEdit) {
-        category.title = title;
-        category.priority = priority;
+        node.title = title;
+        node.priority = priority;
       } else {
-        state.categories.push({ id: uid(), title, priority });
+        state.goalNodes.push({ id: uid(), parentId, title, priority });
       }
       saveData();
       closeModal();
@@ -867,10 +927,10 @@ function openCategoryModal(category) {
   });
 }
 
-function openTaskModal(defaultCategoryId, source = "todo") {
-  const category = defaultCategoryId ? categoryById(defaultCategoryId) : null;
+function openTaskModal(defaultNodeId, source = "todo") {
+  const node = defaultNodeId ? nodeById(defaultNodeId) : null;
   openModal(`
-    <h3>${source === "category" ? "Aufgabe in " + escapeHtml(category ? category.title : "Bereich") : "Aufgabe hinzufügen"}</h3>
+    <h3>${source === "category" ? "Aufgabe in " + escapeHtml(node ? node.title : "Bereich") : "Aufgabe hinzufügen"}</h3>
     <div class="field">
       <label>Titel</label>
       <input type="text" id="mTaskTitle" placeholder="z.B. Bericht abschicken">
@@ -902,7 +962,7 @@ function openTaskModal(defaultCategoryId, source = "todo") {
       <label>Zielbereich (optional, ordnet die Aufgabe zusätzlich dort ein)</label>
       <select id="mTaskCategory">
         <option value="">– keiner –</option>
-        ${categoryOptionsHtml()}
+        ${nodeOptionsHtml()}
       </select>
     </div>`}
     <div class="modal-actions">
@@ -920,8 +980,8 @@ function openTaskModal(defaultCategoryId, source = "todo") {
       const size = body.querySelector("#mTaskSize").value;
       const priority = body.querySelector("#mTaskPriority").value;
       const categorySelect = body.querySelector("#mTaskCategory");
-      const categoryId = source === "category" ? defaultCategoryId : (categorySelect ? categorySelect.value || null : null);
-      state.tasks.push({ id: uid(), title, dueDate, dueTime, categoryId, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source });
+      const nodeId = source === "category" ? defaultNodeId : (categorySelect ? categorySelect.value || null : null);
+      state.tasks.push({ id: uid(), title, nodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source });
       saveData();
       closeModal();
       renderAll();
@@ -947,7 +1007,7 @@ function openHabitModal() {
       <label>Zielbereich (optional)</label>
       <select id="mHabitCategory">
         <option value="">– keiner –</option>
-        ${categoryOptionsHtml()}
+        ${nodeOptionsHtml()}
       </select>
     </div>
     <div class="modal-actions">
@@ -960,9 +1020,9 @@ function openHabitModal() {
     body.querySelector("#mSave").addEventListener("click", () => {
       const title = body.querySelector("#mHabitTitle").value.trim();
       if (!title) return;
-      const categoryId = body.querySelector("#mHabitCategory").value || null;
+      const nodeId = body.querySelector("#mHabitCategory").value || null;
       const frequency = body.querySelector("#mHabitFrequency").value;
-      state.habits.push({ id: uid(), title, categoryId, history: {}, createdAt: new Date().toISOString(), frequency, routineOrder: null, type: "check" });
+      state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, routineOrder: null, type: "check" });
       saveData();
       closeModal();
       renderAll();
@@ -1119,6 +1179,114 @@ function renderPlanning() {
   }
 }
 
+// ---------- Gebetsanliegen ----------
+const REFRESH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 4v3h-3M6 20v-3h3"/></svg>';
+const CROSS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+function renderPrayers() {
+  const listWrap = document.getElementById("prayerList");
+  const openPrayers = state.prayers.filter(p => p.status === "open");
+  listWrap.innerHTML = openPrayers.length
+    ? openPrayers.map(p => `
+        <div class="item prayer-item">
+          <div class="item-body">
+            <div class="item-title">${escapeHtml(p.title)}</div>
+            ${p.deferredCount ? `<div class="item-meta">${p.deferredCount}× auf nächste Woche verschoben</div>` : ""}
+          </div>
+          <button class="icon-btn" data-prayer-fulfilled="${p.id}" title="Erfüllt">${CHECK_ICON}</button>
+          <button class="icon-btn" data-prayer-defer="${p.id}" title="Nächste Woche">${REFRESH_ICON}</button>
+          <button class="icon-btn" data-prayer-irrelevant="${p.id}" title="Nicht mehr relevant">${CROSS_ICON}</button>
+        </div>
+      `).join("")
+    : '<div class="empty-hint">Keine offenen Anliegen.</div>';
+
+  const archiveWrap = document.getElementById("prayerArchive");
+  const fulfilled = state.prayers
+    .filter(p => p.status === "fulfilled")
+    .sort((a, b) => (b.fulfilledAt || "").localeCompare(a.fulfilledAt || ""));
+  archiveWrap.innerHTML = fulfilled.length
+    ? fulfilled.map(p => `
+        <div class="prayer-archive-entry">
+          <div class="item-meta">${(p.fulfilledAt || "").slice(0, 10)}</div>
+          <div class="item-title">${escapeHtml(p.title)}</div>
+          ${p.fulfillmentText ? `<div class="small-text">${escapeHtml(p.fulfillmentText)}</div>` : ""}
+          ${(p.attachments || []).map(a => a.type.startsWith("image/")
+            ? `<img class="prayer-attachment-img" src="${a.dataUrl}" alt="${escapeHtml(a.name)}">`
+            : `<a class="prayer-attachment-file" href="${a.dataUrl}" download="${escapeHtml(a.name)}">${escapeHtml(a.name)}</a>`
+          ).join("")}
+        </div>
+      `).join("")
+    : '<div class="empty-hint">Noch keine Erhörungen festgehalten.</div>';
+}
+
+function openPrayerModal() {
+  openModal(`
+    <h3>Gebetsanliegen hinzufügen</h3>
+    <div class="field">
+      <label>Titel</label>
+      <input type="text" id="mPrayerTitle" placeholder="z.B. Weisheit für die Studienwahl">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mPrayerTitle").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const title = body.querySelector("#mPrayerTitle").value.trim();
+      if (!title) return;
+      state.prayers.push({ id: uid(), title, createdAt: new Date().toISOString(), status: "open", deferredCount: 0 });
+      saveData();
+      closeModal();
+      renderAll();
+    });
+  });
+}
+
+function openPrayerFulfillModal(prayerId) {
+  const prayer = state.prayers.find(p => p.id === prayerId);
+  if (!prayer) return;
+  openModal(`
+    <h3>Erfüllt: ${escapeHtml(prayer.title)}</h3>
+    <div class="field">
+      <label>Wie wurde es erfüllt?</label>
+      <textarea id="mPrayerText" class="reflection-textarea" placeholder="Was ist passiert?"></textarea>
+    </div>
+    <div class="field">
+      <label>Anhang (Bild/Datei, optional)</label>
+      <input type="file" id="mPrayerFiles" multiple>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    body.querySelector("#mSave").addEventListener("click", async () => {
+      const text = body.querySelector("#mPrayerText").value.trim();
+      const files = Array.from(body.querySelector("#mPrayerFiles").files || []);
+      const attachments = await Promise.all(files.map(readFileAsAttachment));
+      prayer.status = "fulfilled";
+      prayer.fulfilledAt = new Date().toISOString();
+      prayer.fulfillmentText = text;
+      prayer.attachments = attachments;
+      saveData();
+      closeModal();
+      renderAll();
+    });
+  });
+}
+
+function readFileAsAttachment(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, type: file.type, dataUrl: reader.result });
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // ---------- Vollständiger Export (Obsidian-kompatibles Markdown, für Vault & Chat-Analyse) ----------
 function exportWeekReview() {
   const end = new Date();
@@ -1172,8 +1340,8 @@ function exportWeekReview() {
   });
 
   md += `\n## Zielbereiche\n`;
-  state.categories.forEach(cat => {
-    md += `- **${cat.title}**${cat.priority ? " (Priorität)" : ""}: ${Math.round(categoryProgress(cat) * 100)}%\n`;
+  childNodes(null).forEach(node => {
+    md += `- **${node.title}**${node.priority ? " (Priorität)" : ""}: ${Math.round(nodeProgress(node) * 100)}%\n`;
   });
 
   md += `\n## Langzeit-Auswertung (letzte ${longTermDays} Tage)\n`;
