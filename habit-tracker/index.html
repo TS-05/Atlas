@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Atlas</title>
-<meta name="theme-color" content="#0a0906">
+<meta name="theme-color" content="#080b14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Atlas">
@@ -40,9 +40,8 @@
           <button class="btn btn-primary" id="addDeviationBtn">Eintragen</button>
         </div>
         <div id="deviationList" class="deviation-list"></div>
+        <div id="workShiftBanner" class="work-shift-wrap"></div>
       </div>
-
-      <div id="workShiftBanner" class="work-shift-wrap"></div>
 
       <div class="card routine-card">
         <h2>Tagesroutine</h2>
@@ -69,17 +68,14 @@
       <div id="todoList" class="list"></div>
     </section>
 
-    <!-- ZIELBEREICHE -->
+    <!-- BEREICHE -->
     <section id="tab-zielbereiche" class="tab-panel">
       <div class="goals-header">
-        <h2>Zielbereiche</h2>
-        <button class="add-btn" id="addCategoryBtn">+ Unterordner hier</button>
+        <h2>Bereiche</h2>
+        <button class="add-btn" id="addCategoryBtn">+ Bereich hinzufügen</button>
       </div>
-      <p class="hint">Jeder Ordner arbeitet auf das übergeordnete Ziel hin — beliebig tief verschachtelbar, ganz unten stehen die eigentlichen Aufgaben.</p>
-      <div id="goalBreadcrumb" class="breadcrumb"></div>
-      <div id="goalFolders" class="goals-tree"></div>
-      <div id="goalDirectTasks" class="list"></div>
-      <button class="add-btn" id="addGoalTaskBtn">+ Aufgabe hier</button>
+      <p class="hint">Themenfelder fürs Leben — jeder Unterordner arbeitet auf das übergeordnete Thema hin, beliebig tief verschachtelbar. Ein Fortschrittsbalken zeigt, wie viel du in jedem Bereich schon erledigt/gelernt hast.</p>
+      <div id="goalTree" class="goal-tree"></div>
 
       <div class="card planning-card">
         <h3>Fächer</h3>
@@ -100,13 +96,32 @@
       </div>
     </section>
 
-    <!-- WOCHE -->
-    <section id="tab-woche" class="tab-panel">
-      <h2>Woche</h2>
+    <!-- GEBETE -->
+    <section id="tab-gebete" class="tab-panel">
+      <div class="goals-header">
+        <h2>Gebetsanliegen</h2>
+        <button class="add-btn" id="addPrayerBtn">+ Anliegen hinzufügen</button>
+      </div>
+      <div id="prayerList" class="list"></div>
+
+      <div class="card">
+        <h3>Erhörungen</h3>
+        <p class="hint">Beantwortete Anliegen mit Datum, Text und Anhang.</p>
+        <div id="prayerArchive" class="list"></div>
+      </div>
+    </section>
+
+    <!-- ANALYSE -->
+    <section id="tab-analyse" class="tab-panel">
+      <h2>Analyse</h2>
       <div class="stats-grid" id="statsGrid"></div>
       <div class="card">
         <h3>Langzeit-Auswertung (60 Tage)</h3>
         <div class="stats-grid" id="longTermStats"></div>
+      </div>
+      <div class="card">
+        <h3>Weitere Kennzahlen</h3>
+        <div class="stats-grid" id="moreStats"></div>
       </div>
       <div class="card">
         <h3>Pünktlichkeit erledigter Aufgaben</h3>
@@ -121,21 +136,6 @@
         <h3>Wochenrückblick &amp; vollständiger Datenexport</h3>
         <p class="small-text">Lädt eine Obsidian-kompatible Markdown-Datei mit Wochenstatistik, Langzeit-Auswertung, Reflexion, Abweichungs-Log und allen Rohdaten herunter — zum Ablegen im Vault-Ordner <code>30_Projekte/Wochenrueckblicke</code> oder zum Einfügen in den Chat.</p>
         <button class="add-btn" id="exportWeekBtn">Vollständigen Export herunterladen</button>
-      </div>
-    </section>
-
-    <!-- GEBETE -->
-    <section id="tab-gebete" class="tab-panel">
-      <div class="goals-header">
-        <h2>Gebetsanliegen</h2>
-        <button class="add-btn" id="addPrayerBtn">+ Anliegen hinzufügen</button>
-      </div>
-      <div id="prayerList" class="list"></div>
-
-      <div class="card">
-        <h3>Erhörungen</h3>
-        <p class="hint">Beantwortete Anliegen mit Datum, Text und Anhang.</p>
-        <div id="prayerArchive" class="list"></div>
       </div>
     </section>
   </main>
@@ -153,13 +153,13 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>
       <span>Bereiche</span>
     </button>
-    <button class="tab-btn" data-tab="woche">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V10M12 19V5M19 19v-7"/></svg>
-      <span>Woche</span>
-    </button>
     <button class="tab-btn" data-tab="gebete">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 8h12"/></svg>
       <span>Gebete</span>
+    </button>
+    <button class="tab-btn" data-tab="analyse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V10M12 19V5M19 19v-7"/></svg>
+      <span>Analyse</span>
     </button>
   </nav>
 </div>

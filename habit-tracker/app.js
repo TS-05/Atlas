@@ -1,6 +1,25 @@
 // ---------- Storage ----------
 const STORAGE_KEY = "habit-tracker-data-v2";
 
+// ---------- Lebenswissen-Ordnerstruktur (siehe 20_Wissen/Themen/Lebenswissen_Ordnerstruktur.md) ----------
+const LEBENSWISSEN = [
+  ["Glaube", true, ["Grundlagen des christlichen Glaubens", "Die einzelnen Bibelbücher", "Historischer/kultureller Hintergrund", "Gebet (Formen, Praxis)", "Gemeindeleben & geistliche Gemeinschaft", "Theologische Grundbegriffe"]],
+  ["Gesundheit", false, ["Anatomie des Menschen", "Organsysteme", "Ernährung", "Hormone & ihre Wirkung", "Blut & Blutwerte", "Bewegung/Training", "Schlaf", "Erste Hilfe", "Mentale Gesundheit", "Zahnpflege", "Vorsorgeuntersuchungen"]],
+  ["Haushalt", false, ["Wäsche", "Kochen", "Putzen", "Ordnung & Organisation", "Reparaturen im Haushalt", "Pflanzen & Garten", "Mülltrennung & Entsorgung"]],
+  ["Handwerkliches & Technik im Alltag", false, ["Auto", "Heimnetzwerk/WLAN", "Unterhaltungselektronik", "Kabelmanagement", "Rasieren & Bartpflege", "Selbstschutz", "Selbstverteidigung", "Werkzeugkoffer"]],
+  ["Bürokratie & Finanzen", false, ["Ordnersystem für Unterlagen", "Dokumente aufbewahren", "Gehalt/Lohn verstehen", "Steuern", "Versicherungen", "Konten, Sparen, Budget", "Verträge lesen & verstehen", "Behördengänge"]],
+  ["Handwerk & Werkstatt", false, ["Elektro", "Holzbearbeitung", "Metallbearbeitung", "Werkstatt-Grundausstattung", "Schweißen", "Kleben", "Nägel & Schrauben", "Technische Zeichnungen", "Anlagen/Installationen", "Gas, Wasser, Sanitär"]],
+  ["Zukunft & Karriere", false, ["Karriereplanung", "Softskills", "Hardskills", "Hausbau/Immobilien", "Finanzen & Vermögensaufbau", "Selbstständigkeit", "Lebens-/Zielplanung"]],
+  ["Kunst & Kreatives", false, ["Schreiben", "Zeichnen/Malen", "Kunstgeschichte", "Bekannte Künstler", "Kunstrichtungen", "Worldbuilding"]],
+  ["Überleben & Sicherheit", false, ["Notfallarten", "Verletzungen erkennen & versorgen", "Outdoor-Grundlagen", "Ausrüstung", "Gefahren – nicht selbst eingreifen", "Notfallkontakte & -plan"]],
+  ["Essen & Trinken", false, ["Whisky", "Kaffee", "Wein", "Bier", "Food-Pairing"]],
+  ["Digitales Leben & Sicherheit", false, ["Passwort-Sicherheit", "Datenschutz-Grundlagen", "Backups", "Betrugsmaschen erkennen", "Digitale Nachlassplanung"]],
+  ["Recht im Alltag", false, ["Mietrecht-Basics", "Kaufrecht/Gewährleistung", "Verkehrsrecht-Basics", "Wichtige Fristen"]],
+  ["Beziehungen & Kommunikation", false, ["Kommunikationsgrundlagen", "Konfliktlösung", "Partnerschaft/Ehe-Vorbereitung", "Erziehung/Elternschaft"]],
+  ["Reisen", false, ["Reiseplanung & Budget", "Dokumente", "Packen & Ausrüstung", "Sprachliche Basics", "Sicherheit auf Reisen"]],
+  ["Umgang mit Behörden & Institutionen", false, ["Wichtige Ämter im Überblick", "Anträge & Fristen", "Widerspruch/Einspruch"]]
+];
+
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
@@ -31,7 +50,10 @@ function migrateToGoalNodes(data) {
   if (data.categories) {
     data.goalNodes = data.categories.map(c => ({ id: c.id, parentId: null, title: c.title, priority: !!c.priority }));
     delete data.categories;
-    (data.tasks || []).forEach(t => { if (t.categoryId !== undefined) { t.nodeId = t.categoryId; delete t.categoryId; } });
+    (data.tasks || []).forEach(t => {
+      if (t.categoryId !== undefined) { t.nodeId = t.categoryId; delete t.categoryId; }
+      if (typeof t.priority !== "number") t.priority = t.priority === "hoch" ? 5 : 0;
+    });
     (data.habits || []).forEach(h => { if (h.categoryId !== undefined) { h.nodeId = h.categoryId; delete h.categoryId; } });
     return;
   }
@@ -63,7 +85,7 @@ function migrateToGoalNodes(data) {
     if (t.nodeId !== undefined) return;
     t.nodeId = t.goalId ? (idMap[t.goalId] || null) : null;
     delete t.goalId;
-    if (t.priority === undefined) t.priority = "normal";
+    if (typeof t.priority !== "number") t.priority = t.priority === "hoch" ? 5 : 0;
     if (t.source === undefined) t.source = "category";
   });
 
@@ -86,9 +108,9 @@ state.weeklyReflection = state.weeklyReflection || {};
 state.prayers = state.prayers || [];
 saveData();
 
-let currentFolderId = null; // Laufzeit-Status des Ordner-Browsers (nicht persistiert)
+const expandedNodes = new Set(); // Laufzeit-Status des Bereiche-Akkordeons (nicht persistiert)
 
-// ---------- Seed data (aus Obsidian-Vault: Ziele.md, Präferenzen.md, Habit_und_Zielsystem.md) ----------
+// ---------- Seed data ----------
 function seedData() {
   const data = { goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [] };
   const c = (title, parentId = null, priority = false) => {
@@ -103,49 +125,43 @@ function seedData() {
       type: extra.type || "check"
     });
   };
-  const t = (title, nodeId, dueDate, size = "klein", priority = "normal") => {
+  const t = (title, nodeId, dueDate, size = "klein", priority = 0) => {
     data.tasks.push({ id: uid(), title, nodeId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source: "category" });
   };
   const s = (title) => { data.subjects.push({ id: uid(), title }); };
 
-  const glaube = c("Glaube", null, true);
-  h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
-  h("Abendlektüre 30 Min. vor dem Schlafen", glaube, "daily", { routineOrder: 7 });
-  t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, "gross", "hoch");
+  const rootId = {};
+  LEBENSWISSEN.forEach(([title, priority, subs]) => {
+    const id = c(title, null, priority);
+    rootId[title] = id;
+    subs.forEach(sub => c(sub, id));
+  });
 
-  const schule = c("Schule");
-  h("Lernen / Schularbeit 60–90 Min.", schule, "weekdays", { routineOrder: 6 });
-  t("Bewerbungen duales Studium abschicken", schule, "2026-07-13", "gross", "hoch");
-  t("Seminararbeit Physik in Filmen fertigstellen", schule, null, "gross");
+  const glaube = rootId["Glaube"];
+  h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
+  h("Abendlektüre 30 Min. vor dem Schlafen", glaube, "daily", { routineOrder: 8 });
+  t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, "gross", 5);
+
+  const gesundheit = rootId["Gesundheit"];
+  h("Joggen 5,5 km", gesundheit, "daily", { routineOrder: 5 });
+  h("Ernährung im Rahmen (max. 2.000 kcal)", gesundheit, "daily", { routineOrder: 10 });
+
+  const zukunft = rootId["Zukunft & Karriere"];
+  h("Lernen / Schularbeit 60–90 Min.", zukunft, "weekdays", { routineOrder: 6 });
+  t("Bewerbungen duales Studium abschicken", zukunft, "2026-07-13", "gross", 5);
+  t("Seminararbeit Physik in Filmen fertigstellen", zukunft, null, "gross");
   s("Englisch");
   s("Deutsch");
   s("BWL");
   s("Mathe");
 
-  const gesundheit = c("Gesundheit");
-  h("Joggen 5,5 km", gesundheit, "daily", { routineOrder: 5 });
-  h("Ernährung im Rahmen (max. 2.000 kcal)", gesundheit, "daily", { routineOrder: 10 });
-  const traumkoerper = c("Traumkörper", gesundheit);
-  const wissenKoerper = c("Wissen über den Körper", traumkoerper);
-  const anatomieBuch = c("Anatomie-Buch lesen", wissenKoerper);
-  t("Kapitel 1 lesen", anatomieBuch, null, "klein");
-  t("Kapitel 1 verstehen", anatomieBuch, null, "klein");
-  const training = c("Tägliches Training", traumkoerper);
-  t("Trainingsplan erstellen", training, null, "klein");
-
-  const allgemein = c("Allgemein");
-  h("Pünktlich aufstehen", allgemein, "daily", { routineOrder: 1 });
-  h("Bett gemacht & Gewicht", allgemein, "daily", { routineOrder: 2, type: "weight" });
-  h("Handy weglegen 21:30", allgemein, "daily", { routineOrder: 8 });
-  h("Skin Care & Anziehen", allgemein, "daily", { routineOrder: 3 });
-  h("Tag im Griff", allgemein, "daily", { routineOrder: 9 });
-
-  const bildung = c("Bildung");
-  h("Lesen (ca. 1 Buch/Monat)", bildung, "daily");
-  t("Die Anatomie des menschlichen Körpers lesen", bildung, null, "gross");
-
-  c("Zukunft");
-  c("Beziehung");
+  // Reine Tagesroutine-Habits ohne Wissensbereich (persönlicher Alltag, kein Lernthema)
+  h("Pünktlich aufstehen", null, "daily", { routineOrder: 1 });
+  h("Bett gemacht & Gewicht", null, "daily", { routineOrder: 2, type: "weight" });
+  h("Handy weglegen 21:30", null, "daily", { routineOrder: 7 });
+  h("Skin Care & Anziehen", null, "daily", { routineOrder: 3 });
+  h("Tag im Griff", null, "daily", { routineOrder: 9 });
+  h("Lesen (ca. 1 Buch/Monat)", rootId["Kunst & Kreatives"], "daily");
 
   return data;
 }
@@ -192,6 +208,10 @@ function childNodes(parentId) {
 function tasksForNode(nodeId) {
   return state.tasks.filter(t => t.nodeId === nodeId);
 }
+// Nur Aufgaben, die direkt im Bereiche-Baum angelegt wurden (nicht ToDo-Aufgaben, die nur informativ zugeordnet sind)
+function categoryTasksForNode(nodeId) {
+  return state.tasks.filter(t => t.nodeId === nodeId && t.source === "category");
+}
 function habitsForNode(nodeId) {
   return state.habits.filter(h => h.nodeId === nodeId);
 }
@@ -204,7 +224,7 @@ function isPriority(nodeId) {
   return false;
 }
 function nodeProgress(node) {
-  const tasks = tasksForNode(node.id);
+  const tasks = categoryTasksForNode(node.id);
   const habits = habitsForNode(node.id);
   const children = childNodes(node.id);
   const parts = [];
@@ -246,20 +266,31 @@ function nodeOptionsHtml() {
   ).join("");
 }
 function removeNode(nodeId) {
-  const wasCurrent = currentFolderId === nodeId;
-  const node = nodeById(nodeId);
-  const parentId = node ? node.parentId : null;
   childNodes(nodeId).forEach(c => removeNode(c.id));
   state.goalNodes = state.goalNodes.filter(n => n.id !== nodeId);
   state.tasks.forEach(t => { if (t.nodeId === nodeId) t.nodeId = null; });
   state.habits.forEach(h => { if (h.nodeId === nodeId) h.nodeId = null; });
-  if (wasCurrent) currentFolderId = parentId;
+  expandedNodes.delete(nodeId);
 }
 
 function isScheduledToday(habit, dateObj = new Date()) {
   if (habit.frequency === "weekdays") {
     const day = dateObj.getDay(); // 0 So, 6 Sa
     return day >= 1 && day <= 5;
+  }
+  if (habit.frequency === "interval") {
+    const n = habit.intervalDays || 1;
+    const createdKey = new Date(habit.createdAt).toISOString().slice(0, 10);
+    const dateKey = dateObj.toISOString().slice(0, 10);
+    const diffDays = Math.round((dateFromKey(dateKey) - dateFromKey(createdKey)) / 86400000);
+    return diffDays >= 0 && diffDays % n === 0;
+  }
+  if (habit.frequency === "weekly-on") {
+    const weekday = habit.weekday ?? 0;
+    if (dateObj.getDay() !== weekday) return false;
+    const n = habit.everyNWeeks || 1;
+    const weeksSince = Math.floor((mondayOfWeek(dateObj) - mondayOfWeek(new Date(habit.createdAt))) / (7 * 86400000));
+    return weeksSince >= 0 && weeksSince % n === 0;
   }
   return true;
 }
@@ -298,6 +329,13 @@ function computeStreak(habit) {
   return streak;
 }
 
+function frequencyLabel(habit) {
+  if (habit.frequency === "weekdays") return "Mo–Fr";
+  if (habit.frequency === "interval") return `alle ${habit.intervalDays || 1} Tage`;
+  if (habit.frequency === "weekly-on") return `alle ${habit.everyNWeeks || 1} Wo. ${WEEKDAY_LABELS[((habit.weekday ?? 0) + 6) % 7] || ""}`.trim();
+  return "täglich";
+}
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
@@ -320,7 +358,7 @@ function renderTaskItem(t) {
       <div class="item-title">${escapeHtml(t.title)}</div>
       <div class="item-meta">${t.size === "gross" ? "Groß" : "Klein"}${t.dueDate ? " · fällig " + t.dueDate : ""}${t.dueTime ? " " + t.dueTime : ""}${node ? " · " + escapeHtml(node.title) : ""}</div>
     </div>
-    ${t.priority === "hoch" ? '<span class="item-tag priority">Priorität</span>' : ""}
+    ${t.priority > 0 ? `<span class="item-tag priority">P${t.priority}</span>` : ""}
     ${overdue ? '<span class="item-tag late">Überfällig</span>' : ""}
     <button class="icon-btn" data-del-task="${t.id}">✕</button>
   `;
@@ -345,9 +383,7 @@ function renderTodo() {
     .sort((a, b) => {
       const ad = a.dueDate || "9999-99-99", bd = b.dueDate || "9999-99-99";
       if (ad !== bd) return ad.localeCompare(bd);
-      const ap = a.priority === "hoch" ? 0 : 1;
-      const bp = b.priority === "hoch" ? 0 : 1;
-      return ap - bp;
+      return (b.priority || 0) - (a.priority || 0);
     });
   const doneTasks = todoTasks.filter(t => t.done);
 
@@ -486,7 +522,7 @@ function renderRoutineChain() {
     }
 
     const controlHtml = h.type === "weight"
-      ? `<input type="number" step="0.1" inputmode="decimal" class="routine-weight-input" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
+      ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="routine-weight-input" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
       : `<input type="checkbox" ${doneToday ? "checked" : ""} data-habit="${h.id}">`;
 
     const el = document.createElement("div");
@@ -544,7 +580,7 @@ function renderOtherHabits() {
       <input type="checkbox" ${doneToday ? "checked" : ""} data-habit="${h.id}">
       <div class="item-body">
         <div class="item-title">${escapeHtml(h.title)}</div>
-        <div class="item-meta">${h.frequency === "weekdays" ? "Mo–Fr" : "täglich"} · Serie: ${streak}</div>
+        <div class="item-meta">${frequencyLabel(h)} · Serie: ${streak}</div>
       </div>
       ${priority ? '<span class="item-tag priority">Priorität</span>' : ""}
       <button class="icon-btn" data-del-habit="${h.id}">✕</button>
@@ -553,53 +589,64 @@ function renderOtherHabits() {
   });
 }
 
-// ---------- Rendering: Zielbereiche (verschachtelter Ordner-Browser) ----------
+// ---------- Rendering: Bereiche (Akkordeon-Baum) ----------
 function renderGoalBrowser() {
-  const breadcrumbWrap = document.getElementById("goalBreadcrumb");
-  const path = nodePath(currentFolderId);
-  let crumbHtml = `<button class="breadcrumb-item" data-open-node="">Zielbereiche</button>`;
-  path.forEach(n => {
-    crumbHtml += `<span class="breadcrumb-sep">/</span><button class="breadcrumb-item" data-open-node="${n.id}">${escapeHtml(n.title)}</button>`;
-  });
-  breadcrumbWrap.innerHTML = crumbHtml;
-  breadcrumbWrap.querySelectorAll(".breadcrumb-item").forEach((btn, i) => {
-    if (i === path.length) btn.classList.add("current");
-  });
-
-  const foldersWrap = document.getElementById("goalFolders");
-  const folders = childNodes(currentFolderId);
-  foldersWrap.innerHTML = "";
-  folders.forEach(node => foldersWrap.appendChild(renderFolderCard(node)));
-
-  const tasksWrap = document.getElementById("goalDirectTasks");
-  const tasks = tasksForNode(currentFolderId);
-  tasksWrap.innerHTML = "";
-  if (folders.length === 0 && tasks.length === 0) {
-    tasksWrap.innerHTML = '<div class="empty-hint">Noch leer — leg einen Unterordner oder eine Aufgabe an.</div>';
-  } else {
-    tasks.forEach(t => tasksWrap.appendChild(renderTaskItem(t)));
+  const wrap = document.getElementById("goalTree");
+  wrap.innerHTML = "";
+  const roots = childNodes(null);
+  if (roots.length === 0) {
+    wrap.innerHTML = '<div class="empty-hint">Noch keine Bereiche angelegt.</div>';
+    return;
   }
+  roots.forEach(node => wrap.appendChild(renderTreeNode(node, 0)));
 }
 
-function renderFolderCard(node) {
+function renderTreeNode(node, depth) {
+  const expanded = expandedNodes.has(node.id);
   const pct = Math.round(nodeProgress(node) * 100);
-  const subCount = childNodes(node.id).length;
-  const taskCount = tasksForNode(node.id).length;
-  const habitCount = habitsForNode(node.id).length;
+  const children = childNodes(node.id);
+  const tasks = categoryTasksForNode(node.id);
+
   const wrap = document.createElement("div");
-  wrap.className = "card category-card";
-  wrap.innerHTML = `
-    <div class="goal-head">
-      <button class="goal-title folder-open" data-open-node="${node.id}">${escapeHtml(node.title)} ${node.priority ? '<span class="item-tag priority">Priorität</span>' : ""}</button>
-      <div>
-        <button class="icon-btn" data-decompose-category="${node.id}" title="Aufgaben vorschlagen (Prompt kopieren)">···</button>
-        <button class="icon-btn" data-edit-category="${node.id}" title="Umbenennen">✎</button>
-        <button class="icon-btn" data-del-category="${node.id}">✕</button>
-      </div>
+  wrap.className = "goal-node" + (expanded ? " expanded" : "");
+  wrap.style.setProperty("--depth", depth);
+
+  const hasContent = children.length > 0 || tasks.length > 0;
+  const header = document.createElement("div");
+  header.className = "goal-node-header";
+  header.innerHTML = `
+    <button class="goal-node-toggle" data-toggle-node="${node.id}">${hasContent ? (expanded ? "−" : "+") : "·"}</button>
+    <button class="goal-node-main" data-toggle-node="${node.id}">
+      <div class="goal-node-title">${escapeHtml(node.title)} ${node.priority ? '<span class="item-tag priority">Priorität</span>' : ""}</div>
+      <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
+      <div class="progress-pct">${pct}% · ${children.length} Unterordner, ${tasks.length} Aufgabe(n)</div>
+    </button>
+    <div class="goal-node-actions">
+      <button class="icon-btn" data-decompose-category="${node.id}" title="Aufgaben vorschlagen">···</button>
+      <button class="icon-btn" data-edit-category="${node.id}" title="Umbenennen">✎</button>
+      <button class="icon-btn" data-del-category="${node.id}">✕</button>
     </div>
-    <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
-    <div class="progress-pct">${pct}% · ${subCount} Unterordner, ${taskCount} Aufgabe(n), ${habitCount} Gewohnheit(en)</div>
   `;
+  wrap.appendChild(header);
+
+  if (expanded) {
+    const body = document.createElement("div");
+    body.className = "goal-node-body";
+
+    tasks.forEach(t => body.appendChild(renderTaskItem(t)));
+    children.forEach(child => body.appendChild(renderTreeNode(child, depth + 1)));
+
+    const actionsRow = document.createElement("div");
+    actionsRow.className = "goal-node-add-row";
+    actionsRow.innerHTML = `
+      <button class="add-btn" data-add-subfolder="${node.id}">+ Unterordner</button>
+      <button class="add-btn" data-add-task-category="${node.id}">+ Aufgabe hier</button>
+    `;
+    body.appendChild(actionsRow);
+
+    wrap.appendChild(body);
+  }
+
   return wrap;
 }
 
@@ -626,7 +673,56 @@ function renderWeekStats() {
     completed.length ? `${onTime} von ${completed.length} erledigten Aufgaben pünktlich (${pct}%)` : "Noch keine erledigten Aufgaben mit Termin.";
 
   renderLongTermStats();
+  renderMoreStats();
   renderReflection();
+}
+
+function taskCompletionRateInWindow(days) {
+  const cutoff = todayStr(-days);
+  const relevant = state.tasks.filter(t => t.createdAt && t.createdAt.slice(0, 10) >= cutoff);
+  if (relevant.length === 0) return null;
+  return relevant.filter(t => t.done).length / relevant.length;
+}
+
+function weightTrend() {
+  const weightHabit = state.habits.find(h => h.type === "weight");
+  if (!weightHabit) return null;
+  const entries = Object.entries(weightHabit.history)
+    .filter(([, v]) => typeof v === "number")
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  if (entries.length === 0) return null;
+  const latest = entries[entries.length - 1][1];
+  if (entries.length === 1) return { latest, arrow: "–" };
+  const prev = entries[entries.length - 2][1];
+  const arrow = latest > prev ? "↑" : latest < prev ? "↓" : "–";
+  return { latest, arrow };
+}
+
+function renderMoreStats() {
+  const wrap = document.getElementById("moreStats");
+  if (!wrap) return;
+
+  const rate7 = taskCompletionRateInWindow(7);
+  const rate30 = taskCompletionRateInWindow(30);
+  const rate60 = taskCompletionRateInWindow(60);
+  const devCount7 = state.deviations.filter(d => d.date >= todayStr(-7)).length;
+  const devCount30 = state.deviations.filter(d => d.date >= todayStr(-30)).length;
+  const prayerFulfilled = state.prayers.filter(p => p.status === "fulfilled").length;
+  const weight = weightTrend();
+
+  const boxes = [
+    { num: rate7 !== null ? Math.round(rate7 * 100) + "%" : "–", label: "Aufgaben erledigt (7 Tage)" },
+    { num: rate30 !== null ? Math.round(rate30 * 100) + "%" : "–", label: "Aufgaben erledigt (30 Tage)" },
+    { num: rate60 !== null ? Math.round(rate60 * 100) + "%" : "–", label: "Aufgaben erledigt (60 Tage)" },
+    { num: devCount7, label: "Abweichungen (7 Tage)" },
+    { num: devCount30, label: "Abweichungen (30 Tage)" },
+    { num: prayerFulfilled, label: "Erhörungen gesamt" },
+    { num: weight ? `${weight.latest} kg ${weight.arrow}` : "–", label: "Gewichtstrend" }
+  ];
+
+  wrap.innerHTML = boxes.map(b => `
+    <div class="stat-box"><div class="stat-num">${b.num}</div><div class="stat-label">${b.label}</div></div>
+  `).join("");
 }
 
 function habitStatsWindow(habit, days) {
@@ -751,7 +847,7 @@ document.addEventListener("change", e => {
     const habit = state.habits.find(h => h.id === id);
     const key = todayStr();
     const val = e.target.value === "" ? null : parseFloat(e.target.value);
-    if (val === null || isNaN(val)) delete habit.history[key];
+    if (val === null || isNaN(val) || val < 0) delete habit.history[key];
     else habit.history[key] = val;
     saveData();
     renderAll();
@@ -785,9 +881,14 @@ document.addEventListener("click", e => {
   if (e.target.matches("[data-decompose-category]")) {
     copyDecomposePrompt(e.target.dataset.decomposeCategory, e.target);
   }
-  if (e.target.matches("[data-open-node]")) {
-    currentFolderId = e.target.dataset.openNode || null;
+  const toggleBtn = e.target.closest("[data-toggle-node]");
+  if (toggleBtn) {
+    const id = toggleBtn.dataset.toggleNode;
+    if (expandedNodes.has(id)) expandedNodes.delete(id); else expandedNodes.add(id);
     renderGoalBrowser();
+  }
+  if (e.target.matches("[data-add-subfolder]")) {
+    openCategoryModal(null, e.target.dataset.addSubfolder);
   }
   if (e.target.matches("[data-del-shift]")) {
     state.workShifts = state.workShifts.filter(s => s.id !== e.target.dataset.delShift);
@@ -824,7 +925,7 @@ document.addEventListener("click", e => {
 
 // ---------- Zielbereich-Zerlegung: Copy-Prompt für Chat-Analyse ----------
 function buildDecomposePrompt(node) {
-  const tasks = tasksForNode(node.id);
+  const tasks = categoryTasksForNode(node.id);
   const habits = habitsForNode(node.id);
   const pct = Math.round(nodeProgress(node) * 100);
   const path = nodePath(node.id).map(n => n.title).join(" / ");
@@ -839,7 +940,7 @@ function buildDecomposePrompt(node) {
   }
   if (habits.length) {
     prompt += `\nBereits verknüpfte Gewohnheiten:\n`;
-    habits.forEach(h => { prompt += `- ${h.title} (${h.frequency === "weekdays" ? "Mo–Fr" : "täglich"})\n`; });
+    habits.forEach(h => { prompt += `- ${h.title} (${frequencyLabel(h)})\n`; });
   }
 
   prompt += `\nSchlag mir bitte 3-6 konkrete neue Aufgaben oder Unterordner für diesen Zweig vor.`;
@@ -877,8 +978,7 @@ function downloadText(text, filename) {
 }
 
 // ---------- Add buttons ----------
-document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal(null, currentFolderId));
-document.getElementById("addGoalTaskBtn").addEventListener("click", () => openTaskModal(currentFolderId, "category"));
+document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal(null, null));
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
 document.getElementById("exportWeekBtn").addEventListener("click", exportWeekReview);
@@ -951,10 +1051,14 @@ function openTaskModal(defaultNodeId, source = "todo") {
       </select>
     </div>
     <div class="field">
-      <label>Priorität</label>
+      <label>Priorität (0 = keine, 5 = höchste)</label>
       <select id="mTaskPriority">
-        <option value="normal">normal</option>
-        <option value="hoch">hoch</option>
+        <option value="0">0 – keine</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5 – höchste</option>
       </select>
     </div>
     ${source === "category" ? "" : `
@@ -978,7 +1082,7 @@ function openTaskModal(defaultNodeId, source = "todo") {
       const dueDate = body.querySelector("#mTaskDate").value || null;
       const dueTime = body.querySelector("#mTaskTime").value || null;
       const size = body.querySelector("#mTaskSize").value;
-      const priority = body.querySelector("#mTaskPriority").value;
+      const priority = parseInt(body.querySelector("#mTaskPriority").value, 10) || 0;
       const categorySelect = body.querySelector("#mTaskCategory");
       const nodeId = source === "category" ? defaultNodeId : (categorySelect ? categorySelect.value || null : null);
       state.tasks.push({ id: uid(), title, nodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source });
@@ -1001,7 +1105,27 @@ function openHabitModal() {
       <select id="mHabitFrequency">
         <option value="daily">täglich</option>
         <option value="weekdays">Werktage (Mo–Fr)</option>
+        <option value="interval">alle X Tage</option>
+        <option value="weekly-on">alle X Wochen an einem Wochentag</option>
       </select>
+    </div>
+    <div class="field" id="mHabitIntervalField" style="display:none">
+      <label>Alle wie viele Tage?</label>
+      <input type="number" id="mHabitIntervalDays" min="2" value="3">
+    </div>
+    <div class="field" id="mHabitWeeklyField" style="display:none">
+      <label>Wochentag</label>
+      <select id="mHabitWeekday">
+        <option value="1">Montag</option>
+        <option value="2">Dienstag</option>
+        <option value="3">Mittwoch</option>
+        <option value="4">Donnerstag</option>
+        <option value="5">Freitag</option>
+        <option value="6">Samstag</option>
+        <option value="0">Sonntag</option>
+      </select>
+      <label>Alle wie viele Wochen?</label>
+      <input type="number" id="mHabitEveryNWeeks" min="1" value="2">
     </div>
     <div class="field">
       <label>Zielbereich (optional)</label>
@@ -1017,12 +1141,25 @@ function openHabitModal() {
   `, body => {
     body.querySelector("#mHabitTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
+    const freqSelect = body.querySelector("#mHabitFrequency");
+    const intervalField = body.querySelector("#mHabitIntervalField");
+    const weeklyField = body.querySelector("#mHabitWeeklyField");
+    freqSelect.addEventListener("change", () => {
+      intervalField.style.display = freqSelect.value === "interval" ? "" : "none";
+      weeklyField.style.display = freqSelect.value === "weekly-on" ? "" : "none";
+    });
     body.querySelector("#mSave").addEventListener("click", () => {
       const title = body.querySelector("#mHabitTitle").value.trim();
       if (!title) return;
       const nodeId = body.querySelector("#mHabitCategory").value || null;
-      const frequency = body.querySelector("#mHabitFrequency").value;
-      state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, routineOrder: null, type: "check" });
+      const frequency = freqSelect.value;
+      const extra = {};
+      if (frequency === "interval") extra.intervalDays = parseInt(body.querySelector("#mHabitIntervalDays").value, 10) || 1;
+      if (frequency === "weekly-on") {
+        extra.weekday = parseInt(body.querySelector("#mHabitWeekday").value, 10);
+        extra.everyNWeeks = parseInt(body.querySelector("#mHabitEveryNWeeks").value, 10) || 1;
+      }
+      state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder: null, type: "check" });
       saveData();
       closeModal();
       renderAll();
