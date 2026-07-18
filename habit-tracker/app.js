@@ -6,18 +6,18 @@ const LEBENSWISSEN = [
   ["Glaube", true, ["Grundlagen des christlichen Glaubens", "Die einzelnen Bibelbücher", "Historischer/kultureller Hintergrund", "Gebet (Formen, Praxis)", "Gemeindeleben & geistliche Gemeinschaft", "Theologische Grundbegriffe"]],
   ["Gesundheit", false, ["Anatomie des Menschen", "Organsysteme", "Ernährung", "Hormone & ihre Wirkung", "Blut & Blutwerte", "Bewegung/Training", "Schlaf", "Erste Hilfe", "Mentale Gesundheit", "Zahnpflege", "Vorsorgeuntersuchungen"]],
   ["Haushalt", false, ["Wäsche", "Kochen", "Putzen", "Ordnung & Organisation", "Reparaturen im Haushalt", "Pflanzen & Garten", "Mülltrennung & Entsorgung"]],
-  ["Handwerkliches & Technik im Alltag", false, ["Auto", "Heimnetzwerk/WLAN", "Unterhaltungselektronik", "Kabelmanagement", "Rasieren & Bartpflege", "Selbstschutz", "Selbstverteidigung", "Werkzeugkoffer"]],
+  ["Technik & Alltag", false, ["Auto", "Heimnetzwerk/WLAN", "Unterhaltungselektronik", "Kabelmanagement", "Rasieren & Bartpflege", "Selbstschutz", "Selbstverteidigung", "Werkzeugkoffer"]],
   ["Bürokratie & Finanzen", false, ["Ordnersystem für Unterlagen", "Dokumente aufbewahren", "Gehalt/Lohn verstehen", "Steuern", "Versicherungen", "Konten, Sparen, Budget", "Verträge lesen & verstehen", "Behördengänge"]],
   ["Handwerk & Werkstatt", false, ["Elektro", "Holzbearbeitung", "Metallbearbeitung", "Werkstatt-Grundausstattung", "Schweißen", "Kleben", "Nägel & Schrauben", "Technische Zeichnungen", "Anlagen/Installationen", "Gas, Wasser, Sanitär"]],
-  ["Zukunft & Karriere", false, ["Karriereplanung", "Softskills", "Hardskills", "Hausbau/Immobilien", "Finanzen & Vermögensaufbau", "Selbstständigkeit", "Lebens-/Zielplanung"]],
-  ["Kunst & Kreatives", false, ["Schreiben", "Zeichnen/Malen", "Kunstgeschichte", "Bekannte Künstler", "Kunstrichtungen", "Worldbuilding"]],
-  ["Überleben & Sicherheit", false, ["Notfallarten", "Verletzungen erkennen & versorgen", "Outdoor-Grundlagen", "Ausrüstung", "Gefahren – nicht selbst eingreifen", "Notfallkontakte & -plan"]],
+  ["Zukunft", false, ["Karriereplanung", "Softskills", "Hardskills", "Hausbau/Immobilien", "Finanzen & Vermögensaufbau", "Selbstständigkeit", "Lebens-/Zielplanung"]],
+  ["Kunst", false, ["Schreiben", "Zeichnen/Malen", "Kunstgeschichte", "Bekannte Künstler", "Kunstrichtungen", "Worldbuilding"]],
+  ["Überleben", false, ["Notfallarten", "Verletzungen erkennen & versorgen", "Outdoor-Grundlagen", "Ausrüstung", "Gefahren – nicht selbst eingreifen", "Notfallkontakte & -plan"]],
   ["Essen & Trinken", false, ["Whisky", "Kaffee", "Wein", "Bier", "Food-Pairing"]],
-  ["Digitales Leben & Sicherheit", false, ["Passwort-Sicherheit", "Datenschutz-Grundlagen", "Backups", "Betrugsmaschen erkennen", "Digitale Nachlassplanung"]],
+  ["Digitales", false, ["Passwort-Sicherheit", "Datenschutz-Grundlagen", "Backups", "Betrugsmaschen erkennen", "Digitale Nachlassplanung"]],
   ["Recht im Alltag", false, ["Mietrecht-Basics", "Kaufrecht/Gewährleistung", "Verkehrsrecht-Basics", "Wichtige Fristen"]],
-  ["Beziehungen & Kommunikation", false, ["Kommunikationsgrundlagen", "Konfliktlösung", "Partnerschaft/Ehe-Vorbereitung", "Erziehung/Elternschaft"]],
+  ["Beziehung", false, ["Kommunikationsgrundlagen", "Konfliktlösung", "Partnerschaft/Ehe-Vorbereitung", "Erziehung/Elternschaft"]],
   ["Reisen", false, ["Reiseplanung & Budget", "Dokumente", "Packen & Ausrüstung", "Sprachliche Basics", "Sicherheit auf Reisen"]],
-  ["Umgang mit Behörden & Institutionen", false, ["Wichtige Ämter im Überblick", "Anträge & Fristen", "Widerspruch/Einspruch"]]
+  ["Behörden", false, ["Wichtige Ämter im Überblick", "Anträge & Fristen", "Widerspruch/Einspruch"]]
 ];
 
 function loadData() {
@@ -98,6 +98,55 @@ function migrateToGoalNodes(data) {
   delete data.goals;
 }
 
+// ---------- Einmalige Ergänzung: Tims konkrete ToDos/Habits/Fächer (Phase 6) ----------
+function applyPhase6Additions(data) {
+  if (data._phase6Additions) return;
+  data._phase6Additions = true;
+
+  const findRoot = title => (data.goalNodes.find(n => n.title === title) || {}).id || null;
+  const glaube = findRoot("Glaube");
+  const zukunft = findRoot("Zukunft");
+
+  const addTask = (title, nodeId, dueDate) => {
+    data.tasks.push({
+      id: uid(), title, nodeId, dueDate, dueTime: null, done: false, completedAt: null,
+      createdAt: new Date().toISOString(), size: "klein", priority: 0, source: "todo"
+    });
+  };
+  addTask("\"Gemischte Gefühle\" (Bibelkurs) – Kapitel 1", glaube, "2026-07-19");
+  addTask("\"Gemischte Gefühle\" (Bibelkurs) – Kapitel 2", glaube, "2026-07-19");
+  addTask("\"Roter Faden durch die Bibel\" (Bibelkurs)", glaube, "2026-07-31");
+  addTask("Buch: \"Lieblingsmensch fürs Leben?\"", glaube, "2026-07-22");
+  addTask("Buch: \"Du musst sterben, bevor du lebst, damit du lebst, bevor du stirbst\"", glaube, "2026-07-31");
+  addTask("Seminar: Themenfrage, Themenerklärung, Gliederung & Literatur", zukunft, "2026-07-20");
+  addTask("Wäsche", null, todayStr());
+  addTask("2 Bewerbungen verschicken (täglich, bis alle weg sind)", null, todayStr());
+  addTask("Unterschrift von der Bibliothek bei Frau Herrmann abholen", null, "2026-07-20");
+  addTask("Pflanzen umtopfen", null, null);
+
+  const addHabit = (title, extra = {}) => {
+    data.habits.push({
+      id: uid(), title, nodeId: null, history: {}, createdAt: new Date().toISOString(),
+      frequency: "interval", intervalDays: 7, routineOrder: null, type: "check", ...extra
+    });
+  };
+  addHabit("Pflanzen gießen");
+  addHabit("Französisch: Vokabeln wiederholen (1 Std./Woche)");
+  addHabit("Französisch: Grammatik wiederholen (30 Min./Woche)");
+
+  if (!data.subjects.find(s => s.title === "Französisch")) {
+    data.subjects.push({ id: uid(), title: "Französisch" });
+  }
+  ["Englisch", "Deutsch", "BWL", "Mathe", "Französisch"].forEach(title => {
+    if (!data.habits.find(h => h.title === title)) {
+      data.habits.push({
+        id: uid(), title, nodeId: null, history: {}, createdAt: new Date().toISOString(),
+        frequency: "weekdays", routineOrder: null, type: "check"
+      });
+    }
+  });
+}
+
 let state = loadData();
 migrateToGoalNodes(state);
 state.subjects = state.subjects || [];
@@ -106,6 +155,7 @@ state.workShifts = state.workShifts || [];
 state.deviations = state.deviations || [];
 state.weeklyReflection = state.weeklyReflection || {};
 state.prayers = state.prayers || [];
+applyPhase6Additions(state);
 saveData();
 
 const expandedNodes = new Set(); // Laufzeit-Status des Bereiche-Akkordeons (nicht persistiert)
@@ -312,10 +362,15 @@ function habitCompletionRate(habit, days = 30) {
 function computeStreak(habit) {
   let streak = 0;
   let d = new Date();
+  const createdDate = new Date(habit.createdAt);
   if (!habit.history[todayStr()] && isScheduledToday(habit, d)) {
     d.setDate(d.getDate() - 1);
   }
-  while (true) {
+  // Für "alle X Tage"/"alle X Wochen"-Habits ist nie ein Tag vor der Erstellung geplant —
+  // ohne diesen Abbruch würde die Rückwärtssuche sonst endlos weiterlaufen.
+  let guard = 0;
+  while (guard++ < 3660) {
+    if (d < createdDate) break;
     if (!isScheduledToday(habit, d)) {
       d.setDate(d.getDate() - 1);
       continue;
@@ -672,7 +727,6 @@ function renderWeekStats() {
   document.getElementById("punctualityText").textContent =
     completed.length ? `${onTime} von ${completed.length} erledigten Aufgaben pünktlich (${pct}%)` : "Noch keine erledigten Aufgaben mit Termin.";
 
-  renderLongTermStats();
   renderMoreStats();
   renderReflection();
 }
@@ -758,34 +812,6 @@ function weekdayDifficulty(days) {
     total: t.total,
     rate: t.total ? t.done / t.total : null
   }));
-}
-
-function renderLongTermStats(days = 60) {
-  const container = document.getElementById("longTermStats");
-  const habitStats = state.habits
-    .map(h => ({ habit: h, ...habitStatsWindow(h, days) }))
-    .filter(s => s.total > 0);
-  const weekdayStats = weekdayDifficulty(days).filter(w => w.total > 0);
-
-  if (habitStats.length === 0) {
-    container.innerHTML = `<div class="empty-hint">Noch nicht genug Daten (mind. 1 fälliger Habit-Tag in den letzten ${days} Tagen nötig).</div>`;
-    return;
-  }
-
-  const best = habitStats.reduce((a, b) => (b.rate > a.rate ? b : a));
-  const worst = habitStats.reduce((a, b) => (b.rate < a.rate ? b : a));
-
-  let hardestDayBox = "";
-  if (weekdayStats.length) {
-    const hardest = weekdayStats.reduce((a, b) => (b.rate < a.rate ? b : a));
-    hardestDayBox = `<div class="stat-box"><div class="stat-num">${hardest.day}</div><div class="stat-label">Schwierigster Wochentag (${Math.round(hardest.rate * 100)}%)</div></div>`;
-  }
-
-  container.innerHTML = `
-    <div class="stat-box"><div class="stat-num">${Math.round(best.rate * 100)}%</div><div class="stat-label">Bester Habit: ${escapeHtml(best.habit.title)}</div></div>
-    <div class="stat-box"><div class="stat-num">${Math.round(worst.rate * 100)}%</div><div class="stat-label">Schwierigster Habit: ${escapeHtml(worst.habit.title)}</div></div>
-    ${hardestDayBox}
-  `;
 }
 
 function weekStartKey(dateObj = new Date()) {
@@ -982,7 +1008,6 @@ document.getElementById("addCategoryBtn").addEventListener("click", () => openCa
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
 document.getElementById("exportWeekBtn").addEventListener("click", exportWeekReview);
-document.getElementById("addSubjectBtn").addEventListener("click", () => openSubjectModal());
 document.getElementById("addExamBtn").addEventListener("click", () => openExamModal());
 document.getElementById("addPrayerBtn").addEventListener("click", () => openPrayerModal());
 document.getElementById("addDeviationBtn").addEventListener("click", () => {
@@ -1268,52 +1293,23 @@ function openExamModal() {
 }
 
 function renderPlanning() {
-  const subjectsWrap = document.getElementById("subjectsList");
-  if (subjectsWrap) {
-    subjectsWrap.innerHTML = state.subjects.length
-      ? state.subjects.map(s => `
-          <div class="item">
-            <div class="item-body"><div class="item-title">${escapeHtml(s.title)}</div></div>
-            <button class="icon-btn" data-del-subject="${s.id}">✕</button>
-          </div>
-        `).join("")
-      : '<div class="empty-hint">Noch keine Fächer angelegt.</div>';
-  }
-
   const examsWrap = document.getElementById("examsList");
-  if (examsWrap) {
-    const sorted = state.exams.slice().sort((a, b) => a.date.localeCompare(b.date));
-    examsWrap.innerHTML = sorted.length
-      ? sorted.map(e => {
-          const subject = state.subjects.find(s => s.id === e.subjectId);
-          return `
-            <div class="item">
-              <div class="item-body">
-                <div class="item-title">${subject ? escapeHtml(subject.title) : "Unbekanntes Fach"}</div>
-                <div class="item-meta">${e.date}</div>
-              </div>
-              <button class="icon-btn" data-del-exam="${e.id}">✕</button>
-            </div>
-          `;
-        }).join("")
-      : '<div class="empty-hint">Noch keine Klassenarbeiten eingetragen.</div>';
-  }
-
-  const shiftsWrap = document.getElementById("shiftsList");
-  if (shiftsWrap) {
-    const sorted = state.workShifts.slice().sort((a, b) => b.date.localeCompare(a.date));
-    shiftsWrap.innerHTML = sorted.length
-      ? sorted.map(s => `
+  if (!examsWrap) return;
+  const sorted = state.exams.slice().sort((a, b) => a.date.localeCompare(b.date));
+  examsWrap.innerHTML = sorted.length
+    ? sorted.map(e => {
+        const subject = state.subjects.find(s => s.id === e.subjectId);
+        return `
           <div class="item">
             <div class="item-body">
-              <div class="item-title">${s.date}${s.label ? " · " + escapeHtml(s.label) : ""}</div>
-              <div class="item-meta">${s.start}–${s.end}</div>
+              <div class="item-title">${subject ? escapeHtml(subject.title) : "Unbekanntes Fach"}</div>
+              <div class="item-meta">${e.date}</div>
             </div>
-            <button class="icon-btn" data-del-shift="${s.id}">✕</button>
+            <button class="icon-btn" data-del-exam="${e.id}">✕</button>
           </div>
-        `).join("")
-      : '<div class="empty-hint">Noch keine Arbeitsschichten eingetragen.</div>';
-  }
+        `;
+      }).join("")
+    : '<div class="empty-hint">Noch keine Klassenarbeiten eingetragen.</div>';
 }
 
 // ---------- Gebetsanliegen ----------
@@ -1325,14 +1321,14 @@ function renderPrayers() {
   const openPrayers = state.prayers.filter(p => p.status === "open");
   listWrap.innerHTML = openPrayers.length
     ? openPrayers.map(p => `
-        <div class="item prayer-item">
-          <div class="item-body">
-            <div class="item-title">${escapeHtml(p.title)}</div>
-            ${p.deferredCount ? `<div class="item-meta">${p.deferredCount}× auf nächste Woche verschoben</div>` : ""}
+        <div class="prayer-card">
+          <div class="item-title">${escapeHtml(p.title)}</div>
+          ${p.deferredCount ? `<div class="item-meta">${p.deferredCount}× auf nächste Woche verschoben</div>` : ""}
+          <div class="prayer-actions">
+            <button class="prayer-action prayer-action-fulfilled" data-prayer-fulfilled="${p.id}">${CHECK_ICON}<span>Erfüllt</span></button>
+            <button class="prayer-action" data-prayer-defer="${p.id}">${REFRESH_ICON}<span>Nächste Woche</span></button>
+            <button class="prayer-action" data-prayer-irrelevant="${p.id}">${CROSS_ICON}<span>Nicht mehr relevant</span></button>
           </div>
-          <button class="icon-btn" data-prayer-fulfilled="${p.id}" title="Erfüllt">${CHECK_ICON}</button>
-          <button class="icon-btn" data-prayer-defer="${p.id}" title="Nächste Woche">${REFRESH_ICON}</button>
-          <button class="icon-btn" data-prayer-irrelevant="${p.id}" title="Nicht mehr relevant">${CROSS_ICON}</button>
         </div>
       `).join("")
     : '<div class="empty-hint">Keine offenen Anliegen.</div>';
