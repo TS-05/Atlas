@@ -73,10 +73,13 @@
     <section id="tab-zielbereiche" class="tab-panel">
       <div class="goals-header">
         <h2>Zielbereiche</h2>
-        <button class="add-btn" id="addCategoryBtn">+ Bereich hinzufügen</button>
+        <button class="add-btn" id="addCategoryBtn">+ Unterordner hier</button>
       </div>
-      <p class="hint">Jeder Bereich enthält Aufgaben, die dich deinem Idealbild in diesem Lebensbereich näherbringen.</p>
-      <div id="categoriesList" class="goals-tree"></div>
+      <p class="hint">Jeder Ordner arbeitet auf das übergeordnete Ziel hin — beliebig tief verschachtelbar, ganz unten stehen die eigentlichen Aufgaben.</p>
+      <div id="goalBreadcrumb" class="breadcrumb"></div>
+      <div id="goalFolders" class="goals-tree"></div>
+      <div id="goalDirectTasks" class="list"></div>
+      <button class="add-btn" id="addGoalTaskBtn">+ Aufgabe hier</button>
 
       <div class="card planning-card">
         <h3>Fächer</h3>
@@ -120,6 +123,21 @@
         <button class="add-btn" id="exportWeekBtn">Vollständigen Export herunterladen</button>
       </div>
     </section>
+
+    <!-- GEBETE -->
+    <section id="tab-gebete" class="tab-panel">
+      <div class="goals-header">
+        <h2>Gebetsanliegen</h2>
+        <button class="add-btn" id="addPrayerBtn">+ Anliegen hinzufügen</button>
+      </div>
+      <div id="prayerList" class="list"></div>
+
+      <div class="card">
+        <h3>Erhörungen</h3>
+        <p class="hint">Beantwortete Anliegen mit Datum, Text und Anhang.</p>
+        <div id="prayerArchive" class="list"></div>
+      </div>
+    </section>
   </main>
 
   <nav class="tabs">
@@ -138,6 +156,10 @@
     <button class="tab-btn" data-tab="woche">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V10M12 19V5M19 19v-7"/></svg>
       <span>Woche</span>
+    </button>
+    <button class="tab-btn" data-tab="gebete">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 8h12"/></svg>
+      <span>Gebete</span>
     </button>
   </nav>
 </div>
