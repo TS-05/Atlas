@@ -166,18 +166,138 @@ function seedData() {
   return data;
 }
 
+// ---------- Splat-Häkchen-System (aus dem Claude-Design-Handoff, Atlas.dc.html) ----------
+const SPLATS = [
+  { path: 'M10,3 L11.5,6 L15,5 L13,8.5 L16.5,10 L13,11 L14.5,15 L11,13 L10,17 L8.5,13 L5,15 L7,11 L3,10 L7,8.5 L5,5 L8.5,6 Z',
+    dots: [[17,3,0.8],[2,15,1],[15,17,0.6]] },
+  { path: 'M9,2 L10,5 L13,3.5 L11.5,7 L16,6 L13,9.5 L18,11 L12.5,11.5 L15,15 L10,13 L11,18 L8,14 L4,17 L6.5,12.5 L1,13 L5,10 L2,7 L7,8.5 L6,4 Z',
+    dots: [[18,4,0.7],[1,4,1.1],[9,19,0.8],[19,15,0.6]] },
+  { path: 'M8,3 L11,4 L13,2 L13,6 L17,7 L14,9 L17,12 L13,12.5 L14,16.5 L10.5,14 L9,19 L8,15 L4,16 L6,12 L2,11.5 L5.5,9 L2.5,6.5 L7,7.5 Z',
+    dots: [[18,9,1],[3,3,0.8],[16,17,0.7],[1,17,0.5]] },
+  { path: 'M10,4 L12,5.5 L14,4.5 L13,7.5 L16,9 L12.5,10 L14,13.5 L11,12 L10,16 L8.5,12.5 L5,14 L7,10.5 L4,9 L7.5,7.5 L6,4.5 L9,5.5 Z',
+    dots: [[16,4,0.7],[3,16,0.9]] }
+];
+const TAB_SPLATS = [
+  SPLATS[0], SPLATS[1], SPLATS[2], SPLATS[3],
+  { path: 'M9,3 L12,4.5 L14,2.5 L14,6.5 L18,7 L15,9.5 L18,13 L14,13 L15,17 L11,14.5 L9,19 L7.5,15 L3,16.5 L6,12.5 L2,10 L6.5,8.5 L4,4.5 L8,6 Z',
+    dots: [[17,3,0.8],[2,17,1]] }
+];
+function splatFor(id) {
+  // deterministischer Splat je nach (String-)ID, wie im Design-Prototyp
+  let n = 0;
+  for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0;
+  const v = SPLATS[n % SPLATS.length];
+  const scale = 0.78 + ((n * 29) % 65) / 100;
+  const rot = ((n * 53) % 60) - 30;
+  return {
+    path: v.path, dots: v.dots.map(([cx, cy, r]) => ({ cx, cy, r })),
+    scale: scale.toFixed(2), rot
+  };
+}
+function splatSvg(id) {
+  const s = splatFor(id);
+  return `<svg width="18" height="18" viewBox="0 0 20 20" style="overflow:visible;">
+    <g transform="translate(10 10) scale(${s.scale}) rotate(${s.rot}) translate(-10 -10)">
+      <path d="${s.path}" fill="url(#goldGradRing)" filter="url(#inkRough)"/>
+      ${s.dots.map(d => `<circle cx="${d.cx}" cy="${d.cy}" r="${d.r}" fill="url(#goldGradRing)"/>`).join("")}
+    </g>
+  </svg>`;
+}
+function pieSlicePath(pct) {
+  const cx = 20, cy = 20, R = 30;
+  if (pct >= 99.5) return "M0,0 H40 V40 H0 Z";
+  if (pct <= 0.5) return `M${cx},${cy} L${cx},${cy - R} Z`;
+  const endDeg = -90 + pct * 3.6;
+  const endRad = endDeg * Math.PI / 180;
+  const ex = (cx + R * Math.cos(endRad)).toFixed(2);
+  const ey = (cy + R * Math.sin(endRad)).toFixed(2);
+  const largeArc = pct > 50 ? 1 : 0;
+  return `M${cx},${cy} L${cx},${cy - R} A${R},${R} 0 ${largeArc} 1 ${ex},${ey} Z`;
+}
+
 // ---------- Tabs ----------
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-    document.body.dataset.tab = btn.dataset.tab;
-    renderAll();
-  });
+const TAB_ORDER = ["heute", "todo", "zielbereiche", "gebete", "analyse"];
+const TAB_ROT = [-6, 10, -12, 7, -4];
+const TAB_SCALE = [1.05, 0.92, 1.1, 0.95, 1.02];
+const tabBtns = Array.from(document.querySelectorAll(".tab-btn"));
+const tabIndicator = document.getElementById("tabIndicator");
+const tabIndicatorPath = document.getElementById("tabIndicatorPath");
+
+function positionTabIndicator(idx, animateDrop) {
+  const leftPct = (idx + 0.5) / TAB_ORDER.length * 100;
+  tabIndicator.style.left = `calc(${leftPct}% - 28px)`;
+  const s = TAB_SPLATS[idx % TAB_SPLATS.length];
+  const scale = TAB_SCALE[idx] || 1;
+  const rot = TAB_ROT[idx] || 0;
+  const apply = () => {
+    tabIndicatorPath.setAttribute("d", s.path);
+    tabIndicatorPath.setAttribute("transform", `translate(10 10) scale(${scale}) rotate(${rot}) translate(-10 -10)`);
+  };
+  if (animateDrop) {
+    tabIndicator.style.transform = "scale(0.4)";
+    tabIndicator.style.opacity = "0.85";
+    setTimeout(() => {
+      apply();
+      tabIndicator.style.transform = "scale(1)";
+      tabIndicator.style.opacity = "1";
+    }, 180);
+  } else {
+    apply();
+  }
+}
+
+function switchTab(tabName) {
+  const idx = TAB_ORDER.indexOf(tabName);
+  tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === tabName));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("tab-" + tabName).classList.add("active");
+  document.body.dataset.tab = tabName;
+  positionTabIndicator(idx, true);
+  quickAddVisible = false;
+  updateHeaderPlusButton();
+  renderAll();
+}
+
+tabBtns.forEach(btn => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
 });
 document.body.dataset.tab = "heute";
+positionTabIndicator(0, false);
+
+// ---------- Kopfzeile: kontextabhängiger Plus-Button ----------
+const QUICK_ADD_BTN_IDS = { heute: ["addRoutineBtn", "addHabitBtn"], todo: ["addTaskBtn"] };
+let quickAddVisible = false;
+Object.values(QUICK_ADD_BTN_IDS).flat().forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.style.display = "none";
+});
+
+function updateHeaderPlusButton() {
+  const tab = document.body.dataset.tab;
+  const ids = QUICK_ADD_BTN_IDS[tab];
+  if (ids) ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = quickAddVisible ? "" : "none"; });
+  const prayerCard = document.getElementById("prayerAddCard");
+  if (prayerCard) prayerCard.style.display = (tab === "gebete" && quickAddVisible) ? "flex" : "none";
+}
+
+document.getElementById("headerPlusBtn").addEventListener("click", () => {
+  const tab = document.body.dataset.tab;
+  if (tab === "heute" || tab === "todo") {
+    quickAddVisible = !quickAddVisible;
+    updateHeaderPlusButton();
+  } else if (tab === "zielbereiche") {
+    openCategoryModal(null, null);
+  } else if (tab === "gebete") {
+    quickAddVisible = !quickAddVisible;
+    updateHeaderPlusButton();
+    if (quickAddVisible) document.getElementById("prayerInput").focus();
+  } else if (tab === "analyse") {
+    exportWeekReview();
+  }
+});
+document.getElementById("addRoutineBtn").addEventListener("click", () => openHabitModal());
+document.getElementById("savePrayerBtn").addEventListener("click", savePrayerFromInline);
+document.getElementById("prayerInput").addEventListener("keydown", e => { if (e.key === "Enter") savePrayerFromInline(); });
 
 document.getElementById("todayLabel").textContent = new Date().toLocaleDateString("de-DE", {
   weekday: "long", day: "2-digit", month: "long", year: "numeric"
@@ -187,8 +307,9 @@ document.getElementById("todayLabel").textContent = new Date().toLocaleDateStrin
 const overlay = document.getElementById("modalOverlay");
 const modalBody = document.getElementById("modalBody");
 
-function openModal(html, onMount) {
-  modalBody.innerHTML = html;
+function openModal(html, onMount, mode = "dialog") {
+  overlay.classList.toggle("dialog-mode", mode === "dialog");
+  modalBody.innerHTML = mode === "sheet" ? '<div class="modal-grabber"></div>' + html : html;
   overlay.classList.remove("hidden");
   if (onMount) onMount(modalBody);
 }
@@ -342,25 +463,25 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-const CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
-const PENCIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1 10-10-3-3L5 16l-1 4z"/></svg>';
-
-// ---------- Rendering: ToDo ----------
+// ---------- Rendering: ToDo / Bereiche-Aufgaben (gemeinsame Zeile) ----------
 function renderTaskItem(t) {
   const today = todayStr();
   const overdue = !t.done && t.dueDate && t.dueDate < today;
   const node = nodeById(t.nodeId);
+  const metaParts = [t.size === "gross" ? "Groß" : "Klein"];
+  if (t.dueDate) metaParts.push("fällig " + t.dueDate + (t.dueTime ? " " + t.dueTime : ""));
+  if (node) metaParts.push(node.title);
   const el = document.createElement("div");
-  el.className = "item" + (t.done ? " done" : "");
+  el.className = "atlas-row" + (t.done ? " done" : "");
   el.innerHTML = `
-    <input type="checkbox" ${t.done ? "checked" : ""} data-task="${t.id}">
-    <div class="item-body">
+    <button class="atlas-check${t.done ? " checked" : ""}" data-task="${t.id}">${t.done ? splatSvg(t.id) : ""}</button>
+    <div style="flex:1; min-width:0;">
       <div class="item-title">${escapeHtml(t.title)}</div>
-      <div class="item-meta">${t.size === "gross" ? "Groß" : "Klein"}${t.dueDate ? " · fällig " + t.dueDate : ""}${t.dueTime ? " " + t.dueTime : ""}${node ? " · " + escapeHtml(node.title) : ""}</div>
+      <div class="item-meta">${escapeHtml(metaParts.join(" · "))}</div>
     </div>
-    ${t.priority > 0 ? `<span class="item-tag priority">P${t.priority}</span>` : ""}
-    ${overdue ? '<span class="item-tag late">Überfällig</span>' : ""}
-    <button class="icon-btn" data-del-task="${t.id}">✕</button>
+    ${t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
+    ${overdue ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">ÜBERFÄLLIG</span>' : ""}
+    <button class="btn btn-icon btn-ghost" data-del-task="${t.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
   `;
   return el;
 }
@@ -423,14 +544,22 @@ function renderWeekCircle() {
     const done = scheduled.filter(h => h.history[key]).length;
     const pct = scheduled.length ? Math.round((done / scheduled.length) * 100) : null;
 
+    const maskUrl = `assets/ring-mask-${i + 1}.png`;
+    const clip = pieSlicePath(pct === null ? 0 : pct);
+
     const el = document.createElement("div");
     el.className = "week-circle-day" + (isToday ? " is-today" : "") + (isFuture ? " is-future" : "");
     el.title = `${key}: ${scheduled.length ? done + "/" + scheduled.length + " Habits" : "keine Habits fällig"}`;
     el.innerHTML = `
-      <div class="week-circle-ring" style="--pct:${pct === null ? 0 : pct}%">
-        <div class="week-circle-ring-inner">${pct === null ? "–" : pct + "%"}</div>
+      <div class="week-ring">
+        <div class="week-ring-dim" style="background-image:url('${maskUrl}')"></div>
+        <div class="week-ring-lit-wrap" style="clip-path: path('${clip}');">
+          <div class="week-ring-lit" style="background-image:url('${maskUrl}')"></div>
+        </div>
+        <div class="week-ring-shine"></div>
+        <div class="week-ring-label">${pct === null ? "–" : pct + "%"}</div>
       </div>
-      <div class="week-circle-label">${WEEKDAY_LABELS[i]}</div>
+      <div class="week-circle-day-label">${WEEKDAY_LABELS[i]}</div>
     `;
     wrap.appendChild(el);
   }
@@ -445,7 +574,7 @@ function renderDeviationLog() {
         <div class="deviation-entry">
           <span class="deviation-time">${d.time}</span>
           <span class="deviation-text">${escapeHtml(d.text)}</span>
-          <button class="icon-btn" data-del-deviation="${d.id}">✕</button>
+          <button class="btn btn-icon btn-ghost" data-del-deviation="${d.id}" aria-label="Löschen"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1.5 1.5L10.5 10.5M10.5 1.5L1.5 10.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
         </div>
       `).join("")
     : '<div class="empty-hint">Heute noch keine Abweichung eingetragen.</div>';
@@ -522,19 +651,19 @@ function renderRoutineChain() {
     }
 
     const controlHtml = h.type === "weight"
-      ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="routine-weight-input" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
-      : `<input type="checkbox" ${doneToday ? "checked" : ""} data-habit="${h.id}">`;
+      ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:72px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
+      : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}">${doneToday ? splatSvg(h.id) : ""}</button>`;
 
     const el = document.createElement("div");
-    el.className = "routine-step" + (doneToday ? " done" : "");
+    el.className = "atlas-row" + (doneToday ? " done" : "");
     el.dataset.type = h.type;
     el.innerHTML = `
-      <div class="routine-step-num">${h.type === "weight" ? PENCIL_ICON : CHECK_ICON}</div>
-      <div class="routine-step-body">
+      ${h.type === "weight" ? "" : controlHtml}
+      <div style="flex:1; min-width:0;">
         <div class="item-title">${escapeHtml(h.title)}</div>
         ${noteHtml}
       </div>
-      ${controlHtml}
+      ${h.type === "weight" ? controlHtml : ""}
     `;
     wrap.appendChild(el);
   });
@@ -548,12 +677,12 @@ function renderWorkShiftBanner() {
   const wrap = document.getElementById("workShiftBanner");
   const shift = shiftForDate(todayStr());
   if (!shift) {
-    wrap.innerHTML = `<button class="add-btn" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
+    wrap.innerHTML = `<button class="btn btn-ghost btn-block" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
   } else {
     wrap.innerHTML = `
-      <div class="day-rule shift-banner">
+      <div class="gold-frame rule-banner shift-banner" style="justify-content:space-between;">
         <span>Arbeit heute: ${shift.start}–${shift.end}${shift.label ? " · " + escapeHtml(shift.label) : ""}</span>
-        <button class="icon-btn" data-del-shift="${shift.id}">✕</button>
+        <button class="btn btn-icon btn-ghost" data-del-shift="${shift.id}" aria-label="Löschen"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1.5 1.5L10.5 10.5M10.5 1.5L1.5 10.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
       </div>
     `;
   }
@@ -575,15 +704,15 @@ function renderOtherHabits() {
     const streak = computeStreak(h);
     const priority = isPriority(h.nodeId);
     const el = document.createElement("div");
-    el.className = "item" + (doneToday ? " done" : "");
+    el.className = "atlas-row" + (doneToday ? " done" : "");
     el.innerHTML = `
-      <input type="checkbox" ${doneToday ? "checked" : ""} data-habit="${h.id}">
-      <div class="item-body">
+      <button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}">${doneToday ? splatSvg(h.id) : ""}</button>
+      <div style="flex:1; min-width:0;">
         <div class="item-title">${escapeHtml(h.title)}</div>
         <div class="item-meta">${frequencyLabel(h)} · Serie: ${streak}</div>
       </div>
-      ${priority ? '<span class="item-tag priority">Priorität</span>' : ""}
-      <button class="icon-btn" data-del-habit="${h.id}">✕</button>
+      ${priority ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">Priorität</span>' : ""}
+      <button class="btn btn-icon btn-ghost" data-del-habit="${h.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
     `;
     habitWrap.appendChild(el);
   });
@@ -606,45 +735,60 @@ function renderTreeNode(node, depth) {
   const pct = Math.round(nodeProgress(node) * 100);
   const children = childNodes(node.id);
   const tasks = categoryTasksForNode(node.id);
+  const priority = isPriority(node.id);
 
   const wrap = document.createElement("div");
-  wrap.className = "goal-node" + (expanded ? " expanded" : "");
+  wrap.className = "card elev-sm goal-node" + (priority ? " gold-frame" : "") + (expanded ? " expanded" : "");
   wrap.style.setProperty("--depth", depth);
+  wrap.style.padding = "0";
 
-  const hasContent = children.length > 0 || tasks.length > 0;
-  const header = document.createElement("div");
+  const header = document.createElement("button");
   header.className = "goal-node-header";
+  header.style.width = "100%";
+  header.style.background = "none";
+  header.style.border = "none";
+  header.style.color = "inherit";
+  header.style.font = "inherit";
+  header.style.textAlign = "left";
+  header.style.cursor = "pointer";
+  header.dataset.toggleNode = node.id;
   header.innerHTML = `
-    <button class="goal-node-toggle" data-toggle-node="${node.id}">${hasContent ? (expanded ? "−" : "+") : "·"}</button>
-    <button class="goal-node-main" data-toggle-node="${node.id}">
-      <div class="goal-node-title">${escapeHtml(node.title)} ${node.priority ? '<span class="item-tag priority">Priorität</span>' : ""}</div>
-      <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
-      <div class="progress-pct">${pct}% · ${children.length} Unterordner, ${tasks.length} Aufgabe(n)</div>
-    </button>
-    <div class="goal-node-actions">
-      <button class="icon-btn" data-decompose-category="${node.id}" title="Aufgaben vorschlagen">···</button>
-      <button class="icon-btn" data-edit-category="${node.id}" title="Umbenennen">✎</button>
-      <button class="icon-btn" data-del-category="${node.id}">✕</button>
+    <div class="goal-node-header-left">
+      <svg class="goal-node-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="var(--color-neutral-400)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="card-title" style="font-size:14px;">${escapeHtml(node.title)}</div>
     </div>
+    <div class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">${pct}%</div>
   `;
   wrap.appendChild(header);
+  const meta = document.createElement("div");
+  meta.className = "goal-node-meta";
+  meta.textContent = `${children.length} Unterordner, ${tasks.length} Aufgabe(n)`;
+  wrap.appendChild(meta);
 
   if (expanded) {
-    const body = document.createElement("div");
-    body.className = "goal-node-body";
-
-    tasks.forEach(t => body.appendChild(renderTaskItem(t)));
-    children.forEach(child => body.appendChild(renderTreeNode(child, depth + 1)));
+    if (tasks.length || children.length) {
+      const body = document.createElement("div");
+      body.className = "goal-node-body";
+      tasks.forEach(t => body.appendChild(renderTaskItem(t)));
+      wrap.appendChild(body);
+    }
+    if (children.length) {
+      const childrenWrap = document.createElement("div");
+      childrenWrap.className = "goal-node-children";
+      children.forEach(child => childrenWrap.appendChild(renderTreeNode(child, depth + 1)));
+      wrap.appendChild(childrenWrap);
+    }
 
     const actionsRow = document.createElement("div");
     actionsRow.className = "goal-node-add-row";
     actionsRow.innerHTML = `
-      <button class="add-btn" data-add-subfolder="${node.id}">+ Unterordner</button>
-      <button class="add-btn" data-add-task-category="${node.id}">+ Aufgabe hier</button>
+      <button class="btn btn-ghost" data-add-subfolder="${node.id}">+ Unterordner</button>
+      <button class="btn btn-ghost" data-add-task-category="${node.id}">+ Aufgabe hier</button>
+      <button class="btn btn-icon btn-ghost" data-edit-category="${node.id}" title="Umbenennen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 11.5l1-3.5 6-6 2.5 2.5-6 6-3.5 1z" stroke="var(--color-neutral-400)" stroke-width="1.2" stroke-linejoin="round"/></svg></button>
+      <button class="btn btn-icon btn-ghost" data-decompose-category="${node.id}" title="Aufgaben vorschlagen">···</button>
+      <button class="btn btn-icon btn-ghost" data-del-category="${node.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
     `;
-    body.appendChild(actionsRow);
-
-    wrap.appendChild(body);
+    wrap.appendChild(actionsRow);
   }
 
   return wrap;
@@ -672,7 +816,8 @@ function renderWeekStats() {
   document.getElementById("punctualityText").textContent =
     completed.length ? `${onTime} von ${completed.length} erledigten Aufgaben pünktlich (${pct}%)` : "Noch keine erledigten Aufgaben mit Termin.";
 
-  renderLongTermStats();
+  renderActivityHeatmap();
+  renderAreaLoad();
   renderMoreStats();
   renderReflection();
 }
@@ -721,7 +866,7 @@ function renderMoreStats() {
   ];
 
   wrap.innerHTML = boxes.map(b => `
-    <div class="stat-box"><div class="stat-num">${b.num}</div><div class="stat-label">${b.label}</div></div>
+    <div class="stat-box minor"><div class="stat-num">${b.num}</div><div class="stat-label">${b.label}</div></div>
   `).join("");
 }
 
@@ -760,32 +905,70 @@ function weekdayDifficulty(days) {
   }));
 }
 
-function renderLongTermStats(days = 60) {
-  const container = document.getElementById("longTermStats");
-  const habitStats = state.habits
-    .map(h => ({ habit: h, ...habitStatsWindow(h, days) }))
-    .filter(s => s.total > 0);
-  const weekdayStats = weekdayDifficulty(days).filter(w => w.total > 0);
+// ---------- Aktivitäts-Heatmap (letzte 7 Wochen) ----------
+function dayCompletionPct(dateObj) {
+  const key = dateObj.toISOString().slice(0, 10);
+  const scheduled = state.habits.filter(h => new Date(h.createdAt) <= dateObj && isScheduledToday(h, dateObj));
+  const done = scheduled.filter(h => h.history[key]).length;
+  return scheduled.length ? Math.round((done / scheduled.length) * 100) : null;
+}
 
-  if (habitStats.length === 0) {
-    container.innerHTML = `<div class="empty-hint">Noch nicht genug Daten (mind. 1 fälliger Habit-Tag in den letzten ${days} Tagen nötig).</div>`;
-    return;
+function renderActivityHeatmap() {
+  const wrap = document.getElementById("activityHeatmap");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const today = new Date();
+  const days = [];
+  for (let i = 48; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push(d);
   }
+  days.forEach(d => {
+    const pct = dayCompletionPct(d);
+    const cell = document.createElement("div");
+    cell.className = "heatmap-cell";
+    cell.style.background = pct === null
+      ? "var(--color-neutral-800)"
+      : `color-mix(in oklch, var(--color-accent) ${pct}%, var(--color-neutral-800))`;
+    cell.title = `${d.toISOString().slice(0, 10)}${pct === null ? "" : ": " + pct + "%"}`;
+    cell.dataset.date = d.toISOString().slice(0, 10);
+    wrap.appendChild(cell);
+  });
+}
 
-  const best = habitStats.reduce((a, b) => (b.rate > a.rate ? b : a));
-  const worst = habitStats.reduce((a, b) => (b.rate < a.rate ? b : a));
+function openDaySheet(dateKey) {
+  const d = dateFromKey(dateKey);
+  const pct = dayCompletionPct(d);
+  const weekday = d.toLocaleDateString("de-DE", { weekday: "long" });
+  const dateLabel = d.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+  openModal(`
+    <h3>${weekday}, ${dateLabel}</h3>
+    <p class="card-body">${pct === null ? "Keine Gewohnheiten an diesem Tag fällig." : `Erledigungsquote: ${pct}%`}</p>
+  `, null, "sheet");
+}
 
-  let hardestDayBox = "";
-  if (weekdayStats.length) {
-    const hardest = weekdayStats.reduce((a, b) => (b.rate < a.rate ? b : a));
-    hardestDayBox = `<div class="stat-box"><div class="stat-num">${hardest.day}</div><div class="stat-label">Schwierigster Wochentag (${Math.round(hardest.rate * 100)}%)</div></div>`;
-  }
+// ---------- Aufgaben je Bereich ----------
+function countTasksInSubtree(nodeId) {
+  let count = categoryTasksForNode(nodeId).length;
+  childNodes(nodeId).forEach(c => { count += countTasksInSubtree(c.id); });
+  return count;
+}
 
-  container.innerHTML = `
-    <div class="stat-box"><div class="stat-num">${Math.round(best.rate * 100)}%</div><div class="stat-label">Bester Habit: ${escapeHtml(best.habit.title)}</div></div>
-    <div class="stat-box"><div class="stat-num">${Math.round(worst.rate * 100)}%</div><div class="stat-label">Schwierigster Habit: ${escapeHtml(worst.habit.title)}</div></div>
-    ${hardestDayBox}
-  `;
+function renderAreaLoad() {
+  const wrap = document.getElementById("areaLoad");
+  if (!wrap) return;
+  const roots = childNodes(null).map(n => ({ node: n, count: countTasksInSubtree(n.id) }));
+  const max = Math.max(1, ...roots.map(r => r.count));
+  wrap.innerHTML = roots.length
+    ? roots.map(r => `
+        <div class="areaload-row">
+          <div class="areaload-name">${escapeHtml(r.node.title)}</div>
+          <div class="areaload-bar-outer"><div class="areaload-bar-inner" style="width:${Math.round((r.count / max) * 100)}%"></div></div>
+          <div class="areaload-count">${r.count}</div>
+        </div>
+      `).join("")
+    : '<div class="empty-hint">Noch keine Bereiche angelegt.</div>';
 }
 
 function weekStartKey(dateObj = new Date()) {
@@ -825,23 +1008,6 @@ function renderAll() {
 
 // ---------- Event delegation ----------
 document.addEventListener("change", e => {
-  if (e.target.matches("[data-task]")) {
-    const id = e.target.dataset.task;
-    const task = state.tasks.find(t => t.id === id);
-    task.done = e.target.checked;
-    task.completedAt = task.done ? new Date().toISOString() : null;
-    saveData();
-    renderAll();
-  }
-  if (e.target.matches("[data-habit]")) {
-    const id = e.target.dataset.habit;
-    const habit = state.habits.find(h => h.id === id);
-    const key = todayStr();
-    if (e.target.checked) habit.history[key] = true;
-    else delete habit.history[key];
-    saveData();
-    renderAll();
-  }
   if (e.target.matches("[data-weight-habit]")) {
     const id = e.target.dataset.weightHabit;
     const habit = state.habits.find(h => h.id === id);
@@ -860,6 +1026,25 @@ document.addEventListener("change", e => {
 });
 
 document.addEventListener("click", e => {
+  const taskCheck = e.target.closest("[data-task]");
+  if (taskCheck) {
+    const task = state.tasks.find(t => t.id === taskCheck.dataset.task);
+    task.done = !task.done;
+    task.completedAt = task.done ? new Date().toISOString() : null;
+    saveData();
+    renderAll();
+    return;
+  }
+  const habitCheck = e.target.closest("[data-habit]");
+  if (habitCheck) {
+    const habit = state.habits.find(h => h.id === habitCheck.dataset.habit);
+    const key = todayStr();
+    if (habit.history[key]) delete habit.history[key];
+    else habit.history[key] = true;
+    saveData();
+    renderAll();
+    return;
+  }
   if (e.target.matches("[data-del-task]")) {
     state.tasks = state.tasks.filter(t => t.id !== e.target.dataset.delTask);
     saveData(); renderAll();
@@ -921,6 +1106,10 @@ document.addEventListener("click", e => {
     state.prayers = state.prayers.filter(p => p.id !== irrelevantBtn.dataset.prayerIrrelevant);
     saveData(); renderAll();
   }
+  const heatmapCell = e.target.closest(".heatmap-cell");
+  if (heatmapCell) {
+    openDaySheet(heatmapCell.dataset.date);
+  }
 });
 
 // ---------- Zielbereich-Zerlegung: Copy-Prompt für Chat-Analyse ----------
@@ -978,13 +1167,9 @@ function downloadText(text, filename) {
 }
 
 // ---------- Add buttons ----------
-document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal(null, null));
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
-document.getElementById("exportWeekBtn").addEventListener("click", exportWeekReview);
-document.getElementById("addSubjectBtn").addEventListener("click", () => openSubjectModal());
 document.getElementById("addExamBtn").addEventListener("click", () => openExamModal());
-document.getElementById("addPrayerBtn").addEventListener("click", () => openPrayerModal());
 document.getElementById("addDeviationBtn").addEventListener("click", () => {
   const input = document.getElementById("deviationInput");
   addDeviation(input.value);
@@ -1268,18 +1453,6 @@ function openExamModal() {
 }
 
 function renderPlanning() {
-  const subjectsWrap = document.getElementById("subjectsList");
-  if (subjectsWrap) {
-    subjectsWrap.innerHTML = state.subjects.length
-      ? state.subjects.map(s => `
-          <div class="item">
-            <div class="item-body"><div class="item-title">${escapeHtml(s.title)}</div></div>
-            <button class="icon-btn" data-del-subject="${s.id}">✕</button>
-          </div>
-        `).join("")
-      : '<div class="empty-hint">Noch keine Fächer angelegt.</div>';
-  }
-
   const examsWrap = document.getElementById("examsList");
   if (examsWrap) {
     const sorted = state.exams.slice().sort((a, b) => a.date.localeCompare(b.date));
@@ -1287,52 +1460,37 @@ function renderPlanning() {
       ? sorted.map(e => {
           const subject = state.subjects.find(s => s.id === e.subjectId);
           return `
-            <div class="item">
-              <div class="item-body">
+            <div class="atlas-row">
+              <div style="flex:1; min-width:0;">
                 <div class="item-title">${subject ? escapeHtml(subject.title) : "Unbekanntes Fach"}</div>
                 <div class="item-meta">${e.date}</div>
               </div>
-              <button class="icon-btn" data-del-exam="${e.id}">✕</button>
+              <button class="btn btn-icon btn-ghost" data-del-exam="${e.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
             </div>
           `;
         }).join("")
       : '<div class="empty-hint">Noch keine Klassenarbeiten eingetragen.</div>';
   }
-
-  const shiftsWrap = document.getElementById("shiftsList");
-  if (shiftsWrap) {
-    const sorted = state.workShifts.slice().sort((a, b) => b.date.localeCompare(a.date));
-    shiftsWrap.innerHTML = sorted.length
-      ? sorted.map(s => `
-          <div class="item">
-            <div class="item-body">
-              <div class="item-title">${s.date}${s.label ? " · " + escapeHtml(s.label) : ""}</div>
-              <div class="item-meta">${s.start}–${s.end}</div>
-            </div>
-            <button class="icon-btn" data-del-shift="${s.id}">✕</button>
-          </div>
-        `).join("")
-      : '<div class="empty-hint">Noch keine Arbeitsschichten eingetragen.</div>';
-  }
 }
 
 // ---------- Gebetsanliegen ----------
-const REFRESH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 4v3h-3M6 20v-3h3"/></svg>';
-const CROSS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+const CHECK_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-300)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+const REFRESH_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-neutral-400)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 4v3h-3M6 20v-3h3"/></svg>';
+const CROSS_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-neutral-500)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
 function renderPrayers() {
   const listWrap = document.getElementById("prayerList");
   const openPrayers = state.prayers.filter(p => p.status === "open");
   listWrap.innerHTML = openPrayers.length
     ? openPrayers.map(p => `
-        <div class="item prayer-item">
-          <div class="item-body">
+        <div class="atlas-row">
+          <div style="flex:1; min-width:0;">
             <div class="item-title">${escapeHtml(p.title)}</div>
             ${p.deferredCount ? `<div class="item-meta">${p.deferredCount}× auf nächste Woche verschoben</div>` : ""}
           </div>
-          <button class="icon-btn" data-prayer-fulfilled="${p.id}" title="Erfüllt">${CHECK_ICON}</button>
-          <button class="icon-btn" data-prayer-defer="${p.id}" title="Nächste Woche">${REFRESH_ICON}</button>
-          <button class="icon-btn" data-prayer-irrelevant="${p.id}" title="Nicht mehr relevant">${CROSS_ICON}</button>
+          <button class="btn btn-icon btn-ghost" data-prayer-fulfilled="${p.id}" title="Erfüllt" style="width:26px; height:26px;">${CHECK_ICON}</button>
+          <button class="btn btn-icon btn-ghost" data-prayer-defer="${p.id}" title="Nächste Woche" style="width:26px; height:26px;">${REFRESH_ICON}</button>
+          <button class="btn btn-icon btn-ghost" data-prayer-irrelevant="${p.id}" title="Nicht mehr relevant" style="width:26px; height:26px;">${CROSS_ICON}</button>
         </div>
       `).join("")
     : '<div class="empty-hint">Keine offenen Anliegen.</div>';
@@ -1356,29 +1514,16 @@ function renderPrayers() {
     : '<div class="empty-hint">Noch keine Erhörungen festgehalten.</div>';
 }
 
-function openPrayerModal() {
-  openModal(`
-    <h3>Gebetsanliegen hinzufügen</h3>
-    <div class="field">
-      <label>Titel</label>
-      <input type="text" id="mPrayerTitle" placeholder="z.B. Weisheit für die Studienwahl">
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
-      <button class="btn btn-primary" id="mSave">Speichern</button>
-    </div>
-  `, body => {
-    body.querySelector("#mPrayerTitle").focus();
-    body.querySelector("#mCancel").addEventListener("click", closeModal);
-    body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mPrayerTitle").value.trim();
-      if (!title) return;
-      state.prayers.push({ id: uid(), title, createdAt: new Date().toISOString(), status: "open", deferredCount: 0 });
-      saveData();
-      closeModal();
-      renderAll();
-    });
-  });
+function savePrayerFromInline() {
+  const input = document.getElementById("prayerInput");
+  const title = input.value.trim();
+  if (!title) return;
+  state.prayers.push({ id: uid(), title, createdAt: new Date().toISOString(), status: "open", deferredCount: 0 });
+  saveData();
+  input.value = "";
+  quickAddVisible = false;
+  document.getElementById("prayerAddCard").style.display = "none";
+  renderAll();
 }
 
 function openPrayerFulfillModal(prayerId) {
