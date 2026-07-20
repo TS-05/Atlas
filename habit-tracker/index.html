@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Atlas</title>
 <meta name="theme-color" content="#12161d">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -61,7 +61,7 @@
       <h1>Heute</h1>
 
       <h6 class="metal-gold">Wochenkreis</h6>
-      <div id="weekCircle" class="week-circle"></div>
+      <div id="weekCircle"></div>
 
       <h6 class="metal-gold">Abweichung vom Plan</h6>
       <p class="hint">Wenn du heute etwas anderes gemacht hast als geplant, halte es hier kurz fest.</p>
@@ -145,9 +145,7 @@
   </main>
 
   <nav class="tabs">
-    <div class="tab-indicator" id="tabIndicator">
-      <svg viewBox="0 0 20 20"><path id="tabIndicatorPath" fill="url(#goldGradRing)" filter="url(#inkRough)"/></svg>
-    </div>
+    <div class="tab-indicator" id="tabIndicator"></div>
     <button class="tab-btn active" data-tab="heute">
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M3 9L10 3L17 9V16.5C17 17.3 16.3 18 15.5 18H4.5C3.7 18 3 17.3 3 16.5V9Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
       <span>Heute</span>

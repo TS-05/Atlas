@@ -191,20 +191,6 @@ textarea.input { min-height: 90px; resize: vertical; }
 .tab-btn.active { color: var(--color-accent-200); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-accent) 70%, transparent)); }
 .tab-btn svg { width: 18px; height: 18px; }
 
-/* ============================================================
-   Wochenkreis (Ring-Masken)
-   ============================================================ */
-.week-circle { display: flex; justify-content: space-between; margin-bottom: 10px; }
-.week-circle-day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.week-ring { position: relative; width: 40px; height: 40px; }
-.week-ring-dim, .week-ring-lit-wrap, .week-ring-lit, .week-ring-shine { position: absolute; inset: 0; }
-.week-ring-dim { background-size: contain; background-position: center; background-repeat: no-repeat; filter: brightness(0.42) contrast(1.3); }
-.week-ring-lit { width: 100%; height: 100%; background-size: contain; background-position: center; background-repeat: no-repeat; filter: sepia(1) saturate(6) brightness(1.15) hue-rotate(-12deg) contrast(1.1); }
-.week-ring-shine { background: radial-gradient(circle at 32% 24%, rgba(255,255,255,0.9), transparent 55%); mix-blend-mode: overlay; opacity: 0.55; pointer-events: none; }
-.week-ring-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-family: var(--font-heading); color: var(--color-neutral-100); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
-.week-circle-day-label { font-size: 11px; font-family: var(--font-heading); color: var(--color-neutral-500); }
-.week-circle-day.is-today .week-circle-day-label { color: var(--color-accent-300); }
-
 /* ---------- Abweichung / Arbeitsschicht ---------- */
 .deviation-input-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .deviation-input-row .input { flex: 1; }
