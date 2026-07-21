@@ -2,22 +2,27 @@
 const STORAGE_KEY = "habit-tracker-data-v2";
 
 // ---------- Lebenswissen-Ordnerstruktur (siehe 20_Wissen/Themen/Lebenswissen_Ordnerstruktur.md) ----------
+// Phase 7.5: auf einheitliche Ein-Wort-Oberbegriffe umstrukturiert, Redundanzen entfernt
+// (z.B. "Umgang mit Behörden" in "Recht" vereint, Biologie/Sicherheit/Gesellschaft/Geschichte/Psychologie neu)
 const LEBENSWISSEN = [
   ["Glaube", true, ["Grundlagen des christlichen Glaubens", "Die einzelnen Bibelbücher", "Historischer/kultureller Hintergrund", "Gebet (Formen, Praxis)", "Gemeindeleben & geistliche Gemeinschaft", "Theologische Grundbegriffe"]],
-  ["Gesundheit", false, ["Anatomie des Menschen", "Organsysteme", "Ernährung", "Hormone & ihre Wirkung", "Blut & Blutwerte", "Bewegung/Training", "Schlaf", "Erste Hilfe", "Mentale Gesundheit", "Zahnpflege", "Vorsorgeuntersuchungen"]],
+  ["Biologie", false, ["Anatomie des Menschen", "Organsysteme", "Hormone & ihre Wirkung", "Blut & Blutwerte"]],
+  ["Gesundheit", false, ["Ernährung", "Bewegung/Training", "Schlaf", "Erste Hilfe", "Mentale Gesundheit", "Zahnpflege", "Vorsorgeuntersuchungen", "Rasieren & Bartpflege"]],
   ["Haushalt", false, ["Wäsche", "Kochen", "Putzen", "Ordnung & Organisation", "Reparaturen im Haushalt", "Pflanzen & Garten", "Mülltrennung & Entsorgung"]],
-  ["Handwerkliches & Technik im Alltag", false, ["Auto", "Heimnetzwerk/WLAN", "Unterhaltungselektronik", "Kabelmanagement", "Rasieren & Bartpflege", "Selbstschutz", "Selbstverteidigung", "Werkzeugkoffer"]],
-  ["Bürokratie & Finanzen", false, ["Ordnersystem für Unterlagen", "Dokumente aufbewahren", "Gehalt/Lohn verstehen", "Steuern", "Versicherungen", "Konten, Sparen, Budget", "Verträge lesen & verstehen", "Behördengänge"]],
-  ["Handwerk & Werkstatt", false, ["Elektro", "Holzbearbeitung", "Metallbearbeitung", "Werkstatt-Grundausstattung", "Schweißen", "Kleben", "Nägel & Schrauben", "Technische Zeichnungen", "Anlagen/Installationen", "Gas, Wasser, Sanitär"]],
-  ["Zukunft & Karriere", false, ["Karriereplanung", "Softskills", "Hardskills", "Hausbau/Immobilien", "Finanzen & Vermögensaufbau", "Selbstständigkeit", "Lebens-/Zielplanung"]],
-  ["Kunst & Kreatives", false, ["Schreiben", "Zeichnen/Malen", "Kunstgeschichte", "Bekannte Künstler", "Kunstrichtungen", "Worldbuilding"]],
-  ["Überleben & Sicherheit", false, ["Notfallarten", "Verletzungen erkennen & versorgen", "Outdoor-Grundlagen", "Ausrüstung", "Gefahren – nicht selbst eingreifen", "Notfallkontakte & -plan"]],
-  ["Essen & Trinken", false, ["Whisky", "Kaffee", "Wein", "Bier", "Food-Pairing"]],
-  ["Digitales Leben & Sicherheit", false, ["Passwort-Sicherheit", "Datenschutz-Grundlagen", "Backups", "Betrugsmaschen erkennen", "Digitale Nachlassplanung"]],
-  ["Recht im Alltag", false, ["Mietrecht-Basics", "Kaufrecht/Gewährleistung", "Verkehrsrecht-Basics", "Wichtige Fristen"]],
-  ["Beziehungen & Kommunikation", false, ["Kommunikationsgrundlagen", "Konfliktlösung", "Partnerschaft/Ehe-Vorbereitung", "Erziehung/Elternschaft"]],
+  ["Technik", false, ["Auto", "Heimnetzwerk/WLAN", "Unterhaltungselektronik", "Kabelmanagement", "Werkzeugkoffer"]],
+  ["Handwerk", false, ["Elektro", "Holzbearbeitung", "Metallbearbeitung", "Werkstatt-Grundausstattung", "Schweißen", "Kleben", "Nägel & Schrauben", "Technische Zeichnungen", "Anlagen/Installationen", "Gas, Wasser, Sanitär"]],
+  ["Wirtschaft", false, ["Ordnersystem für Unterlagen", "Dokumente aufbewahren", "Gehalt/Lohn verstehen", "Steuern", "Versicherungen", "Konten, Sparen, Budget", "Verträge lesen & verstehen", "Hausbau/Immobilien", "Finanzen & Vermögensaufbau"]],
+  ["Karriere", false, ["Karriereplanung", "Softskills", "Hardskills", "Selbstständigkeit", "Lebens-/Zielplanung"]],
+  ["Kunst", false, ["Schreiben", "Zeichnen/Malen", "Kunstgeschichte", "Bekannte Künstler", "Kunstrichtungen", "Worldbuilding"]],
+  ["Sicherheit", false, ["Notfallarten", "Verletzungen erkennen & versorgen", "Outdoor-Grundlagen", "Ausrüstung", "Gefahren – nicht selbst eingreifen", "Notfallkontakte & -plan", "Selbstschutz", "Selbstverteidigung"]],
+  ["Genuss", false, ["Whisky", "Kaffee", "Wein", "Bier", "Food-Pairing"]],
+  ["Digital", false, ["Passwort-Sicherheit", "Datenschutz-Grundlagen", "Backups", "Betrugsmaschen erkennen", "Digitale Nachlassplanung"]],
+  ["Recht", false, ["Mietrecht-Basics", "Kaufrecht/Gewährleistung", "Verkehrsrecht-Basics", "Wichtige Fristen", "Behördengänge", "Wichtige Ämter im Überblick", "Anträge & Fristen", "Widerspruch/Einspruch"]],
+  ["Beziehung", false, ["Kommunikationsgrundlagen", "Konfliktlösung", "Partnerschaft/Ehe-Vorbereitung", "Erziehung/Elternschaft"]],
   ["Reisen", false, ["Reiseplanung & Budget", "Dokumente", "Packen & Ausrüstung", "Sprachliche Basics", "Sicherheit auf Reisen"]],
-  ["Umgang mit Behörden & Institutionen", false, ["Wichtige Ämter im Überblick", "Anträge & Fristen", "Widerspruch/Einspruch"]]
+  ["Geschichte", false, ["Weltgeschichte im Überblick", "Deutsche Geschichte", "Antike & Mittelalter", "Neuzeit", "Zeitgeschichte (20./21. Jahrhundert)"]],
+  ["Gesellschaft", false, ["Politisches System Deutschlands", "Wichtige Ideologien & Strömungen", "Aktuelle gesellschaftliche Debatten", "Wirtschaftssysteme im Überblick", "Medienkompetenz"]],
+  ["Psychologie", false, ["Grundlagen der Psychologie", "Persönlichkeitsmodelle", "Kognitive Verzerrungen", "Entwicklungspsychologie", "Motivation & Gewohnheiten", "Emotionsregulation"]]
 ];
 
 function loadData() {
@@ -98,8 +103,87 @@ function migrateToGoalNodes(data) {
   delete data.goals;
 }
 
+// ---------- Migration: Lebenswissen-Bereiche auf Ein-Wort-Oberbegriffe umstellen (Phase 7.5) ----------
+function migrateBereicheNaming(data) {
+  if (data.bereicheRestructureApplied || !data.goalNodes) return;
+
+  const roots = () => data.goalNodes.filter(n => n.parentId === null);
+  const findRoot = title => roots().find(n => n.title === title);
+  const childrenOf = id => data.goalNodes.filter(n => n.parentId === id);
+  const reassign = (fromId, toId) => {
+    data.goalNodes.forEach(n => { if (n.parentId === fromId) n.parentId = toId; });
+    (data.tasks || []).forEach(t => { if (t.nodeId === fromId) t.nodeId = toId; });
+    (data.habits || []).forEach(h => { if (h.nodeId === fromId) h.nodeId = toId; });
+  };
+  const ensureRoot = title => findRoot(title) || (() => {
+    const node = { id: uid(), parentId: null, title, priority: false };
+    data.goalNodes.push(node);
+    return node;
+  })();
+  const moveChild = (parentTitle, childTitle, newParentTitle) => {
+    const parent = findRoot(parentTitle);
+    if (!parent) return;
+    const child = childrenOf(parent.id).find(n => n.title === childTitle);
+    if (!child) return;
+    child.parentId = ensureRoot(newParentTitle).id;
+  };
+
+  // 1) Root-Umbenennungen (nur exakte alte Titel)
+  const RENAME_MAP = {
+    "Handwerkliches & Technik im Alltag": "Technik",
+    "Bürokratie & Finanzen": "Wirtschaft",
+    "Handwerk & Werkstatt": "Handwerk",
+    "Zukunft & Karriere": "Karriere",
+    "Kunst & Kreatives": "Kunst",
+    "Überleben & Sicherheit": "Sicherheit",
+    "Essen & Trinken": "Genuss",
+    "Digitales Leben & Sicherheit": "Digital",
+    "Recht im Alltag": "Recht",
+    "Beziehungen & Kommunikation": "Beziehung"
+  };
+  roots().forEach(n => { if (RENAME_MAP[n.title]) n.title = RENAME_MAP[n.title]; });
+
+  // 2) Biologie aus Gesundheit heraustrennen
+  ["Anatomie des Menschen", "Organsysteme", "Hormone & ihre Wirkung", "Blut & Blutwerte"]
+    .forEach(t => moveChild("Gesundheit", t, "Biologie"));
+
+  // 3) "Umgang mit Behörden & Institutionen" in "Recht" aufgehen lassen
+  const behoerden = findRoot("Umgang mit Behörden & Institutionen");
+  if (behoerden) {
+    reassign(behoerden.id, ensureRoot("Recht").id);
+    data.goalNodes = data.goalNodes.filter(n => n.id !== behoerden.id);
+  }
+
+  // 4) Selbstschutz/Selbstverteidigung/Rasieren aus Technik heraus, in Sicherheit/Gesundheit
+  moveChild("Technik", "Selbstschutz", "Sicherheit");
+  moveChild("Technik", "Selbstverteidigung", "Sicherheit");
+  moveChild("Technik", "Rasieren & Bartpflege", "Gesundheit");
+
+  // 5) Immobilien/Vermögensaufbau aus Karriere in Wirtschaft
+  moveChild("Karriere", "Hausbau/Immobilien", "Wirtschaft");
+  moveChild("Karriere", "Finanzen & Vermögensaufbau", "Wirtschaft");
+
+  // 6) Neue akademische Bereiche ergänzen (nur falls noch nicht vorhanden)
+  const c = (title, parentId) => { const id = uid(); data.goalNodes.push({ id, parentId, title, priority: false }); return id; };
+  if (!findRoot("Geschichte")) {
+    const id = c("Geschichte", null);
+    ["Weltgeschichte im Überblick", "Deutsche Geschichte", "Antike & Mittelalter", "Neuzeit", "Zeitgeschichte (20./21. Jahrhundert)"].forEach(t => c(t, id));
+  }
+  if (!findRoot("Gesellschaft")) {
+    const id = c("Gesellschaft", null);
+    ["Politisches System Deutschlands", "Wichtige Ideologien & Strömungen", "Aktuelle gesellschaftliche Debatten", "Wirtschaftssysteme im Überblick", "Medienkompetenz"].forEach(t => c(t, id));
+  }
+  if (!findRoot("Psychologie")) {
+    const id = c("Psychologie", null);
+    ["Grundlagen der Psychologie", "Persönlichkeitsmodelle", "Kognitive Verzerrungen", "Entwicklungspsychologie", "Motivation & Gewohnheiten", "Emotionsregulation"].forEach(t => c(t, id));
+  }
+
+  data.bereicheRestructureApplied = true;
+}
+
 let state = loadData();
 migrateToGoalNodes(state);
+migrateBereicheNaming(state);
 state.subjects = state.subjects || [];
 state.exams = state.exams || [];
 state.workShifts = state.workShifts || [];
@@ -161,7 +245,7 @@ function seedData() {
   h("Joggen 5,5 km", gesundheit, "daily", { routineOrder: 5 });
   h("Ernährung im Rahmen (max. 2.000 kcal)", gesundheit, "daily", { routineOrder: 10 });
 
-  const zukunft = rootId["Zukunft & Karriere"];
+  const zukunft = rootId["Karriere"];
   h("Lernen / Schularbeit 60–90 Min.", zukunft, "weekdays", { routineOrder: 6 });
   t("Bewerbungen duales Studium abschicken", zukunft, "2026-07-13", "gross", 5);
   t("Seminararbeit Physik in Filmen fertigstellen", zukunft, null, "gross");
@@ -176,7 +260,7 @@ function seedData() {
   h("Handy weglegen 21:30", null, "daily", { routineOrder: 7 });
   h("Skin Care & Anziehen", null, "daily", { routineOrder: 3 });
   h("Tag im Griff", null, "daily", { routineOrder: 9 });
-  h("Lesen (ca. 1 Buch/Monat)", rootId["Kunst & Kreatives"], "daily");
+  h("Lesen (ca. 1 Buch/Monat)", rootId["Kunst"], "daily");
 
   // Aktuelle ToDo's (Stand 21.07.2026)
   td("Montag 27.7.2026 Planen", "2026-07-21", "klein", 4);
