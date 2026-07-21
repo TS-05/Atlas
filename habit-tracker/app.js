@@ -257,7 +257,7 @@ function switchTab(tabName) {
 
   if (dropTimer) clearTimeout(dropTimer);
   renderTabIndicator(idx, "flying");
-  dropTimer = setTimeout(() => renderTabIndicator(idx, "settled"), 360);
+  dropTimer = setTimeout(() => renderTabIndicator(idx, "settled"), 190);
 
   quickAddVisible = false;
   updateHeaderPlusButton();
