@@ -260,6 +260,8 @@ function switchTab(tabName) {
   dropTimer = setTimeout(() => renderTabIndicator(idx, "settled"), 190);
 
   quickAddVisible = false;
+  bereicheSearchVisible = false;
+  bereicheSearchQuery = "";
   updateHeaderPlusButton();
   renderAll();
 }
@@ -273,10 +275,16 @@ renderTabIndicator(0, "settled");
 // ---------- Kopfzeile: kontextabhängiger Plus-Button ----------
 const QUICK_ADD_BTN_IDS = { heute: ["addRoutineBtn", "addHabitBtn"], todo: ["addTaskBtn"] };
 let quickAddVisible = false;
+let bereicheSearchVisible = false;
+let bereicheSearchQuery = "";
 Object.values(QUICK_ADD_BTN_IDS).flat().forEach(id => {
   const el = document.getElementById(id);
   if (el) el.style.display = "none";
 });
+
+const HEADER_ICON_PLUS = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const HEADER_ICON_SEARCH = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 9.5L13 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const HEADER_ICON_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V9.5M4 6.5L7 9.5L10 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 11.5V12.5H12V11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
 function updateHeaderPlusButton() {
   const tab = document.body.dataset.tab;
@@ -284,6 +292,21 @@ function updateHeaderPlusButton() {
   if (ids) ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = quickAddVisible ? "" : "none"; });
   const prayerCard = document.getElementById("prayerAddCard");
   if (prayerCard) prayerCard.style.display = (tab === "gebete" && quickAddVisible) ? "flex" : "none";
+  const searchCard = document.getElementById("bereicheSearchCard");
+  if (searchCard) searchCard.style.display = (tab === "zielbereiche" && bereicheSearchVisible) ? "flex" : "none";
+
+  const icon = document.getElementById("headerPlusIcon");
+  const btn = document.getElementById("headerPlusBtn");
+  if (tab === "zielbereiche") {
+    icon.innerHTML = HEADER_ICON_SEARCH;
+    btn.setAttribute("aria-label", "Bereiche durchsuchen");
+  } else if (tab === "analyse") {
+    icon.innerHTML = HEADER_ICON_DOWNLOAD;
+    btn.setAttribute("aria-label", "Wochendaten herunterladen");
+  } else {
+    icon.innerHTML = HEADER_ICON_PLUS;
+    btn.setAttribute("aria-label", "Hinzufügen");
+  }
 }
 
 document.getElementById("headerPlusBtn").addEventListener("click", () => {
@@ -293,7 +316,14 @@ document.getElementById("headerPlusBtn").addEventListener("click", () => {
     updateHeaderPlusButton();
     renderAll();
   } else if (tab === "zielbereiche") {
-    openCategoryModal(null, null);
+    bereicheSearchVisible = !bereicheSearchVisible;
+    if (!bereicheSearchVisible) {
+      bereicheSearchQuery = "";
+      document.getElementById("bereicheSearchInput").value = "";
+      renderGoalBrowser();
+    }
+    updateHeaderPlusButton();
+    if (bereicheSearchVisible) document.getElementById("bereicheSearchInput").focus();
   } else if (tab === "gebete") {
     quickAddVisible = !quickAddVisible;
     updateHeaderPlusButton();
@@ -301,6 +331,10 @@ document.getElementById("headerPlusBtn").addEventListener("click", () => {
   } else if (tab === "analyse") {
     exportWeekReview();
   }
+});
+document.getElementById("bereicheSearchInput").addEventListener("input", e => {
+  bereicheSearchQuery = e.target.value;
+  renderGoalBrowser();
 });
 document.getElementById("addRoutineBtn").addEventListener("click", () => openHabitModal(true));
 document.getElementById("savePrayerBtn").addEventListener("click", savePrayerFromInline);
@@ -796,21 +830,27 @@ function renderOtherHabits() {
 }
 
 // ---------- Rendering: Bereiche (Akkordeon-Baum) ----------
+function subtreeMatchesQuery(node, q) {
+  if (node.title.toLowerCase().includes(q)) return true;
+  return childNodes(node.id).some(c => subtreeMatchesQuery(c, q));
+}
+
 function renderGoalBrowser() {
   const wrap = document.getElementById("goalTree");
   wrap.innerHTML = "";
-  const roots = childNodes(null);
+  const q = bereicheSearchQuery.trim().toLowerCase();
+  const roots = q ? childNodes(null).filter(n => subtreeMatchesQuery(n, q)) : childNodes(null);
   if (roots.length === 0) {
-    wrap.innerHTML = '<div class="empty-hint">Noch keine Bereiche angelegt.</div>';
+    wrap.innerHTML = q ? '<div class="empty-hint">Keine Bereiche gefunden.</div>' : '<div class="empty-hint">Noch keine Bereiche angelegt.</div>';
     return;
   }
-  roots.forEach(node => wrap.appendChild(renderTreeNode(node, 0)));
+  roots.forEach(node => wrap.appendChild(renderTreeNode(node, 0, q)));
 }
 
-function renderTreeNode(node, depth) {
-  const expanded = expandedNodes.has(node.id);
+function renderTreeNode(node, depth, searchQuery = "") {
+  const expanded = !!searchQuery || expandedNodes.has(node.id);
   const pct = Math.round(nodeProgress(node) * 100);
-  const children = childNodes(node.id);
+  const children = searchQuery ? childNodes(node.id).filter(c => subtreeMatchesQuery(c, searchQuery)) : childNodes(node.id);
   const tasks = categoryTasksForNode(node.id);
   const priority = isPriority(node.id);
 
@@ -852,7 +892,7 @@ function renderTreeNode(node, depth) {
     if (children.length) {
       const childrenWrap = document.createElement("div");
       childrenWrap.className = "goal-node-children";
-      children.forEach(child => childrenWrap.appendChild(renderTreeNode(child, depth + 1)));
+      children.forEach(child => childrenWrap.appendChild(renderTreeNode(child, depth + 1, searchQuery)));
       wrap.appendChild(childrenWrap);
     }
 

@@ -50,7 +50,7 @@
     </div>
     <div class="header-actions">
       <button class="btn btn-icon btn-secondary" id="headerPlusBtn" aria-label="Hinzufügen">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span id="headerPlusIcon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
       </button>
     </div>
   </header>
@@ -92,6 +92,10 @@
     <!-- BEREICHE -->
     <section id="tab-zielbereiche" class="tab-panel">
       <h1>Bereiche</h1>
+
+      <div class="card elev-sm" style="margin-bottom: 14px; flex-direction: row; gap: 8px; display:none;" id="bereicheSearchCard">
+        <input class="input" id="bereicheSearchInput" placeholder="Bereich oder Thema suchen …">
+      </div>
 
       <div class="card elev-sm" style="margin-bottom: 14px;">
         <div class="card-title" style="font-size: 14px;">Klassenarbeiten</div>
