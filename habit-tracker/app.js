@@ -129,7 +129,21 @@ function seedData() {
   const t = (title, nodeId, dueDate, size = "klein", priority = 0) => {
     data.tasks.push({ id: uid(), title, nodeId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source: "category" });
   };
+  const td = (title, dueDate, size = "klein", priority = 0, done = false) => {
+    data.tasks.push({
+      id: uid(), title, nodeId: null, dueDate, dueTime: null, done,
+      completedAt: done ? new Date().toISOString() : null,
+      createdAt: new Date().toISOString(), size, priority, source: "todo"
+    });
+  };
   const s = (title) => { data.subjects.push({ id: uid(), title }); };
+  const pr = (title, opts = {}) => {
+    data.prayers.push({
+      id: uid(), title, createdAt: new Date().toISOString(),
+      status: opts.fulfilledAt ? "fulfilled" : "open", deferredCount: 0,
+      ...(opts.fulfilledAt ? { fulfilledAt: opts.fulfilledAt, fulfillmentText: opts.fulfillmentText || "" } : {})
+    });
+  };
 
   const rootId = {};
   LEBENSWISSEN.forEach(([title, priority, subs]) => {
@@ -163,6 +177,27 @@ function seedData() {
   h("Skin Care & Anziehen", null, "daily", { routineOrder: 3 });
   h("Tag im Griff", null, "daily", { routineOrder: 9 });
   h("Lesen (ca. 1 Buch/Monat)", rootId["Kunst & Kreatives"], "daily");
+
+  // Aktuelle ToDo's (Stand 21.07.2026)
+  td("Montag 27.7.2026 Planen", "2026-07-21", "klein", 4);
+  td("Bewerbung Porsche", "2026-07-21", "klein", 2);
+  td("Bewerbung BMW", "2026-07-21", "klein", 2);
+  td("Themenfrage und Gliederung abklären", "2026-07-24", "klein", 5);
+  td("Portfolio ausfüllen", "2026-07-24", "gross", 4);
+  td("App inhalt machen für Bereiche", "2026-07-26", "gross", 1);
+  td("Fertige Gliederung", "2026-07-31", "gross", 5);
+  td("Buch fertig", "2026-07-31", "gross", 5);
+  td("Gefühle Kapitel 2", "2026-07-31", "klein", 2);
+  td("Gefühle Kapitel 2", "2026-08-01", "klein", 2);
+  td("Arbeitsheft Gefühle bis Kapitel 3", "2026-08-02", "klein", 2);
+  td("Fertige Themenfrage", "2026-07-31", "gross", 5, true);
+  td("Anja klären Montag 27.7.", "2026-07-21", "klein", 5, true);
+
+  // Aktuelle Gebetsanliegen (Stand 21.07.2026)
+  pr("Geld um Versicherung und Schilden zurück zu Zahlen");
+  pr("Mama Papa wieder zusammen finden");
+  pr("Familie gläubig");
+  pr("Schlaf verbessern", { fulfilledAt: "2026-07-21T00:00:00.000Z", fulfillmentText: "Schlaf bei 100%" });
 
   return data;
 }
