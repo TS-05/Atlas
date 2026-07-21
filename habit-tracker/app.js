@@ -571,20 +571,21 @@ function renderWeekCircle() {
   wrap.innerHTML = `
     <div style="display:flex; justify-content:center; margin-bottom:30px;">
       <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
-        <div style="position:relative; width:200px; height:200px; filter:drop-shadow(0 0 6px color-mix(in srgb, var(--color-accent) 45%, transparent));">
+        <div style="position:relative; width:200px; height:200px;">
           <div style="position:absolute; inset:0;
             background:rgba(255,255,255,0.16);
-            -webkit-mask-image:url('${maskUrl}'); -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat;
-            mask-image:url('${maskUrl}'); mask-size:100% 100%; mask-repeat:no-repeat;"></div>
+            -webkit-mask-image:url('${maskUrl}'); -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat; -webkit-mask-position:center;
+            mask-image:url('${maskUrl}'); mask-size:100% 100%; mask-repeat:no-repeat; mask-position:center;"></div>
           <div style="position:absolute; inset:0;
-            background:conic-gradient(from -90deg, var(--color-accent-300), var(--color-accent-600) 25%, var(--color-accent-100) 45%, var(--color-accent-700) 65%, var(--color-accent-300) 85%, var(--color-accent-600) 100%);
-            -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-composite:source-in;
-            mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-composite:intersect;"></div>
+            background:conic-gradient(from -90deg, var(--color-accent-700) 0%, var(--color-accent-100) 16.6%, var(--color-accent-600) 33.3%, var(--color-accent-200) 50%, var(--color-accent-700) 66.6%, var(--color-accent-300) 83.3%, var(--color-accent-700) 100%);
+            -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
+            mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;
+            filter:drop-shadow(0 0 5px color-mix(in srgb, var(--color-accent) 50%, transparent));"></div>
           <div style="position:absolute; inset:0;
             background:radial-gradient(circle at 32% 24%, rgba(255,255,255,0.9), transparent 55%);
             mix-blend-mode:overlay; opacity:0.6;
-            -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-composite:source-in;
-            mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-composite:intersect;"></div>
+            -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
+            mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;"></div>
           <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:34px; font-family:var(--font-heading); color:var(--color-neutral-100); text-shadow:0 1px 4px rgba(0,0,0,0.6);">${pct}%</span>
         </div>
         <span style="font-size:11px; font-family:var(--font-heading); color:var(--color-accent-300);">${WEEKDAY_LABELS[todayIdx]}</span>
