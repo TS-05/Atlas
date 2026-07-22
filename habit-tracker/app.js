@@ -224,9 +224,30 @@ function migrateBereicheNaming(data) {
   data.bereicheRestructureApplied = true;
 }
 
+// ---------- Reparatur: Ringbezüge (A ist Vorfahre von A) in goalNodes auflösen ----------
+// Verhindert Endlosschleifen in allen Baum-Funktionen (nodePath, isPriority, renderTreeNode, ...).
+// Ein betroffener Knoten wird zur Wurzel gemacht statt gelöscht — es geht nichts verloren.
+function repairCyclicGoalNodes(data) {
+  if (!data.goalNodes) return;
+  const byId = new Map(data.goalNodes.map(n => [n.id, n]));
+  data.goalNodes.forEach(node => {
+    const seen = new Set([node.id]);
+    let cur = node.parentId != null ? byId.get(node.parentId) : null;
+    let guard = 0;
+    while (cur && guard++ < 500) {
+      if (seen.has(cur.id)) { node.parentId = null; return; }
+      seen.add(cur.id);
+      cur = cur.parentId != null ? byId.get(cur.parentId) : null;
+    }
+    if (guard >= 500) node.parentId = null;
+  });
+}
+
 let state = loadData();
 migrateToGoalNodes(state);
+repairCyclicGoalNodes(state);
 migrateBereicheNaming(state);
+repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
 state.exams = state.exams || [];
 state.workShifts = state.workShifts || [];
@@ -541,13 +562,17 @@ function habitsForNode(nodeId) {
 }
 function isPriority(nodeId) {
   let n = nodeById(nodeId);
-  while (n) {
+  const seen = new Set();
+  while (n && !seen.has(n.id)) {
     if (n.priority) return true;
+    seen.add(n.id);
     n = n.parentId ? nodeById(n.parentId) : null;
   }
   return false;
 }
-function nodeProgress(node) {
+function nodeProgress(node, seen = new Set()) {
+  if (seen.has(node.id)) return 0;
+  seen.add(node.id);
   const tasks = categoryTasksForNode(node.id);
   const habits = habitsForNode(node.id);
   const children = childNodes(node.id);
@@ -558,7 +583,7 @@ function nodeProgress(node) {
     parts.push(rates.reduce((a, b) => a + b, 0) / rates.length);
   }
   if (children.length) {
-    const progresses = children.map(nodeProgress);
+    const progresses = children.map(c => nodeProgress(c, seen));
     parts.push(progresses.reduce((a, b) => a + b, 0) / progresses.length);
   }
   if (parts.length === 0) return 0;
@@ -567,7 +592,9 @@ function nodeProgress(node) {
 function nodePath(nodeId) {
   const path = [];
   let n = nodeById(nodeId);
-  while (n) {
+  const seen = new Set();
+  while (n && !seen.has(n.id)) {
+    seen.add(n.id);
     path.unshift(n);
     n = n.parentId ? nodeById(n.parentId) : null;
   }
@@ -575,8 +602,11 @@ function nodePath(nodeId) {
 }
 function allNodesFlat() {
   const result = [];
+  const seen = new Set();
   function walk(parentId, depth) {
     childNodes(parentId).forEach(n => {
+      if (seen.has(n.id)) return;
+      seen.add(n.id);
       result.push({ node: n, depth });
       walk(n.id, depth + 1);
     });
@@ -992,9 +1022,11 @@ function renderOtherHabits() {
 }
 
 // ---------- Rendering: Bereiche (Akkordeon-Baum) ----------
-function subtreeMatchesQuery(node, q) {
+function subtreeMatchesQuery(node, q, seen = new Set()) {
+  if (seen.has(node.id)) return false;
+  seen.add(node.id);
   if (node.title.toLowerCase().includes(q)) return true;
-  return childNodes(node.id).some(c => subtreeMatchesQuery(c, q));
+  return childNodes(node.id).some(c => subtreeMatchesQuery(c, q, seen));
 }
 
 function renderGoalBrowser() {
@@ -1235,9 +1267,11 @@ function openDaySheet(dateKey) {
 }
 
 // ---------- Aufgaben je Bereich ----------
-function countTasksInSubtree(nodeId) {
+function countTasksInSubtree(nodeId, seen = new Set()) {
+  if (seen.has(nodeId)) return 0;
+  seen.add(nodeId);
   let count = categoryTasksForNode(nodeId).length;
-  childNodes(nodeId).forEach(c => { count += countTasksInSubtree(c.id); });
+  childNodes(nodeId).forEach(c => { count += countTasksInSubtree(c.id, seen); });
   return count;
 }
 
