@@ -1,6 +1,49 @@
 // ---------- Storage ----------
 const STORAGE_KEY = "habit-tracker-data-v2";
 
+// ---------- Notfall-Absicherung: bei jedem unerwarteten Absturz sofort Rohdaten-Rettung anbieten ----------
+// Steht bewusst ganz am Anfang der Datei und hängt von nichts anderem ab, damit sie auch dann noch
+// funktioniert, wenn irgendein späterer Teil des Skripts abstürzt (z.B. durch eine kaputte/veraltete
+// zwischengespeicherte Version auf dem Handy) und die App sonst nur einen leeren/schwarzen Bildschirm zeigt.
+(function () {
+  let rescueShown = false;
+  function showRescue(errorInfo) {
+    if (rescueShown) return;
+    rescueShown = true;
+    try {
+      const overlay = document.createElement("div");
+      overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:#12161d;color:#f1e4c8;" +
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;" +
+        "padding:24px;box-sizing:border-box;font-family:system-ui,sans-serif;text-align:center;";
+      overlay.innerHTML =
+        '<div style="font-size:18px;font-weight:600;">Atlas konnte nicht vollständig laden</div>' +
+        '<div style="font-size:13px;opacity:0.75;max-width:320px;">Deine Daten sind wahrscheinlich noch da. Sichere sie jetzt, bevor du etwas anderes versuchst.</div>' +
+        '<button id="__rescueExportBtn" style="padding:14px 22px;border-radius:10px;border:1.5px solid #c9a94e;background:#2a2318;color:#f1e4c8;font-size:15px;font-weight:600;">Rohdaten jetzt sichern</button>' +
+        '<button id="__rescueReloadBtn" style="padding:10px 18px;border-radius:10px;border:1px solid #666;background:transparent;color:#f1e4c8;font-size:13px;">Neu laden versuchen</button>';
+      document.body.appendChild(overlay);
+      document.getElementById("__rescueExportBtn").addEventListener("click", () => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY) || "{}";
+          const blob = new Blob([raw], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "atlas-notfall-sicherung-" + new Date().toISOString().slice(0, 10) + ".json";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          alert("Sicherung fehlgeschlagen: " + (e && e.message));
+        }
+      });
+      document.getElementById("__rescueReloadBtn").addEventListener("click", () => location.reload());
+    } catch (e) { /* wenn selbst das fehlschlägt, ist nichts mehr zu machen */ }
+  }
+  window.addEventListener("error", e => showRescue(e && e.error));
+  window.addEventListener("unhandledrejection", e => showRescue(e && e.reason));
+})();
+
 // ---------- Lebenswissen-Ordnerstruktur (siehe 20_Wissen/Themen/Lebenswissen_Ordnerstruktur.md) ----------
 // Phase 7.5: auf einheitliche Ein-Wort-Oberbegriffe umstrukturiert, Redundanzen entfernt
 // (z.B. "Umgang mit Behörden" in "Recht" vereint, Biologie/Sicherheit/Gesellschaft/Geschichte/Psychologie neu)
