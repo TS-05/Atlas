@@ -62,7 +62,7 @@ const LEBENSWISSEN = [
   ["Digital", false, ["Passwort-Sicherheit", "Datenschutz-Grundlagen", "Backups", "Betrugsmaschen erkennen", "Digitale Nachlassplanung"]],
   ["Recht", false, ["Mietrecht-Basics", "Kaufrecht/Gewährleistung", "Verkehrsrecht-Basics", "Wichtige Fristen", "Behördengänge", "Wichtige Ämter im Überblick", "Anträge & Fristen", "Widerspruch/Einspruch"]],
   ["Beziehung", false, ["Kommunikationsgrundlagen", "Konfliktlösung", "Partnerschaft/Ehe-Vorbereitung", "Erziehung/Elternschaft"]],
-  ["Reisen", false, ["Reiseplanung & Budget", "Dokumente", "Packen & Ausrüstung", "Sprachliche Basics", "Sicherheit auf Reisen"]],
+  ["Planung", false, ["Zielsetzung & Priorisierung", "Projekt-/Aufgabenplanung", "Entscheidungsfindung", "Zeitmanagement", "Reiseplanung"]],
   ["Geschichte", false, ["Weltgeschichte im Überblick", "Deutsche Geschichte", "Antike & Mittelalter", "Neuzeit", "Zeitgeschichte (20./21. Jahrhundert)"]],
   ["Gesellschaft", false, ["Politisches System Deutschlands", "Wichtige Ideologien & Strömungen", "Aktuelle gesellschaftliche Debatten", "Wirtschaftssysteme im Überblick", "Medienkompetenz"]],
   ["Psychologie", false, ["Grundlagen der Psychologie", "Persönlichkeitsmodelle", "Kognitive Verzerrungen", "Entwicklungspsychologie", "Motivation & Gewohnheiten", "Emotionsregulation"]]
@@ -243,10 +243,41 @@ function repairCyclicGoalNodes(data) {
   });
 }
 
+// ---------- Migration: "Reisen" zu "Planung" (Kernfähigkeit statt einzelner Anwendungsfall) ----------
+function migrateReisenToPlanung(data) {
+  if (data.planungMigrationApplied || !data.goalNodes) return;
+  const roots = () => data.goalNodes.filter(n => n.parentId === null);
+  const findRoot = title => roots().find(n => n.title === title);
+
+  const reisen = findRoot("Reisen");
+  if (reisen) {
+    reisen.title = "Planung";
+    const reiseplanungId = uid();
+    data.goalNodes.push({ id: reiseplanungId, parentId: reisen.id, title: "Reiseplanung", priority: false });
+    data.goalNodes.forEach(n => {
+      if (n.parentId === reisen.id && n.id !== reiseplanungId) n.parentId = reiseplanungId;
+    });
+    const budgetNode = data.goalNodes.find(n => n.parentId === reiseplanungId && n.title === "Reiseplanung & Budget");
+    if (budgetNode) budgetNode.title = "Reisebudget";
+    ["Zielsetzung & Priorisierung", "Projekt-/Aufgabenplanung", "Entscheidungsfindung", "Zeitmanagement"].forEach(t => {
+      data.goalNodes.push({ id: uid(), parentId: reisen.id, title: t, priority: false });
+    });
+  } else if (!findRoot("Planung")) {
+    const planungId = uid();
+    data.goalNodes.push({ id: planungId, parentId: null, title: "Planung", priority: false });
+    ["Zielsetzung & Priorisierung", "Projekt-/Aufgabenplanung", "Entscheidungsfindung", "Zeitmanagement", "Reiseplanung"].forEach(t => {
+      data.goalNodes.push({ id: uid(), parentId: planungId, title: t, priority: false });
+    });
+  }
+
+  data.planungMigrationApplied = true;
+}
+
 let state = loadData();
 migrateToGoalNodes(state);
 repairCyclicGoalNodes(state);
 migrateBereicheNaming(state);
+migrateReisenToPlanung(state);
 repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
 state.exams = state.exams || [];
@@ -299,6 +330,12 @@ function seedData() {
     rootId[title] = id;
     subs.forEach(sub => c(sub, id));
   });
+
+  // "Reiseplanung" bekommt als einziger Unterpunkt eine eigene dritte Ebene
+  const reiseplanungNode = data.goalNodes.find(n => n.parentId === rootId["Planung"] && n.title === "Reiseplanung");
+  if (reiseplanungNode) {
+    ["Reisebudget", "Dokumente", "Packen & Ausrüstung", "Sprachliche Basics", "Sicherheit auf Reisen"].forEach(t => c(t, reiseplanungNode.id));
+  }
 
   const glaube = rootId["Glaube"];
   h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
