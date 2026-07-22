@@ -47,26 +47,32 @@ const STORAGE_KEY = "habit-tracker-data-v2";
 // ---------- Lebenswissen-Ordnerstruktur (siehe 20_Wissen/Themen/Lebenswissen_Ordnerstruktur.md) ----------
 // Phase 7.5: auf einheitliche Ein-Wort-Oberbegriffe umstrukturiert, Redundanzen entfernt
 // (z.B. "Umgang mit Behörden" in "Recht" vereint, Biologie/Sicherheit/Gesellschaft/Geschichte/Psychologie neu)
+// Reihenfolge lernoptimiert: erst Meta-/Grundlagenfächer (Planung, Glaube, Psychologie, Biologie),
+// dann eigener Körper/Alltag, dann Geld/Recht/Beruf, dann Sicherheit/Soziales, zuletzt Weltwissen/Kultur/Genuss.
+// Innerhalb jedes Bereichs: Grundlagen -> Vertiefung -> Praxis/Anwendung.
 const LEBENSWISSEN = [
-  ["Glaube", true, ["Grundlagen des christlichen Glaubens", "Die einzelnen Bibelbücher", "Historischer/kultureller Hintergrund", "Gebet (Formen, Praxis)", "Gemeindeleben & geistliche Gemeinschaft", "Theologische Grundbegriffe"]],
-  ["Biologie", false, ["Anatomie des Menschen", "Organsysteme", "Hormone & ihre Wirkung", "Blut & Blutwerte"]],
-  ["Gesundheit", false, ["Ernährung", "Bewegung/Training", "Schlaf", "Erste Hilfe", "Mentale Gesundheit", "Zahnpflege", "Vorsorgeuntersuchungen", "Rasieren & Bartpflege"]],
-  ["Haushalt", false, ["Wäsche", "Kochen", "Putzen", "Ordnung & Organisation", "Reparaturen im Haushalt", "Pflanzen & Garten", "Mülltrennung & Entsorgung"]],
-  ["Technik", false, ["Auto", "Heimnetzwerk/WLAN", "Unterhaltungselektronik", "Kabelmanagement", "Werkzeugkoffer"]],
-  ["Handwerk", false, ["Elektro", "Holzbearbeitung", "Metallbearbeitung", "Werkstatt-Grundausstattung", "Schweißen", "Kleben", "Nägel & Schrauben", "Technische Zeichnungen", "Anlagen/Installationen", "Gas, Wasser, Sanitär"]],
-  ["Wirtschaft", false, ["Ordnersystem für Unterlagen", "Dokumente aufbewahren", "Gehalt/Lohn verstehen", "Steuern", "Versicherungen", "Konten, Sparen, Budget", "Verträge lesen & verstehen", "Hausbau/Immobilien", "Finanzen & Vermögensaufbau"]],
-  ["Karriere", false, ["Karriereplanung", "Softskills", "Hardskills", "Selbstständigkeit", "Lebens-/Zielplanung"]],
-  ["Kunst", false, ["Schreiben", "Zeichnen/Malen", "Kunstgeschichte", "Bekannte Künstler", "Kunstrichtungen", "Worldbuilding"]],
-  ["Sicherheit", false, ["Notfallarten", "Verletzungen erkennen & versorgen", "Outdoor-Grundlagen", "Ausrüstung", "Gefahren – nicht selbst eingreifen", "Notfallkontakte & -plan", "Selbstschutz", "Selbstverteidigung"]],
-  ["Genuss", false, ["Whisky", "Kaffee", "Wein", "Bier", "Food-Pairing"]],
+  ["Planung", false, ["Zielsetzung & Priorisierung", "Entscheidungsfindung", "Projekt-/Aufgabenplanung", "Zeitmanagement", "Reiseplanung"]],
+  ["Glaube", true, ["Grundlagen des christlichen Glaubens", "Theologische Grundbegriffe", "Die einzelnen Bibelbücher", "Historischer/kultureller Hintergrund", "Gebet (Formen, Praxis)", "Gemeindeleben & geistliche Gemeinschaft"]],
+  ["Psychologie", false, ["Grundlagen der Psychologie", "Persönlichkeitsmodelle", "Entwicklungspsychologie", "Kognitive Verzerrungen", "Motivation & Gewohnheiten", "Emotionsregulation"]],
+  ["Biologie", false, ["Anatomie des Menschen", "Organsysteme", "Blut & Blutwerte", "Hormone & ihre Wirkung"]],
+  ["Gesundheit", false, ["Ernährung", "Bewegung/Training", "Schlaf", "Zahnpflege", "Rasieren & Bartpflege", "Mentale Gesundheit", "Vorsorgeuntersuchungen", "Erste Hilfe"]],
+  ["Haushalt", false, ["Ordnung & Organisation", "Wäsche", "Kochen", "Putzen", "Mülltrennung & Entsorgung", "Pflanzen & Garten", "Reparaturen im Haushalt"]],
+  ["Technik", false, ["Werkzeugkoffer", "Heimnetzwerk/WLAN", "Unterhaltungselektronik", "Kabelmanagement", "Auto"]],
+  ["Handwerk", false, ["Werkstatt-Grundausstattung", "Elektro", "Nägel & Schrauben", "Kleben", "Holzbearbeitung", "Metallbearbeitung", "Schweißen", "Technische Zeichnungen", "Anlagen/Installationen", "Gas, Wasser, Sanitär"]],
+  ["Sicherheit", false, ["Notfallarten", "Gefahren – nicht selbst eingreifen", "Verletzungen erkennen & versorgen", "Ausrüstung", "Outdoor-Grundlagen", "Selbstschutz", "Selbstverteidigung", "Notfallkontakte & -plan"]],
+  ["Wirtschaft", false, ["Gehalt/Lohn verstehen", "Konten, Sparen, Budget", "Ordnersystem für Unterlagen", "Dokumente aufbewahren", "Verträge lesen & verstehen", "Versicherungen", "Steuern", "Finanzen & Vermögensaufbau", "Hausbau/Immobilien"]],
+  ["Recht", false, ["Wichtige Fristen", "Wichtige Ämter im Überblick", "Behördengänge", "Anträge & Fristen", "Mietrecht-Basics", "Kaufrecht/Gewährleistung", "Verkehrsrecht-Basics", "Widerspruch/Einspruch"]],
+  ["Karriere", false, ["Softskills", "Hardskills", "Karriereplanung", "Lebens-/Zielplanung", "Selbstständigkeit"]],
   ["Digital", false, ["Passwort-Sicherheit", "Datenschutz-Grundlagen", "Backups", "Betrugsmaschen erkennen", "Digitale Nachlassplanung"]],
-  ["Recht", false, ["Mietrecht-Basics", "Kaufrecht/Gewährleistung", "Verkehrsrecht-Basics", "Wichtige Fristen", "Behördengänge", "Wichtige Ämter im Überblick", "Anträge & Fristen", "Widerspruch/Einspruch"]],
   ["Beziehung", false, ["Kommunikationsgrundlagen", "Konfliktlösung", "Partnerschaft/Ehe-Vorbereitung", "Erziehung/Elternschaft"]],
-  ["Reisen", false, ["Reiseplanung & Budget", "Dokumente", "Packen & Ausrüstung", "Sprachliche Basics", "Sicherheit auf Reisen"]],
-  ["Geschichte", false, ["Weltgeschichte im Überblick", "Deutsche Geschichte", "Antike & Mittelalter", "Neuzeit", "Zeitgeschichte (20./21. Jahrhundert)"]],
-  ["Gesellschaft", false, ["Politisches System Deutschlands", "Wichtige Ideologien & Strömungen", "Aktuelle gesellschaftliche Debatten", "Wirtschaftssysteme im Überblick", "Medienkompetenz"]],
-  ["Psychologie", false, ["Grundlagen der Psychologie", "Persönlichkeitsmodelle", "Kognitive Verzerrungen", "Entwicklungspsychologie", "Motivation & Gewohnheiten", "Emotionsregulation"]]
+  ["Geschichte", false, ["Weltgeschichte im Überblick", "Antike & Mittelalter", "Neuzeit", "Zeitgeschichte (20./21. Jahrhundert)", "Deutsche Geschichte"]],
+  ["Gesellschaft", false, ["Politisches System Deutschlands", "Wirtschaftssysteme im Überblick", "Wichtige Ideologien & Strömungen", "Aktuelle gesellschaftliche Debatten", "Medienkompetenz"]],
+  ["Kunst", false, ["Kunstgeschichte", "Kunstrichtungen", "Bekannte Künstler", "Zeichnen/Malen", "Schreiben", "Worldbuilding"]],
+  ["Genuss", false, ["Kaffee", "Wein", "Bier", "Whisky", "Food-Pairing"]]
 ];
+
+// Feste Unterreihenfolge für die dritte Ebene unter "Reiseplanung" (siehe seedData/Migration)
+const REISEPLANUNG_ORDER = ["Reisebudget", "Dokumente", "Sprachliche Basics", "Packen & Ausrüstung", "Sicherheit auf Reisen"];
 
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -243,10 +249,79 @@ function repairCyclicGoalNodes(data) {
   });
 }
 
+// ---------- Migration: "Reisen" zu "Planung" (Kernfähigkeit statt einzelner Anwendungsfall) ----------
+function migrateReisenToPlanung(data) {
+  if (data.planungMigrationApplied || !data.goalNodes) return;
+  const roots = () => data.goalNodes.filter(n => n.parentId === null);
+  const findRoot = title => roots().find(n => n.title === title);
+
+  const reisen = findRoot("Reisen");
+  if (reisen) {
+    reisen.title = "Planung";
+    const reiseplanungId = uid();
+    data.goalNodes.push({ id: reiseplanungId, parentId: reisen.id, title: "Reiseplanung", priority: false });
+    data.goalNodes.forEach(n => {
+      if (n.parentId === reisen.id && n.id !== reiseplanungId) n.parentId = reiseplanungId;
+    });
+    const budgetNode = data.goalNodes.find(n => n.parentId === reiseplanungId && n.title === "Reiseplanung & Budget");
+    if (budgetNode) budgetNode.title = "Reisebudget";
+    ["Zielsetzung & Priorisierung", "Projekt-/Aufgabenplanung", "Entscheidungsfindung", "Zeitmanagement"].forEach(t => {
+      data.goalNodes.push({ id: uid(), parentId: reisen.id, title: t, priority: false });
+    });
+  } else if (!findRoot("Planung")) {
+    const planungId = uid();
+    data.goalNodes.push({ id: planungId, parentId: null, title: "Planung", priority: false });
+    ["Zielsetzung & Priorisierung", "Projekt-/Aufgabenplanung", "Entscheidungsfindung", "Zeitmanagement", "Reiseplanung"].forEach(t => {
+      data.goalNodes.push({ id: uid(), parentId: planungId, title: t, priority: false });
+    });
+  }
+
+  data.planungMigrationApplied = true;
+}
+
+// ---------- Migration: Bereiche in lernoptimaler Reihenfolge anordnen ----------
+// Sortiert bestehende Bereiche/Unterordner nach LEBENSWISSEN/REISEPLANUNG_ORDER um,
+// ohne irgendwelche Eltern-Kind-Bezüge zu verändern (reine Anzeige-Reihenfolge).
+function migrateLearningOrder(data) {
+  if (data.learningOrderApplied || !data.goalNodes) return;
+  const rootOrder = LEBENSWISSEN.map(([title]) => title);
+  const subOrder = {};
+  LEBENSWISSEN.forEach(([title, , subs]) => { subOrder[title] = subs; });
+  subOrder["Reiseplanung"] = REISEPLANUNG_ORDER;
+
+  const byParent = new Map();
+  data.goalNodes.forEach(n => {
+    if (!byParent.has(n.parentId)) byParent.set(n.parentId, []);
+    byParent.get(n.parentId).push(n);
+  });
+
+  function sortedChildren(parentId, orderList) {
+    const kids = byParent.get(parentId) || [];
+    if (!orderList) return kids;
+    return kids.slice().sort((a, b) => {
+      const ai = orderList.indexOf(a.title), bi = orderList.indexOf(b.title);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    });
+  }
+
+  const result = [];
+  function walk(parentId, orderList) {
+    sortedChildren(parentId, orderList).forEach(n => {
+      result.push(n);
+      walk(n.id, subOrder[n.title]);
+    });
+  }
+  walk(null, rootOrder);
+  data.goalNodes = result;
+  data.learningOrderApplied = true;
+}
+
 let state = loadData();
 migrateToGoalNodes(state);
 repairCyclicGoalNodes(state);
 migrateBereicheNaming(state);
+migrateReisenToPlanung(state);
+migrateLearningOrder(state);
 repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
 state.exams = state.exams || [];
@@ -299,6 +374,12 @@ function seedData() {
     rootId[title] = id;
     subs.forEach(sub => c(sub, id));
   });
+
+  // "Reiseplanung" bekommt als einziger Unterpunkt eine eigene dritte Ebene
+  const reiseplanungNode = data.goalNodes.find(n => n.parentId === rootId["Planung"] && n.title === "Reiseplanung");
+  if (reiseplanungNode) {
+    REISEPLANUNG_ORDER.forEach(t => c(t, reiseplanungNode.id));
+  }
 
   const glaube = rootId["Glaube"];
   h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
