@@ -670,10 +670,13 @@ function habitCompletionRate(habit, days = 30) {
 function computeStreak(habit) {
   let streak = 0;
   let d = new Date();
+  const createdDate = new Date(habit.createdAt);
   if (!habit.history[todayStr()] && isScheduledToday(habit, d)) {
     d.setDate(d.getDate() - 1);
   }
-  while (true) {
+  let guard = 0;
+  while (guard++ < 3660) {
+    if (d < createdDate) break;
     if (!isScheduledToday(habit, d)) {
       d.setDate(d.getDate() - 1);
       continue;
