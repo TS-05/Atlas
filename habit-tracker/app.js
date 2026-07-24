@@ -44,35 +44,112 @@ const STORAGE_KEY = "habit-tracker-data-v2";
   window.addEventListener("unhandledrejection", e => showRescue(e && e.reason));
 })();
 
-// ---------- Lebenswissen-Ordnerstruktur (siehe 20_Wissen/Themen/Lebenswissen_Ordnerstruktur.md) ----------
-// Phase 7.5: auf einheitliche Ein-Wort-Oberbegriffe umstrukturiert, Redundanzen entfernt
-// (z.B. "Umgang mit Behörden" in "Recht" vereint, Biologie/Sicherheit/Gesellschaft/Geschichte/Psychologie neu)
-// Reihenfolge lernoptimiert: erst Meta-/Grundlagenfächer (Planung, Glaube, Psychologie, Biologie),
-// dann eigener Körper/Alltag, dann Geld/Recht/Beruf, dann Sicherheit/Soziales, zuletzt Weltwissen/Kultur/Genuss.
-// Innerhalb jedes Bereichs: Grundlagen -> Vertiefung -> Praxis/Anwendung.
+// ---------- Bereiche-Struktur (Phase 7.11: zielorientiert statt enzyklopädisch) ----------
+// Nicht mehr "18 allgemeine Wissensgebiete + 1 Ziele-Anhang", sondern: Tims tatsächliche
+// Lebensziele SIND die Oberkategorien. Allgemeines Wissen (Kommunikation, Haushaltstechnik, Recht ...)
+// taucht nur noch dort auf, wo ein konkretes Ziel es braucht (z.B. "Guter Ehemann werden" -> Kommunikation).
+// Format: { title, priority?, children: [ "Blatt" | {title, children:[...]} , ... ] } — beliebig tief verschachtelbar.
 const LEBENSWISSEN = [
-  ["Planung", false, ["Zielsetzung & Priorisierung", "Entscheidungsfindung", "Projekt-/Aufgabenplanung", "Zeitmanagement", "Reiseplanung"]],
-  ["Glaube", true, ["Grundlagen des christlichen Glaubens", "Theologische Grundbegriffe", "Die einzelnen Bibelbücher", "Historischer/kultureller Hintergrund", "Gebet (Formen, Praxis)", "Gemeindeleben & geistliche Gemeinschaft"]],
-  ["Psychologie", false, ["Grundlagen der Psychologie", "Persönlichkeitsmodelle", "Entwicklungspsychologie", "Kognitive Verzerrungen", "Motivation & Gewohnheiten", "Emotionsregulation"]],
-  ["Biologie", false, ["Anatomie des Menschen", "Organsysteme", "Blut & Blutwerte", "Hormone & ihre Wirkung"]],
-  ["Gesundheit", false, ["Ernährung", "Bewegung/Training", "Schlaf", "Zahnpflege", "Rasieren & Bartpflege", "Mentale Gesundheit", "Vorsorgeuntersuchungen", "Erste Hilfe"]],
-  ["Haushalt", false, ["Ordnung & Organisation", "Wäsche", "Kochen", "Putzen", "Mülltrennung & Entsorgung", "Pflanzen & Garten", "Reparaturen im Haushalt"]],
-  ["Technik", false, ["Werkzeugkoffer", "Heimnetzwerk/WLAN", "Unterhaltungselektronik", "Kabelmanagement", "Auto"]],
-  ["Handwerk", false, ["Werkstatt-Grundausstattung", "Elektro", "Nägel & Schrauben", "Kleben", "Holzbearbeitung", "Metallbearbeitung", "Schweißen", "Technische Zeichnungen", "Anlagen/Installationen", "Gas, Wasser, Sanitär"]],
-  ["Sicherheit", false, ["Notfallarten", "Gefahren – nicht selbst eingreifen", "Verletzungen erkennen & versorgen", "Ausrüstung", "Outdoor-Grundlagen", "Selbstschutz", "Selbstverteidigung", "Notfallkontakte & -plan"]],
-  ["Wirtschaft", false, ["Gehalt/Lohn verstehen", "Konten, Sparen, Budget", "Ordnersystem für Unterlagen", "Dokumente aufbewahren", "Verträge lesen & verstehen", "Versicherungen", "Steuern", "Finanzen & Vermögensaufbau", "Hausbau/Immobilien"]],
-  ["Recht", false, ["Wichtige Fristen", "Wichtige Ämter im Überblick", "Behördengänge", "Anträge & Fristen", "Mietrecht-Basics", "Kaufrecht/Gewährleistung", "Verkehrsrecht-Basics", "Widerspruch/Einspruch"]],
-  ["Karriere", false, ["Softskills", "Hardskills", "Karriereplanung", "Lebens-/Zielplanung", "Selbstständigkeit"]],
-  ["Digital", false, ["Passwort-Sicherheit", "Datenschutz-Grundlagen", "Backups", "Betrugsmaschen erkennen", "Digitale Nachlassplanung"]],
-  ["Beziehung", false, ["Kommunikationsgrundlagen", "Konfliktlösung", "Partnerschaft/Ehe-Vorbereitung", "Erziehung/Elternschaft"]],
-  ["Geschichte", false, ["Weltgeschichte im Überblick", "Antike & Mittelalter", "Neuzeit", "Zeitgeschichte (20./21. Jahrhundert)", "Deutsche Geschichte"]],
-  ["Gesellschaft", false, ["Politisches System Deutschlands", "Wirtschaftssysteme im Überblick", "Wichtige Ideologien & Strömungen", "Aktuelle gesellschaftliche Debatten", "Medienkompetenz"]],
-  ["Kunst", false, ["Kunstgeschichte", "Kunstrichtungen", "Bekannte Künstler", "Zeichnen/Malen", "Schreiben", "Worldbuilding"]],
-  ["Genuss", false, ["Kaffee", "Wein", "Bier", "Whisky", "Food-Pairing"]]
+  { title: "Glaube", priority: true, children: [
+    "Grundlagen des christlichen Glaubens",
+    "Theologische Grundbegriffe",
+    "Die einzelnen Bibelbücher",
+    "Historischer/kultureller Hintergrund",
+    "Gebet (Formen, Praxis)",
+    "Gemeindeleben & geistliche Gemeinschaft",
+    "Predigtreifes Bibelwissen (Homiletik)",
+    "Mentor-Beziehung (ab September)",
+    "Vorbild in der Gemeinde sein",
+    "Selbst Mentor werden (später)",
+    "Jährliche Bibellese (ab 2027)"
+  ]},
+  { title: "Karriere", children: [
+    { title: "Schule", children: [
+      "Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)",
+      "Lerntechniken & Prüfungsvorbereitung",
+      "Mündliche Beteiligung & Rhetorik"
+    ]},
+    { title: "Studium", children: [
+      "Mechatronik-Grundlagen",
+      "Wirtschaftsingenieurwesen-Grundlagen (Alternative)",
+      "Englisch C1"
+    ]},
+    { title: "Job (Technischer Projektmanager)", children: [
+      "Projektmanagement-Methoden",
+      "Projektmanagement-Zertifizierungen",
+      "Stakeholder-Kommunikation & Führung",
+      "Bewerbungsgespräche"
+    ]},
+    { title: "Selbstständigkeit", children: [
+      "Rechtliches (Firmengründung, Rechtsform)",
+      "Steuerrecht für Unternehmer",
+      "Businessplan-Erstellung"
+    ]}
+  ]},
+  { title: "Vermögen", children: [
+    { title: "Finanzielle Unabhängigkeit", children: [
+      "Vermögensaufbau-Strategien (ETFs, Diversifikation)",
+      "Budget & Sparen"
+    ]},
+    { title: "Immobilien im Ausland", children: [
+      "Rechtliches in Deutschland zum Thema",
+      "Rechtliches im entsprechenden Land zum Thema",
+      "Finanzierung & Rendite-Berechnung"
+    ]}
+  ]},
+  { title: "Ehe", children: [
+    "Verlobung mit Ramona",
+    "Ehevorbereitung (biblisches Eheverständnis, Konfliktlösung als Paar)",
+    { title: "Guter Ehemann werden", children: [
+      "Kommunikation",
+      "Selbstständiges Klarkommen (Haushaltstechnik: Kochen, Putzen, Wäsche, Organisation)",
+      "Finanzielle Verantwortung als Familienvorstand"
+    ]}
+  ]},
+  { title: "Familie", children: [
+    "Erziehungsstile & kindliche Entwicklung",
+    "Vorbereitung auf 2 oder 4 Kinder"
+  ]},
+  { title: "Auswandern", children: [
+    "Aufenthaltsrecht & Visum (Schweiz/Skandinavien)",
+    "Landessprache",
+    "Arbeitsmarkt vor Ort"
+  ]},
+  { title: "Gesundheit & Sport", children: [
+    "Ernährungsplan für Körperzusammensetzung (75→83 kg, ~10% KFA)",
+    "Marathon-Vorbereitung",
+    "Thai-Boxen auf hohem Niveau",
+    "Körperwissen (eigener & weiblicher Körper)"
+  ]},
+  { title: "Kreatives Schaffen", children: [
+    "Fantasy-Buchreihe (Worldbuilding, Erzähltechnik/Plot)",
+    "Christliche Bücher (theologisches Schreiben)",
+    "Zeichnen/Malen"
+  ]},
+  { title: "Musik", children: [
+    "Saxofon",
+    "Klavier",
+    "Singen"
+  ]},
+  { title: "Sprachen", children: [
+    "Englisch (C1)",
+    "Französisch",
+    "Spanisch",
+    "Russisch",
+    "Japanisch oder Mandarin",
+    "Hebräisch",
+    "Griechisch"
+  ]},
+  { title: "Charakter & Persönlichkeit", children: [
+    "Ehrlichkeit & Integrität",
+    "Disziplin & Fleiß",
+    "Weisheit & Besonnenheit",
+    "Charisma & Ausstrahlung",
+    "Positive Lebenseinstellung",
+    "Intelligenz steigern",
+    "Oldtimer-Porsche"
+  ]}
 ];
-
-// Feste Unterreihenfolge für die dritte Ebene unter "Reiseplanung" (siehe seedData/Migration)
-const REISEPLANUNG_ORDER = ["Reisebudget", "Dokumente", "Sprachliche Basics", "Packen & Ausrüstung", "Sicherheit auf Reisen"];
 
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -280,14 +357,18 @@ function migrateReisenToPlanung(data) {
 }
 
 // ---------- Migration: Bereiche in lernoptimaler Reihenfolge anordnen ----------
-// Sortiert bestehende Bereiche/Unterordner nach LEBENSWISSEN/REISEPLANUNG_ORDER um,
+// Sortiert bestehende Bereiche/Unterordner nach LEBENSWISSEN um,
 // ohne irgendwelche Eltern-Kind-Bezüge zu verändern (reine Anzeige-Reihenfolge).
 function migrateLearningOrder(data) {
   if (data.learningOrderApplied || !data.goalNodes) return;
-  const rootOrder = LEBENSWISSEN.map(([title]) => title);
+  const rootOrder = LEBENSWISSEN.map(n => n.title);
   const subOrder = {};
-  LEBENSWISSEN.forEach(([title, , subs]) => { subOrder[title] = subs; });
-  subOrder["Reiseplanung"] = REISEPLANUNG_ORDER;
+  function registerOrder(node) {
+    if (!node.children) return;
+    subOrder[node.title] = node.children.map(c => (typeof c === "string" ? c : c.title));
+    node.children.forEach(c => { if (typeof c !== "string") registerOrder(c); });
+  }
+  LEBENSWISSEN.forEach(registerOrder);
 
   const byParent = new Map();
   data.goalNodes.forEach(n => {
@@ -316,11 +397,106 @@ function migrateLearningOrder(data) {
   data.learningOrderApplied = true;
 }
 
+// ---------- Migration: von der enzyklopädischen 18er-Struktur zur zielorientierten Struktur (Phase 7.11) ----------
+// "Glaube" bleibt (ID/Inhalt erhalten, nur neue Unterpunkte ergänzt). Alle anderen alten Wurzeln: wenn
+// irgendwo im Teilbaum Aufgaben/Gewohnheiten hängen, werden sie unter "Archiv (alte Bereiche)" verschoben
+// statt gelöscht — sonst (leere Kategorie) werden sie entfernt. Danach wird die neue Zielstruktur frisch
+// aufgebaut und die bekannten Start-Aufgaben/-Gewohnheiten an ihren neuen Platz umgehängt.
+function migrateToGoalDrivenStructure(data) {
+  if (data.goalDrivenRestructureApplied || !data.goalNodes) return;
+
+  function subtreeHasContent(nodeId) {
+    const stack = [nodeId];
+    while (stack.length) {
+      const id = stack.pop();
+      if ((data.tasks || []).some(t => t.nodeId === id)) return true;
+      if ((data.habits || []).some(h => h.nodeId === id)) return true;
+      data.goalNodes.filter(n => n.parentId === id).forEach(c => stack.push(c.id));
+    }
+    return false;
+  }
+
+  const oldRoots = data.goalNodes.filter(n => n.parentId === null);
+
+  // 1) "Glaube" erhalten, nur neue Unterpunkte ergänzen
+  const glaubeRoot = oldRoots.find(n => n.title === "Glaube");
+  const glaubeDef = LEBENSWISSEN.find(n => n.title === "Glaube");
+  if (glaubeRoot && glaubeDef) {
+    const existingTitles = new Set(data.goalNodes.filter(n => n.parentId === glaubeRoot.id).map(n => n.title));
+    glaubeDef.children.forEach(child => {
+      const title = typeof child === "string" ? child : child.title;
+      if (!existingTitles.has(title)) data.goalNodes.push({ id: uid(), parentId: glaubeRoot.id, title, priority: false });
+    });
+    glaubeRoot.priority = true;
+  }
+
+  // 2) Alle anderen alten Wurzeln archivieren (falls Inhalt) oder löschen (falls leer)
+  let archivRootId = null;
+  function ensureArchivRoot() {
+    if (archivRootId) return archivRootId;
+    archivRootId = uid();
+    data.goalNodes.push({ id: archivRootId, parentId: null, title: "Archiv (alte Bereiche)", priority: false });
+    return archivRootId;
+  }
+  const idsToDelete = new Set();
+  oldRoots.forEach(root => {
+    if (glaubeRoot && root.id === glaubeRoot.id) return;
+    if (subtreeHasContent(root.id)) {
+      root.parentId = ensureArchivRoot();
+      root.title = root.title + " (alt)";
+    } else {
+      const stack = [root.id];
+      idsToDelete.add(root.id);
+      while (stack.length) {
+        const id = stack.pop();
+        data.goalNodes.filter(n => n.parentId === id).forEach(c => { idsToDelete.add(c.id); stack.push(c.id); });
+      }
+    }
+  });
+  data.goalNodes = data.goalNodes.filter(n => !idsToDelete.has(n.id));
+
+  // 3) Neue Zielstruktur frisch aufbauen (Glaube ausgenommen, s.o.)
+  const byTitle = {};
+  if (glaubeRoot) {
+    byTitle["Glaube"] = glaubeRoot.id;
+    data.goalNodes.filter(n => n.parentId === glaubeRoot.id).forEach(n => { byTitle[n.title] = n.id; });
+  }
+  function buildNode(node, parentId) {
+    const id = uid();
+    data.goalNodes.push({ id, parentId, title: node.title, priority: !!node.priority });
+    byTitle[node.title] = id;
+    (node.children || []).forEach(child => {
+      if (typeof child === "string") { byTitle[child] = uid(); data.goalNodes.push({ id: byTitle[child], parentId: id, title: child, priority: false }); }
+      else buildNode(child, id);
+    });
+    return id;
+  }
+  LEBENSWISSEN.forEach(node => { if (node.title !== "Glaube" || !glaubeRoot) buildNode(node, null); });
+
+  // 4) Bekannte Start-Aufgaben/-Gewohnheiten an ihren neuen Platz umhängen
+  const reattach = {
+    "Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)": byTitle["Glaube"],
+    "Bibellese / stille Zeit": byTitle["Glaube"],
+    "Abendlektüre 30 Min. vor dem Schlafen": byTitle["Glaube"],
+    "Joggen 5,5 km": byTitle["Gesundheit & Sport"],
+    "Ernährung im Rahmen (max. 2.000 kcal)": byTitle["Gesundheit & Sport"],
+    "Lernen / Schularbeit 60–90 Min.": byTitle["Schule"],
+    "Bewerbungen duales Studium abschicken": byTitle["Studium"],
+    "Seminararbeit Physik in Filmen fertigstellen": byTitle["Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)"],
+    "Lesen (ca. 1 Buch/Monat)": byTitle["Kreatives Schaffen"]
+  };
+  (data.tasks || []).forEach(t => { if (reattach[t.title] !== undefined) t.nodeId = reattach[t.title]; });
+  (data.habits || []).forEach(h => { if (reattach[h.title] !== undefined) h.nodeId = reattach[h.title]; });
+
+  data.goalDrivenRestructureApplied = true;
+}
+
 let state = loadData();
 migrateToGoalNodes(state);
 repairCyclicGoalNodes(state);
 migrateBereicheNaming(state);
 migrateReisenToPlanung(state);
+migrateToGoalDrivenStructure(state);
 migrateLearningOrder(state);
 repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
@@ -336,7 +512,11 @@ const expandedNodes = new Set(); // Laufzeit-Status des Bereiche-Akkordeons (nic
 
 // ---------- Seed data ----------
 function seedData() {
-  const data = { goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [] };
+  const data = {
+    goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [],
+    // Frische Seed-Daten entsprechen bereits der aktuellen Struktur — alle Migrationen sollen hier no-op sein
+    bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true, learningOrderApplied: true
+  };
   const c = (title, parentId = null, priority = false) => {
     const id = uid();
     data.goalNodes.push({ id, parentId, title, priority });
@@ -368,32 +548,34 @@ function seedData() {
     });
   };
 
+  // Generischer Baum-Aufbau (beliebig tief, siehe LEBENSWISSEN-Format weiter oben)
   const rootId = {};
-  LEBENSWISSEN.forEach(([title, priority, subs]) => {
-    const id = c(title, null, priority);
-    rootId[title] = id;
-    subs.forEach(sub => c(sub, id));
-  });
-
-  // "Reiseplanung" bekommt als einziger Unterpunkt eine eigene dritte Ebene
-  const reiseplanungNode = data.goalNodes.find(n => n.parentId === rootId["Planung"] && n.title === "Reiseplanung");
-  if (reiseplanungNode) {
-    REISEPLANUNG_ORDER.forEach(t => c(t, reiseplanungNode.id));
+  const byTitle = {};
+  function buildNode(node, parentId) {
+    const id = c(node.title, parentId, !!node.priority);
+    byTitle[node.title] = id;
+    (node.children || []).forEach(child => {
+      if (typeof child === "string") { byTitle[child] = c(child, id); }
+      else buildNode(child, id);
+    });
+    return id;
   }
+  LEBENSWISSEN.forEach(node => { rootId[node.title] = buildNode(node, null); });
 
   const glaube = rootId["Glaube"];
   h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
   h("Abendlektüre 30 Min. vor dem Schlafen", glaube, "daily", { routineOrder: 8 });
   t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, "gross", 5);
 
-  const gesundheit = rootId["Gesundheit"];
-  h("Joggen 5,5 km", gesundheit, "daily", { routineOrder: 5 });
-  h("Ernährung im Rahmen (max. 2.000 kcal)", gesundheit, "daily", { routineOrder: 10 });
+  const gesundheitSport = rootId["Gesundheit & Sport"];
+  h("Joggen 5,5 km", gesundheitSport, "daily", { routineOrder: 5 });
+  h("Ernährung im Rahmen (max. 2.000 kcal)", gesundheitSport, "daily", { routineOrder: 10 });
 
-  const zukunft = rootId["Karriere"];
-  h("Lernen / Schularbeit 60–90 Min.", zukunft, "weekdays", { routineOrder: 6 });
-  t("Bewerbungen duales Studium abschicken", zukunft, "2026-07-13", "gross", 5);
-  t("Seminararbeit Physik in Filmen fertigstellen", zukunft, null, "gross");
+  const schule = byTitle["Schule"];
+  const studium = byTitle["Studium"];
+  h("Lernen / Schularbeit 60–90 Min.", schule, "weekdays", { routineOrder: 6 });
+  t("Bewerbungen duales Studium abschicken", studium, "2026-07-13", "gross", 5);
+  t("Seminararbeit Physik in Filmen fertigstellen", byTitle["Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)"], null, "gross");
   s("Englisch");
   s("Deutsch");
   s("BWL");
@@ -405,7 +587,7 @@ function seedData() {
   h("Handy weglegen 21:30", null, "daily", { routineOrder: 7 });
   h("Skin Care & Anziehen", null, "daily", { routineOrder: 3 });
   h("Tag im Griff", null, "daily", { routineOrder: 9 });
-  h("Lesen (ca. 1 Buch/Monat)", rootId["Kunst"], "daily");
+  h("Lesen (ca. 1 Buch/Monat)", rootId["Kreatives Schaffen"], "daily");
 
   // Aktuelle ToDo's (Stand 21.07.2026)
   td("Montag 27.7.2026 Planen", "2026-07-21", "klein", 4);
