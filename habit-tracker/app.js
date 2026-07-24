@@ -28,7 +28,7 @@ const STORAGE_KEY = "habit-tracker-data-v2";
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = "atlas-notfall-sicherung-" + new Date().toISOString().slice(0, 10) + ".json";
+          a.download = "atlas-notfall-sicherung-" + localDateKey(new Date()) + ".json";
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -167,10 +167,19 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// Kalendertag in Ortszeit (nicht UTC) als YYYY-MM-DD — toISOString() würde nachts je nach
+// Zeitzonen-Offset auf den Vortag zurückfallen und Datumsschlüssel verschieben.
+function localDateKey(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const d = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function todayStr(offsetDays = 0) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+  return localDateKey(d);
 }
 
 // ---------- Migration: alte Ziel-Strukturen -> verschachtelte goalNodes ----------
@@ -964,8 +973,8 @@ function isScheduledToday(habit, dateObj = new Date()) {
   }
   if (habit.frequency === "interval") {
     const n = habit.intervalDays || 1;
-    const createdKey = new Date(habit.createdAt).toISOString().slice(0, 10);
-    const dateKey = dateObj.toISOString().slice(0, 10);
+    const createdKey = localDateKey(new Date(habit.createdAt));
+    const dateKey = localDateKey(dateObj);
     const diffDays = Math.round((dateFromKey(dateKey) - dateFromKey(createdKey)) / 86400000);
     return diffDays >= 0 && diffDays % n === 0;
   }
@@ -986,7 +995,7 @@ function habitCompletionRate(habit, days = 30) {
     d.setDate(d.getDate() - i);
     if (new Date(habit.createdAt) > d) continue;
     if (!isScheduledToday(habit, d)) continue;
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     total++;
     if (habit.history[key]) done++;
   }
@@ -1007,7 +1016,7 @@ function computeStreak(habit) {
       d.setDate(d.getDate() - 1);
       continue;
     }
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     if (habit.history[key]) {
       streak++;
       d.setDate(d.getDate() - 1);
@@ -1188,7 +1197,7 @@ function dateFromKey(key) {
 }
 
 function subjectOfDay(dateObj) {
-  const key = dateObj.toISOString().slice(0, 10);
+  const key = localDateKey(dateObj);
   const overrideId = state.subjectOverride[key];
   if (overrideId) {
     const overridden = state.subjects.find(s => s.id === overrideId);
@@ -1229,7 +1238,7 @@ function openSubjectOverrideModal() {
 }
 
 function examOverride(dateObj) {
-  const todayMidnight = dateFromKey(dateObj.toISOString().slice(0, 10));
+  const todayMidnight = dateFromKey(localDateKey(dateObj));
   const upcoming = state.exams
     .map(e => ({ ...e, subject: state.subjects.find(s => s.id === e.subjectId) }))
     .filter(e => e.subject)
@@ -1239,16 +1248,97 @@ function examOverride(dateObj) {
   return upcoming[0] || null;
 }
 
-function reorderBtnsHtml(habitId, idx, total) {
+function dragHandleHtml(habitId) {
   if (!quickAddVisible) return "";
   return `
-    <button class="btn btn-icon btn-ghost" data-routine-up="${habitId}" aria-label="Nach oben" ${idx === 0 ? "disabled style=\"opacity:0.3;\"" : ""}>
-      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 7L5.5 3L9.5 7" stroke="var(--color-neutral-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <button class="btn btn-icon btn-ghost" data-routine-down="${habitId}" aria-label="Nach unten" ${idx === total - 1 ? "disabled style=\"opacity:0.3;\"" : ""}>
-      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 4L5.5 8L9.5 4" stroke="var(--color-neutral-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <button class="btn btn-icon btn-ghost routine-drag-handle" data-drag-handle="${habitId}" aria-label="Ziehen zum Verschieben" style="touch-action:none; cursor:grab;">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="4" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="9" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="9" r="1" fill="var(--color-neutral-400)"/></svg>
     </button>
   `;
+}
+
+// ---------- Tagesroutine per Touch/Maus an ihren Platz ziehen (statt Auf/Ab-Klicks) ----------
+function commitRoutineReorder(draggedId, newVisibleIndex, visibleIdsBeforeDrag) {
+  const fullChain = state.habits.filter(h => h.routineOrder != null).sort((a, b) => a.routineOrder - b.routineOrder);
+  const draggedHabit = fullChain.find(h => h.id === draggedId);
+  if (!draggedHabit) return;
+  const withoutDragged = fullChain.filter(h => h.id !== draggedId);
+
+  const newVisibleOrder = visibleIdsBeforeDrag.filter(id => id !== draggedId);
+  newVisibleOrder.splice(newVisibleIndex, 0, draggedId);
+  const beforeId = newVisibleIndex > 0 ? newVisibleOrder[newVisibleIndex - 1] : null;
+
+  const insertAt = beforeId === null ? 0 : withoutDragged.findIndex(h => h.id === beforeId) + 1;
+  withoutDragged.splice(insertAt, 0, draggedHabit);
+  withoutDragged.forEach((h, i) => { h.routineOrder = i; });
+  saveData();
+  renderAll();
+}
+
+function initRoutineDragReorder() {
+  const wrap = document.getElementById("routineChain");
+  let dragEl = null, dragHabitId = null, startY = 0, originalTops = [], heights = [], visibleIds = [], dragOriginalIndex = 0, currentDropIndex = 0;
+
+  function clearDropIndicators() {
+    wrap.querySelectorAll(".atlas-row").forEach(r => r.classList.remove("drag-over-top"));
+  }
+
+  wrap.addEventListener("pointerdown", e => {
+    const handle = e.target.closest("[data-drag-handle]");
+    if (!handle) return;
+    e.preventDefault();
+    dragEl = handle.closest(".atlas-row");
+    dragHabitId = handle.dataset.dragHandle;
+    const rows = [...wrap.querySelectorAll(".atlas-row")];
+    visibleIds = rows.map(r => r.dataset.habitId);
+    originalTops = rows.map(r => r.getBoundingClientRect().top);
+    heights = rows.map(r => r.getBoundingClientRect().height);
+    dragOriginalIndex = visibleIds.indexOf(dragHabitId);
+    currentDropIndex = dragOriginalIndex;
+    startY = e.clientY;
+    dragEl.classList.add("dragging");
+    dragEl.style.zIndex = "50";
+    dragEl.setPointerCapture(e.pointerId);
+  });
+
+  wrap.addEventListener("pointermove", e => {
+    if (!dragEl) return;
+    const dy = e.clientY - startY;
+    dragEl.style.transform = `translateY(${dy}px)`;
+    const dragCenterNow = originalTops[dragOriginalIndex] + heights[dragOriginalIndex] / 2 + dy;
+
+    let newIndex = 0;
+    visibleIds.forEach((id, i) => {
+      if (i === dragOriginalIndex) return;
+      const center = originalTops[i] + heights[i] / 2;
+      if (center < dragCenterNow) newIndex++;
+    });
+    currentDropIndex = newIndex;
+
+    clearDropIndicators();
+    if (newIndex !== dragOriginalIndex) {
+      const rows = [...wrap.querySelectorAll(".atlas-row")];
+      const targetRow = rows.find(r => r.dataset.habitId === visibleIds[newIndex] || (newIndex >= rows.length && r === rows[rows.length - 1]));
+      if (targetRow && targetRow !== dragEl) targetRow.classList.add("drag-over-top");
+    }
+  });
+
+  function endDrag(commit) {
+    if (!dragEl) return;
+    dragEl.classList.remove("dragging");
+    dragEl.style.transform = "";
+    dragEl.style.zIndex = "";
+    clearDropIndicators();
+    const finalIndex = currentDropIndex;
+    const id = dragHabitId;
+    const ids = visibleIds;
+    const changed = finalIndex !== dragOriginalIndex;
+    dragEl = null;
+    if (commit && changed) commitRoutineReorder(id, finalIndex, ids);
+  }
+
+  wrap.addEventListener("pointerup", () => endDrag(true));
+  wrap.addEventListener("pointercancel", () => endDrag(false));
 }
 
 function renderRoutineChain() {
@@ -1291,6 +1381,7 @@ function renderRoutineChain() {
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
     el.dataset.type = h.type;
+    el.dataset.habitId = h.id;
     el.innerHTML = `
       ${checkHtml}
       <div style="flex:1; min-width:0;">
@@ -1298,7 +1389,7 @@ function renderRoutineChain() {
         ${noteHtml}
       </div>
       ${weightInputHtml}
-      ${reorderBtnsHtml(h.id, idx, chainHabits.length)}
+      ${dragHandleHtml(h.id)}
     `;
     wrap.appendChild(el);
   });
@@ -1524,7 +1615,7 @@ function habitStatsWindow(habit, days) {
     if (new Date(habit.createdAt) > d) continue;
     if (!isScheduledToday(habit, d)) continue;
     total++;
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     if (habit.history[key]) done++;
   }
   return { total, done, rate: total ? done / total : null };
@@ -1536,7 +1627,7 @@ function weekdayDifficulty(days) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const wd = (d.getDay() + 6) % 7;
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     state.habits.forEach(h => {
       if (new Date(h.createdAt) > d) return;
       if (!isScheduledToday(h, d)) return;
@@ -1553,7 +1644,7 @@ function weekdayDifficulty(days) {
 
 // ---------- Aktivitäts-Heatmap (letzte 7 Wochen) ----------
 function dayCompletionPct(dateObj) {
-  const key = dateObj.toISOString().slice(0, 10);
+  const key = localDateKey(dateObj);
   const scheduled = state.habits.filter(h => new Date(h.createdAt) <= dateObj && isScheduledToday(h, dateObj));
   const done = scheduled.filter(h => h.history[key]).length;
   return scheduled.length ? Math.round((done / scheduled.length) * 100) : null;
@@ -1577,8 +1668,8 @@ function renderActivityHeatmap() {
     cell.style.background = pct === null
       ? "var(--color-neutral-800)"
       : `color-mix(in oklch, var(--color-accent) ${pct}%, var(--color-neutral-800))`;
-    cell.title = `${d.toISOString().slice(0, 10)}${pct === null ? "" : ": " + pct + "%"}`;
-    cell.dataset.date = d.toISOString().slice(0, 10);
+    cell.title = `${localDateKey(d)}${pct === null ? "" : ": " + pct + "%"}`;
+    cell.dataset.date = localDateKey(d);
     wrap.appendChild(cell);
   });
 }
@@ -1627,7 +1718,7 @@ function renderAreaLoad() {
 }
 
 function weekStartKey(dateObj = new Date()) {
-  return mondayOfWeek(dateObj).toISOString().slice(0, 10);
+  return localDateKey(mondayOfWeek(dateObj));
 }
 
 function renderReflection() {
@@ -1774,29 +1865,8 @@ document.addEventListener("click", e => {
   if (e.target.matches("[data-change-subject]")) {
     openSubjectOverrideModal();
   }
-  const upBtn = e.target.closest("[data-routine-up]");
-  if (upBtn) {
-    const habit = state.habits.find(h => h.id === upBtn.dataset.routineUp);
-    const chain = state.habits.filter(h => h.routineOrder != null).sort((a, b) => a.routineOrder - b.routineOrder);
-    const idx = chain.findIndex(h => h.id === habit.id);
-    if (idx > 0) {
-      const prev = chain[idx - 1];
-      [habit.routineOrder, prev.routineOrder] = [prev.routineOrder, habit.routineOrder];
-      saveData(); renderAll();
-    }
-  }
-  const downBtn = e.target.closest("[data-routine-down]");
-  if (downBtn) {
-    const habit = state.habits.find(h => h.id === downBtn.dataset.routineDown);
-    const chain = state.habits.filter(h => h.routineOrder != null).sort((a, b) => a.routineOrder - b.routineOrder);
-    const idx = chain.findIndex(h => h.id === habit.id);
-    if (idx < chain.length - 1) {
-      const next = chain[idx + 1];
-      [habit.routineOrder, next.routineOrder] = [next.routineOrder, habit.routineOrder];
-      saveData(); renderAll();
-    }
-  }
 });
+initRoutineDragReorder();
 
 // ---------- Zielbereich-Zerlegung: Copy-Prompt für Chat-Analyse ----------
 function buildDecomposePrompt(node) {
@@ -1888,7 +1958,7 @@ function addMonthTestTask(nodeId) {
   due.setDate(due.getDate() + 30);
   state.tasks.push({
     id: uid(), title: `${node.title}: 1 Monat lang anwenden/testen`, nodeId,
-    dueDate: due.toISOString().slice(0, 10), dueTime: null, done: false, completedAt: null,
+    dueDate: localDateKey(due), dueTime: null, done: false, completedAt: null,
     createdAt: new Date().toISOString(), size: "gross", priority: 0, source: "category", learnType: "praktisch"
   });
   saveData();
@@ -2356,7 +2426,7 @@ function exportWeekReview() {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - 6);
-  const fmt = d => d.toISOString().slice(0, 10);
+  const fmt = d => localDateKey(d);
   const longTermDays = 60;
 
   let md = `---\n`;

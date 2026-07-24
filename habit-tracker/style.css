@@ -137,6 +137,10 @@ textarea.input { min-height: 90px; resize: vertical; }
 .atlas-scroll::-webkit-scrollbar { display: none; }
 .atlas-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; position: relative; }
 .atlas-row + .atlas-row::before { content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--color-divider); }
+.atlas-row.dragging { background: var(--color-surface); box-shadow: 0 8px 20px rgba(0,0,0,0.35); border-radius: 10px; opacity: 0.95; }
+.atlas-row.drag-over-top::before { background: var(--color-accent-400); height: 2px; }
+.routine-drag-handle { cursor: grab; }
+.routine-drag-handle:active { cursor: grabbing; }
 .atlas-check { width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--color-divider); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: transparent; padding: 0; overflow: visible; }
 .atlas-check.checked { border-color: transparent; }
 .atlas-chip { font-size: 10px; padding: 2px 7px; border-radius: 5px; white-space: nowrap; }
