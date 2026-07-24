@@ -663,6 +663,53 @@ function pieSlicePath(pct) {
   return `M${cx},${cy} L${cx},${cy - R} A${R},${R} 0 ${largeArc} 1 ${ex},${ey} Z`;
 }
 
+// Kleiner, wiederverwendbarer Fortschritts-Ring (z.B. pro Bereiche-Ordner) im selben Gold-Look wie der Wochenkreis
+function miniProgressRing(pct, size = 30) {
+  const inner = Math.round(size * 0.68);
+  const fontSize = Math.max(8, Math.round(size * 0.28));
+  return `
+    <div style="position:relative; width:${size}px; height:${size}px; flex-shrink:0;">
+      <div style="position:absolute; inset:0; border-radius:50%; background:conic-gradient(from -90deg,
+        var(--color-accent-300) 0%, var(--color-accent-600) ${pct}%, var(--color-neutral-800) ${pct}% 100%);"></div>
+      <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
+        <div style="width:${inner}px; height:${inner}px; border-radius:50%; background:var(--color-surface); display:flex; align-items:center; justify-content:center; font-size:${fontSize}px; font-family:var(--font-heading); color:var(--color-accent-200);">${pct}%</div>
+      </div>
+    </div>
+  `;
+}
+
+// Anlassfarben von Stahl: 0-2 Budget-Einheiten = grau (füllt den Ring), danach Farbwechsel bei Überschuss
+const STEEL_STAGES = [
+  { min: 0, color: "#8a93a3", glow: false }, // stahlgrau
+  { min: 2, color: "#e8d577", glow: false }, // strohgelb
+  { min: 3, color: "#d4af37", glow: false }, // gold
+  { min: 4, color: "#8b5a2b", glow: false }, // braun/kupfer
+  { min: 5, color: "#7b3f61", glow: false }, // purpur
+  { min: 6, color: "#3b5b92", glow: false }, // blau
+  { min: 7, color: "#ff6a3d", glow: true }   // glühend
+];
+function steelStageFor(budget) {
+  let stage = STEEL_STAGES[0];
+  STEEL_STAGES.forEach(s => { if (budget >= s.min) stage = s; });
+  return stage;
+}
+function dayBudgetRing(dueCount, doneCount, budget, size = 68) {
+  const pct = Math.min(100, Math.round((budget / 2) * 100));
+  const stage = steelStageFor(budget);
+  const inner = Math.round(size * 0.7);
+  const glowCss = stage.glow ? `box-shadow:0 0 14px 3px ${stage.color}, 0 0 28px 8px ${stage.color}66;` : "";
+  return `
+    <div style="display:flex; justify-content:center; margin-bottom:16px;">
+      <div style="position:relative; width:${size}px; height:${size}px;">
+        <div style="position:absolute; inset:0; border-radius:50%; transition:background 0.4s, box-shadow 0.4s; ${glowCss}
+          background:conic-gradient(from -90deg, ${stage.color} ${pct}%, var(--color-neutral-800) ${pct}% 100%);"></div>
+        <div style="position:absolute; inset:${Math.round((size - inner) / 2)}px; border-radius:50%; background:var(--color-surface);
+          display:flex; align-items:center; justify-content:center; font-size:15px; font-family:var(--font-heading); color:var(--color-neutral-100);">${dueCount}/${doneCount}</div>
+      </div>
+    </div>
+  `;
+}
+
 // ---------- Tabs ----------
 const TAB_ORDER = ["heute", "todo", "zielbereiche", "gebete", "analyse"];
 const TAB_ROT = [-6, 10, -12, 7, -4];
@@ -731,6 +778,22 @@ Object.values(QUICK_ADD_BTN_IDS).flat().forEach(id => {
 const HEADER_ICON_PLUS = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const HEADER_ICON_SEARCH = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 9.5L13 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const HEADER_ICON_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V9.5M4 6.5L7 9.5L10 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 11.5V12.5H12V11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+// ---------- Lernfeldaufgaben: Aufgabentypen mit Icon (statt Klein/Groß, für source="category") ----------
+const LERNTYPEN = [
+  { id: "video", label: "Video schauen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M6 4.8L9.2 7L6 9.2V4.8Z" fill="currentColor"/></svg>' },
+  { id: "podcast", label: "Podcast/Hörbuch anhören", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 6V8M5 4V10M7 2.5V11.5M9 4V10M11.5 6V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>' },
+  { id: "buch", label: "Buch lesen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3.2C6 2.4 4.3 2 2.5 2V10.5C4.3 10.5 6 10.9 7 11.7C8 10.9 9.7 10.5 11.5 10.5V2C9.7 2 8 2.4 7 3.2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M7 3.2V11.7" stroke="currentColor" stroke-width="1.2"/></svg>' },
+  { id: "artikel", label: "Artikel/Wikipedia lesen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2" width="9" height="10" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 5H9.5M4.5 7H9.5M4.5 9H7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>' },
+  { id: "zusammenfassung", label: "Zusammenfassung schreiben", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 11.5L3 9.3L9.3 3L11 4.7L4.7 11L2.5 11.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>' },
+  { id: "erklaeren", label: "Funktionsweise erklären", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5H12V8.5H6.5L4 11V8.5H2V3.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M4.5 6H9.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>' },
+  { id: "mindmap", label: "Mindmap/Diagramm erstellen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="4" r="1.6" stroke="currentColor" stroke-width="1.1"/><circle cx="3" cy="10.5" r="1.6" stroke="currentColor" stroke-width="1.1"/><circle cx="11" cy="10.5" r="1.6" stroke="currentColor" stroke-width="1.1"/><path d="M6 5.3L4 9.1M8 5.3L10 9.1" stroke="currentColor" stroke-width="1.1"/></svg>' },
+  { id: "karteikarten", label: "Karteikarten erstellen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3.5" y="3.5" width="8" height="6" rx="0.8" stroke="currentColor" stroke-width="1.1"/><rect x="2" y="5" width="8" height="6" rx="0.8" fill="var(--color-surface)" stroke="currentColor" stroke-width="1.1"/></svg>' },
+  { id: "quiz", label: "Quiz/Selbsttest machen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2.5" width="9" height="9" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M4.7 7.2L6.2 8.7L9.3 5.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
+  { id: "praktisch", label: "Praktisch üben/anwenden", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 8.5L2 11.5L5 10.5L10.5 5L8.5 3L3 8.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M7 4.5L9 6.5" stroke="currentColor" stroke-width="1.1"/></svg>' },
+  { id: "gespraech", label: "Mit jemandem sprechen/Experten fragen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3H8V7.5H4.5L2 9.5V3Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><path d="M6.5 8.5C6.9 9.6 8 10.3 9.2 10.2L12 12V8.2H10" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>' }
+];
+function lerntypById(id) { return LERNTYPEN.find(l => l.id === id) || LERNTYPEN[0]; }
 
 function updateHeaderPlusButton() {
   const tab = document.body.dataset.tab;
@@ -971,18 +1034,21 @@ function renderTaskItem(t) {
   const today = todayStr();
   const overdue = !t.done && t.dueDate && t.dueDate < today;
   const node = nodeById(t.nodeId);
-  const metaParts = [t.size === "gross" ? "Groß" : "Klein"];
+  const isLernfeld = t.source === "category" && t.learnType;
+  const lerntyp = isLernfeld ? lerntypById(t.learnType) : null;
+  const metaParts = isLernfeld ? [] : [t.size === "gross" ? "Groß" : "Klein"];
   if (t.dueDate) metaParts.push("fällig " + t.dueDate + (t.dueTime ? " " + t.dueTime : ""));
-  if (node) metaParts.push(node.title);
+  if (node && !isLernfeld) metaParts.push(node.title);
   const el = document.createElement("div");
   el.className = "atlas-row" + (t.done ? " done" : "");
   el.innerHTML = `
     <button class="atlas-check${t.done ? " checked" : ""}" data-task="${t.id}">${t.done ? splatSvg(t.id) : ""}</button>
+    ${isLernfeld ? `<span style="color:var(--color-accent-400); flex-shrink:0;" title="${escapeHtml(lerntyp.label)}">${lerntyp.icon}</span>` : ""}
     <div style="flex:1; min-width:0;">
       <div class="item-title">${escapeHtml(t.title)}</div>
-      <div class="item-meta">${escapeHtml(metaParts.join(" · "))}</div>
+      <div class="item-meta">${escapeHtml((isLernfeld ? [lerntyp.label, ...metaParts] : metaParts).join(" · "))}</div>
     </div>
-    ${t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
+    ${!isLernfeld && t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
     ${overdue ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">ÜBERFÄLLIG</span>' : ""}
     <button class="btn btn-icon btn-ghost" data-del-task="${t.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
   `;
@@ -997,10 +1063,10 @@ function renderTodo() {
 
   const today = todayStr();
   const openTodayTasks = todoTasks.filter(t => t.dueDate === today && !t.done);
-  const budgetUsed = openTodayTasks.reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
+  const doneTodayTasks = todoTasks.filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) === today);
+  const doneTodayBudget = doneTodayTasks.reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
   const ruleEl = document.getElementById("dayRule");
-  ruleEl.textContent = `Regel: 2 kleine oder 1 große Aufgabe/Tag · heute fällig: ${openTodayTasks.length} (Budget ${budgetUsed}/2)`;
-  ruleEl.classList.toggle("over", budgetUsed > 2);
+  ruleEl.innerHTML = dayBudgetRing(openTodayTasks.length, doneTodayTasks.length, doneTodayBudget);
 
   const openTasks = todoTasks
     .filter(t => !t.done)
@@ -1334,7 +1400,7 @@ function renderTreeNode(node, depth, searchQuery = "") {
       <svg class="goal-node-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="var(--color-neutral-400)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <div class="card-title" style="font-size:14px;">${escapeHtml(node.title)}</div>
     </div>
-    <div class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">${pct}%</div>
+    ${miniProgressRing(pct, depth === 0 ? 34 : 26)}
   `;
   wrap.appendChild(header);
   const meta = document.createElement("div");
@@ -1343,6 +1409,9 @@ function renderTreeNode(node, depth, searchQuery = "") {
   wrap.appendChild(meta);
 
   if (expanded) {
+    const resources = document.createElement("div");
+    resources.innerHTML = resourceLinksRow(node);
+    wrap.appendChild(resources.firstElementChild);
     if (tasks.length || children.length) {
       const body = document.createElement("div");
       body.className = "goal-node-body";
@@ -1652,6 +1721,12 @@ document.addEventListener("click", e => {
   if (e.target.matches("[data-decompose-category]")) {
     copyDecomposePrompt(e.target.dataset.decomposeCategory, e.target);
   }
+  const geminiBtn = e.target.closest("[data-copy-gemini]");
+  if (geminiBtn) copyGeminiPrompt(geminiBtn.dataset.copyGemini, geminiBtn);
+  const monthBtn = e.target.closest("[data-month-test]");
+  if (monthBtn) addMonthTestTask(monthBtn.dataset.monthTest);
+  const cardBtn = e.target.closest("[data-open-card]");
+  if (cardBtn) openKnowledgeCardModal(cardBtn.dataset.openCard);
   const toggleBtn = e.target.closest("[data-toggle-node]");
   if (toggleBtn) {
     const id = toggleBtn.dataset.toggleNode;
@@ -1777,6 +1852,80 @@ function downloadText(text, filename) {
   URL.revokeObjectURL(url);
 }
 
+// ---------- Wissens-Ressourcen pro Bereich: Wikipedia, YouTube, Gemini-Quiz, 1-Monats-Test, Karteikarte ----------
+const RESOURCE_ICONS = {
+  wikipedia: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 1.5V13.5M1.5 7.5H13.5M2.7 4.2C4.8 5.6 10.2 5.6 12.3 4.2M2.7 10.8C4.8 9.4 10.2 9.4 12.3 10.8" stroke="currentColor" stroke-width="1"/></svg>',
+  youtube: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="3.5" width="12" height="8" rx="2.2" stroke="currentColor" stroke-width="1.2"/><path d="M6.3 5.8L9.5 7.5L6.3 9.2V5.8Z" fill="currentColor"/></svg>',
+  gemini: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1.5C7.5 4.5 9.5 6.5 12.5 6.5C9.5 6.5 7.5 8.5 7.5 11.5C7.5 8.5 5.5 6.5 2.5 6.5C5.5 6.5 7.5 4.5 7.5 1.5Z" fill="currentColor"/></svg>',
+  monat: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="3" width="11" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M2 6H13M5 1.5V4M10 1.5V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  karte: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="4" y="3.5" width="9" height="6.5" rx="0.9" stroke="currentColor" stroke-width="1.1"/><rect x="2" y="5.5" width="9" height="6.5" rx="0.9" fill="var(--color-surface)" stroke="currentColor" stroke-width="1.1"/></svg>'
+};
+
+function wikipediaUrl(title) { return `https://de.wikipedia.org/wiki/Spezial:Suche?search=${encodeURIComponent(title)}`; }
+function youtubeUrl(title) { return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " erklärt")}`; }
+
+function buildGeminiQuizPrompt(node) {
+  const path = nodePath(node.id).map(n => n.title).join(" / ");
+  return `Stelle mir ein kurzes Quiz (5-8 Fragen) zum Thema "${node.title}" (Einordnung: ${path}). Werte danach meine Antworten aus, zeig mir konkret, wo meine Wissenslücken liegen, und erkläre mir diese Lücken verständlich.`;
+}
+
+async function copyGeminiPrompt(nodeId, btn) {
+  const node = nodeById(nodeId);
+  if (!node) return;
+  const prompt = buildGeminiQuizPrompt(node);
+  try {
+    await navigator.clipboard.writeText(prompt);
+    flashButton(btn, "✓");
+  } catch (e) {
+    downloadText(prompt, `Gemini_Quiz_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`);
+  }
+}
+
+function addMonthTestTask(nodeId) {
+  const node = nodeById(nodeId);
+  if (!node) return;
+  const due = new Date();
+  due.setDate(due.getDate() + 30);
+  state.tasks.push({
+    id: uid(), title: `${node.title}: 1 Monat lang anwenden/testen`, nodeId,
+    dueDate: due.toISOString().slice(0, 10), dueTime: null, done: false, completedAt: null,
+    createdAt: new Date().toISOString(), size: "gross", priority: 0, source: "category", learnType: "praktisch"
+  });
+  saveData();
+  renderAll();
+}
+
+function openKnowledgeCardModal(nodeId) {
+  const node = nodeById(nodeId);
+  if (!node) return;
+  openModal(`
+    <h3>Karteikarte: ${escapeHtml(node.title)}</h3>
+    <textarea class="input" id="knowledgeCardText" rows="10" placeholder="Kurze Zusammenfassung / wichtigste Punkte zu diesem Thema...">${escapeHtml(node.knowledgeCard || "")}</textarea>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn btn-primary btn-block" id="saveKnowledgeCard">Speichern</button>
+    </div>
+  `, () => {
+    document.getElementById("saveKnowledgeCard").addEventListener("click", () => {
+      node.knowledgeCard = document.getElementById("knowledgeCardText").value.trim();
+      saveData();
+      closeModal();
+      renderAll();
+    });
+  });
+}
+
+function resourceLinksRow(node) {
+  return `
+    <div class="goal-node-resources" style="display:flex; gap:6px; flex-wrap:wrap; padding:0 14px 10px;">
+      <a class="btn btn-icon btn-ghost" href="${wikipediaUrl(node.title)}" target="_blank" rel="noopener" title="Wikipedia">${RESOURCE_ICONS.wikipedia}</a>
+      <a class="btn btn-icon btn-ghost" href="${youtubeUrl(node.title)}" target="_blank" rel="noopener" title="YouTube-Erklärvideo">${RESOURCE_ICONS.youtube}</a>
+      <button class="btn btn-icon btn-ghost" data-copy-gemini="${node.id}" title="Gemini-Quiz-Prompt kopieren">${RESOURCE_ICONS.gemini}</button>
+      <button class="btn btn-icon btn-ghost" data-month-test="${node.id}" title="1-Monats-Test als Aufgabe anlegen">${RESOURCE_ICONS.monat}</button>
+      <button class="btn btn-icon btn-ghost" data-open-card="${node.id}" title="Karteikarte / Zusammenfassung">${RESOURCE_ICONS.karte}</button>
+    </div>
+  `;
+}
+
 // ---------- Add buttons ----------
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
@@ -1825,20 +1974,29 @@ function openCategoryModal(node, parentId = null) {
 
 function openTaskModal(defaultNodeId, source = "todo") {
   const node = defaultNodeId ? nodeById(defaultNodeId) : null;
+  const isLernfeld = source === "category";
   openModal(`
-    <h3>${source === "category" ? "Aufgabe in " + escapeHtml(node ? node.title : "Bereich") : "Aufgabe hinzufügen"}</h3>
+    <h3>${isLernfeld ? "Lernfeldaufgabe in " + escapeHtml(node ? node.title : "Bereich") : "Aufgabe hinzufügen"}</h3>
+    ${isLernfeld ? `
     <div class="field">
-      <label>Titel</label>
-      <input type="text" id="mTaskTitle" placeholder="z.B. Bericht abschicken">
+      <label>Aufgabentyp</label>
+      <select id="mTaskLernType">
+        ${LERNTYPEN.map(l => `<option value="${l.id}">${escapeHtml(l.label)}</option>`).join("")}
+      </select>
+    </div>` : ""}
+    <div class="field">
+      <label>${isLernfeld ? "Konkret: was genau?" : "Titel"}</label>
+      <input type="text" id="mTaskTitle" placeholder="${isLernfeld ? "z.B. 3Blue1Brown Neuronen-Video" : "z.B. Bericht abschicken"}">
     </div>
     <div class="field">
       <label>Fälligkeitsdatum (optional)</label>
-      <input type="date" id="mTaskDate" value="${todayStr()}">
+      <input type="date" id="mTaskDate" value="${isLernfeld ? "" : todayStr()}">
     </div>
     <div class="field">
       <label>Uhrzeit (optional)</label>
       <input type="time" id="mTaskTime">
     </div>
+    ${isLernfeld ? "" : `
     <div class="field">
       <label>Größe (für die Tagesregel: 2 kleine oder 1 große Aufgabe/Tag)</label>
       <select id="mTaskSize">
@@ -1857,7 +2015,6 @@ function openTaskModal(defaultNodeId, source = "todo") {
         <option value="5">5 – höchste</option>
       </select>
     </div>
-    ${source === "category" ? "" : `
     <div class="field">
       <label>Zielbereich (optional, ordnet die Aufgabe zusätzlich dort ein)</label>
       <select id="mTaskCategory">
@@ -1877,10 +2034,18 @@ function openTaskModal(defaultNodeId, source = "todo") {
       if (!title) return;
       const dueDate = body.querySelector("#mTaskDate").value || null;
       const dueTime = body.querySelector("#mTaskTime").value || null;
+      if (isLernfeld) {
+        const learnType = body.querySelector("#mTaskLernType").value;
+        state.tasks.push({ id: uid(), title, nodeId: defaultNodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size: "klein", priority: 0, source, learnType });
+        saveData();
+        closeModal();
+        renderAll();
+        return;
+      }
       const size = body.querySelector("#mTaskSize").value;
       const priority = parseInt(body.querySelector("#mTaskPriority").value, 10) || 0;
       const categorySelect = body.querySelector("#mTaskCategory");
-      const nodeId = source === "category" ? defaultNodeId : (categorySelect ? categorySelect.value || null : null);
+      const nodeId = categorySelect ? categorySelect.value || null : null;
       state.tasks.push({ id: uid(), title, nodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source });
       saveData();
       closeModal();
