@@ -28,7 +28,7 @@ const STORAGE_KEY = "habit-tracker-data-v2";
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = "atlas-notfall-sicherung-" + new Date().toISOString().slice(0, 10) + ".json";
+          a.download = "atlas-notfall-sicherung-" + localDateKey(new Date()) + ".json";
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -44,28 +44,111 @@ const STORAGE_KEY = "habit-tracker-data-v2";
   window.addEventListener("unhandledrejection", e => showRescue(e && e.reason));
 })();
 
-// ---------- Lebenswissen-Ordnerstruktur (siehe 20_Wissen/Themen/Lebenswissen_Ordnerstruktur.md) ----------
-// Phase 7.5: auf einheitliche Ein-Wort-Oberbegriffe umstrukturiert, Redundanzen entfernt
-// (z.B. "Umgang mit Behörden" in "Recht" vereint, Biologie/Sicherheit/Gesellschaft/Geschichte/Psychologie neu)
+// ---------- Bereiche-Struktur (Phase 7.11: zielorientiert statt enzyklopädisch) ----------
+// Nicht mehr "18 allgemeine Wissensgebiete + 1 Ziele-Anhang", sondern: Tims tatsächliche
+// Lebensziele SIND die Oberkategorien. Allgemeines Wissen (Kommunikation, Haushaltstechnik, Recht ...)
+// taucht nur noch dort auf, wo ein konkretes Ziel es braucht (z.B. "Guter Ehemann werden" -> Kommunikation).
+// Format: { title, priority?, children: [ "Blatt" | {title, children:[...]} , ... ] } — beliebig tief verschachtelbar.
 const LEBENSWISSEN = [
-  ["Glaube", true, ["Grundlagen des christlichen Glaubens", "Die einzelnen Bibelbücher", "Historischer/kultureller Hintergrund", "Gebet (Formen, Praxis)", "Gemeindeleben & geistliche Gemeinschaft", "Theologische Grundbegriffe"]],
-  ["Biologie", false, ["Anatomie des Menschen", "Organsysteme", "Hormone & ihre Wirkung", "Blut & Blutwerte"]],
-  ["Gesundheit", false, ["Ernährung", "Bewegung/Training", "Schlaf", "Erste Hilfe", "Mentale Gesundheit", "Zahnpflege", "Vorsorgeuntersuchungen", "Rasieren & Bartpflege"]],
-  ["Haushalt", false, ["Wäsche", "Kochen", "Putzen", "Ordnung & Organisation", "Reparaturen im Haushalt", "Pflanzen & Garten", "Mülltrennung & Entsorgung"]],
-  ["Technik", false, ["Auto", "Heimnetzwerk/WLAN", "Unterhaltungselektronik", "Kabelmanagement", "Werkzeugkoffer"]],
-  ["Handwerk", false, ["Elektro", "Holzbearbeitung", "Metallbearbeitung", "Werkstatt-Grundausstattung", "Schweißen", "Kleben", "Nägel & Schrauben", "Technische Zeichnungen", "Anlagen/Installationen", "Gas, Wasser, Sanitär"]],
-  ["Wirtschaft", false, ["Ordnersystem für Unterlagen", "Dokumente aufbewahren", "Gehalt/Lohn verstehen", "Steuern", "Versicherungen", "Konten, Sparen, Budget", "Verträge lesen & verstehen", "Hausbau/Immobilien", "Finanzen & Vermögensaufbau"]],
-  ["Karriere", false, ["Karriereplanung", "Softskills", "Hardskills", "Selbstständigkeit", "Lebens-/Zielplanung"]],
-  ["Kunst", false, ["Schreiben", "Zeichnen/Malen", "Kunstgeschichte", "Bekannte Künstler", "Kunstrichtungen", "Worldbuilding"]],
-  ["Sicherheit", false, ["Notfallarten", "Verletzungen erkennen & versorgen", "Outdoor-Grundlagen", "Ausrüstung", "Gefahren – nicht selbst eingreifen", "Notfallkontakte & -plan", "Selbstschutz", "Selbstverteidigung"]],
-  ["Genuss", false, ["Whisky", "Kaffee", "Wein", "Bier", "Food-Pairing"]],
-  ["Digital", false, ["Passwort-Sicherheit", "Datenschutz-Grundlagen", "Backups", "Betrugsmaschen erkennen", "Digitale Nachlassplanung"]],
-  ["Recht", false, ["Mietrecht-Basics", "Kaufrecht/Gewährleistung", "Verkehrsrecht-Basics", "Wichtige Fristen", "Behördengänge", "Wichtige Ämter im Überblick", "Anträge & Fristen", "Widerspruch/Einspruch"]],
-  ["Beziehung", false, ["Kommunikationsgrundlagen", "Konfliktlösung", "Partnerschaft/Ehe-Vorbereitung", "Erziehung/Elternschaft"]],
-  ["Reisen", false, ["Reiseplanung & Budget", "Dokumente", "Packen & Ausrüstung", "Sprachliche Basics", "Sicherheit auf Reisen"]],
-  ["Geschichte", false, ["Weltgeschichte im Überblick", "Deutsche Geschichte", "Antike & Mittelalter", "Neuzeit", "Zeitgeschichte (20./21. Jahrhundert)"]],
-  ["Gesellschaft", false, ["Politisches System Deutschlands", "Wichtige Ideologien & Strömungen", "Aktuelle gesellschaftliche Debatten", "Wirtschaftssysteme im Überblick", "Medienkompetenz"]],
-  ["Psychologie", false, ["Grundlagen der Psychologie", "Persönlichkeitsmodelle", "Kognitive Verzerrungen", "Entwicklungspsychologie", "Motivation & Gewohnheiten", "Emotionsregulation"]]
+  { title: "Glaube", priority: true, children: [
+    "Grundlagen des christlichen Glaubens",
+    "Theologische Grundbegriffe",
+    "Die einzelnen Bibelbücher",
+    "Historischer/kultureller Hintergrund",
+    "Gebet (Formen, Praxis)",
+    "Gemeindeleben & geistliche Gemeinschaft",
+    "Predigtreifes Bibelwissen (Homiletik)",
+    "Mentor-Beziehung (ab September)",
+    "Vorbild in der Gemeinde sein",
+    "Selbst Mentor werden (später)",
+    "Jährliche Bibellese (ab 2027)"
+  ]},
+  { title: "Karriere", children: [
+    { title: "Schule", children: [
+      "Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)",
+      "Lerntechniken & Prüfungsvorbereitung",
+      "Mündliche Beteiligung & Rhetorik"
+    ]},
+    { title: "Studium", children: [
+      "Mechatronik-Grundlagen",
+      "Wirtschaftsingenieurwesen-Grundlagen (Alternative)",
+      "Englisch C1"
+    ]},
+    { title: "Job (Technischer Projektmanager)", children: [
+      "Projektmanagement-Methoden",
+      "Projektmanagement-Zertifizierungen",
+      "Stakeholder-Kommunikation & Führung",
+      "Bewerbungsgespräche"
+    ]},
+    { title: "Selbstständigkeit", children: [
+      "Rechtliches (Firmengründung, Rechtsform)",
+      "Steuerrecht für Unternehmer",
+      "Businessplan-Erstellung"
+    ]}
+  ]},
+  { title: "Vermögen", children: [
+    { title: "Finanzielle Unabhängigkeit", children: [
+      "Vermögensaufbau-Strategien (ETFs, Diversifikation)",
+      "Budget & Sparen"
+    ]},
+    { title: "Immobilien im Ausland", children: [
+      "Rechtliches in Deutschland zum Thema",
+      "Rechtliches im entsprechenden Land zum Thema",
+      "Finanzierung & Rendite-Berechnung"
+    ]}
+  ]},
+  { title: "Ehe", children: [
+    "Verlobung mit Ramona",
+    "Ehevorbereitung (biblisches Eheverständnis, Konfliktlösung als Paar)",
+    { title: "Guter Ehemann werden", children: [
+      "Kommunikation",
+      "Selbstständiges Klarkommen (Haushaltstechnik: Kochen, Putzen, Wäsche, Organisation)",
+      "Finanzielle Verantwortung als Familienvorstand"
+    ]}
+  ]},
+  { title: "Familie", children: [
+    "Erziehungsstile & kindliche Entwicklung",
+    "Vorbereitung auf 2 oder 4 Kinder"
+  ]},
+  { title: "Auswandern", children: [
+    "Aufenthaltsrecht & Visum (Schweiz/Skandinavien)",
+    "Landessprache",
+    "Arbeitsmarkt vor Ort"
+  ]},
+  { title: "Gesundheit & Sport", children: [
+    "Ernährungsplan für Körperzusammensetzung (75→83 kg, ~10% KFA)",
+    "Marathon-Vorbereitung",
+    "Thai-Boxen auf hohem Niveau",
+    "Körperwissen (eigener & weiblicher Körper)"
+  ]},
+  { title: "Kreatives Schaffen", children: [
+    "Fantasy-Buchreihe (Worldbuilding, Erzähltechnik/Plot)",
+    "Christliche Bücher (theologisches Schreiben)",
+    "Zeichnen/Malen"
+  ]},
+  { title: "Musik", children: [
+    "Saxofon",
+    "Klavier",
+    "Singen"
+  ]},
+  { title: "Sprachen", children: [
+    "Englisch (C1)",
+    "Französisch",
+    "Spanisch",
+    "Russisch",
+    "Japanisch oder Mandarin",
+    "Hebräisch",
+    "Griechisch"
+  ]},
+  { title: "Charakter & Persönlichkeit", children: [
+    "Ehrlichkeit & Integrität",
+    "Disziplin & Fleiß",
+    "Weisheit & Besonnenheit",
+    "Charisma & Ausstrahlung",
+    "Positive Lebenseinstellung",
+    "Intelligenz steigern",
+    "Oldtimer-Porsche"
+  ]}
 ];
 
 function loadData() {
@@ -84,10 +167,19 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// Kalendertag in Ortszeit (nicht UTC) als YYYY-MM-DD — toISOString() würde nachts je nach
+// Zeitzonen-Offset auf den Vortag zurückfallen und Datumsschlüssel verschieben.
+function localDateKey(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const d = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function todayStr(offsetDays = 0) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+  return localDateKey(d);
 }
 
 // ---------- Migration: alte Ziel-Strukturen -> verschachtelte goalNodes ----------
@@ -243,10 +335,178 @@ function repairCyclicGoalNodes(data) {
   });
 }
 
+// ---------- Migration: "Reisen" zu "Planung" (Kernfähigkeit statt einzelner Anwendungsfall) ----------
+function migrateReisenToPlanung(data) {
+  if (data.planungMigrationApplied || !data.goalNodes) return;
+  const roots = () => data.goalNodes.filter(n => n.parentId === null);
+  const findRoot = title => roots().find(n => n.title === title);
+
+  const reisen = findRoot("Reisen");
+  if (reisen) {
+    reisen.title = "Planung";
+    const reiseplanungId = uid();
+    data.goalNodes.push({ id: reiseplanungId, parentId: reisen.id, title: "Reiseplanung", priority: false });
+    data.goalNodes.forEach(n => {
+      if (n.parentId === reisen.id && n.id !== reiseplanungId) n.parentId = reiseplanungId;
+    });
+    const budgetNode = data.goalNodes.find(n => n.parentId === reiseplanungId && n.title === "Reiseplanung & Budget");
+    if (budgetNode) budgetNode.title = "Reisebudget";
+    ["Zielsetzung & Priorisierung", "Projekt-/Aufgabenplanung", "Entscheidungsfindung", "Zeitmanagement"].forEach(t => {
+      data.goalNodes.push({ id: uid(), parentId: reisen.id, title: t, priority: false });
+    });
+  } else if (!findRoot("Planung")) {
+    const planungId = uid();
+    data.goalNodes.push({ id: planungId, parentId: null, title: "Planung", priority: false });
+    ["Zielsetzung & Priorisierung", "Projekt-/Aufgabenplanung", "Entscheidungsfindung", "Zeitmanagement", "Reiseplanung"].forEach(t => {
+      data.goalNodes.push({ id: uid(), parentId: planungId, title: t, priority: false });
+    });
+  }
+
+  data.planungMigrationApplied = true;
+}
+
+// ---------- Migration: Bereiche in lernoptimaler Reihenfolge anordnen ----------
+// Sortiert bestehende Bereiche/Unterordner nach LEBENSWISSEN um,
+// ohne irgendwelche Eltern-Kind-Bezüge zu verändern (reine Anzeige-Reihenfolge).
+function migrateLearningOrder(data) {
+  if (data.learningOrderApplied || !data.goalNodes) return;
+  const rootOrder = LEBENSWISSEN.map(n => n.title);
+  const subOrder = {};
+  function registerOrder(node) {
+    if (!node.children) return;
+    subOrder[node.title] = node.children.map(c => (typeof c === "string" ? c : c.title));
+    node.children.forEach(c => { if (typeof c !== "string") registerOrder(c); });
+  }
+  LEBENSWISSEN.forEach(registerOrder);
+
+  const byParent = new Map();
+  data.goalNodes.forEach(n => {
+    if (!byParent.has(n.parentId)) byParent.set(n.parentId, []);
+    byParent.get(n.parentId).push(n);
+  });
+
+  function sortedChildren(parentId, orderList) {
+    const kids = byParent.get(parentId) || [];
+    if (!orderList) return kids;
+    return kids.slice().sort((a, b) => {
+      const ai = orderList.indexOf(a.title), bi = orderList.indexOf(b.title);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    });
+  }
+
+  const result = [];
+  function walk(parentId, orderList) {
+    sortedChildren(parentId, orderList).forEach(n => {
+      result.push(n);
+      walk(n.id, subOrder[n.title]);
+    });
+  }
+  walk(null, rootOrder);
+  data.goalNodes = result;
+  data.learningOrderApplied = true;
+}
+
+// ---------- Migration: von der enzyklopädischen 18er-Struktur zur zielorientierten Struktur (Phase 7.11) ----------
+// "Glaube" bleibt (ID/Inhalt erhalten, nur neue Unterpunkte ergänzt). Alle anderen alten Wurzeln: wenn
+// irgendwo im Teilbaum Aufgaben/Gewohnheiten hängen, werden sie unter "Archiv (alte Bereiche)" verschoben
+// statt gelöscht — sonst (leere Kategorie) werden sie entfernt. Danach wird die neue Zielstruktur frisch
+// aufgebaut und die bekannten Start-Aufgaben/-Gewohnheiten an ihren neuen Platz umgehängt.
+function migrateToGoalDrivenStructure(data) {
+  if (data.goalDrivenRestructureApplied || !data.goalNodes) return;
+
+  function subtreeHasContent(nodeId) {
+    const stack = [nodeId];
+    while (stack.length) {
+      const id = stack.pop();
+      if ((data.tasks || []).some(t => t.nodeId === id)) return true;
+      if ((data.habits || []).some(h => h.nodeId === id)) return true;
+      data.goalNodes.filter(n => n.parentId === id).forEach(c => stack.push(c.id));
+    }
+    return false;
+  }
+
+  const oldRoots = data.goalNodes.filter(n => n.parentId === null);
+
+  // 1) "Glaube" erhalten, nur neue Unterpunkte ergänzen
+  const glaubeRoot = oldRoots.find(n => n.title === "Glaube");
+  const glaubeDef = LEBENSWISSEN.find(n => n.title === "Glaube");
+  if (glaubeRoot && glaubeDef) {
+    const existingTitles = new Set(data.goalNodes.filter(n => n.parentId === glaubeRoot.id).map(n => n.title));
+    glaubeDef.children.forEach(child => {
+      const title = typeof child === "string" ? child : child.title;
+      if (!existingTitles.has(title)) data.goalNodes.push({ id: uid(), parentId: glaubeRoot.id, title, priority: false });
+    });
+    glaubeRoot.priority = true;
+  }
+
+  // 2) Alle anderen alten Wurzeln archivieren (falls Inhalt) oder löschen (falls leer)
+  let archivRootId = null;
+  function ensureArchivRoot() {
+    if (archivRootId) return archivRootId;
+    archivRootId = uid();
+    data.goalNodes.push({ id: archivRootId, parentId: null, title: "Archiv (alte Bereiche)", priority: false });
+    return archivRootId;
+  }
+  const idsToDelete = new Set();
+  oldRoots.forEach(root => {
+    if (glaubeRoot && root.id === glaubeRoot.id) return;
+    if (subtreeHasContent(root.id)) {
+      root.parentId = ensureArchivRoot();
+      root.title = root.title + " (alt)";
+    } else {
+      const stack = [root.id];
+      idsToDelete.add(root.id);
+      while (stack.length) {
+        const id = stack.pop();
+        data.goalNodes.filter(n => n.parentId === id).forEach(c => { idsToDelete.add(c.id); stack.push(c.id); });
+      }
+    }
+  });
+  data.goalNodes = data.goalNodes.filter(n => !idsToDelete.has(n.id));
+
+  // 3) Neue Zielstruktur frisch aufbauen (Glaube ausgenommen, s.o.)
+  const byTitle = {};
+  if (glaubeRoot) {
+    byTitle["Glaube"] = glaubeRoot.id;
+    data.goalNodes.filter(n => n.parentId === glaubeRoot.id).forEach(n => { byTitle[n.title] = n.id; });
+  }
+  function buildNode(node, parentId) {
+    const id = uid();
+    data.goalNodes.push({ id, parentId, title: node.title, priority: !!node.priority });
+    byTitle[node.title] = id;
+    (node.children || []).forEach(child => {
+      if (typeof child === "string") { byTitle[child] = uid(); data.goalNodes.push({ id: byTitle[child], parentId: id, title: child, priority: false }); }
+      else buildNode(child, id);
+    });
+    return id;
+  }
+  LEBENSWISSEN.forEach(node => { if (node.title !== "Glaube" || !glaubeRoot) buildNode(node, null); });
+
+  // 4) Bekannte Start-Aufgaben/-Gewohnheiten an ihren neuen Platz umhängen
+  const reattach = {
+    "Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)": byTitle["Glaube"],
+    "Bibellese / stille Zeit": byTitle["Glaube"],
+    "Abendlektüre 30 Min. vor dem Schlafen": byTitle["Glaube"],
+    "Joggen 5,5 km": byTitle["Gesundheit & Sport"],
+    "Ernährung im Rahmen (max. 2.000 kcal)": byTitle["Gesundheit & Sport"],
+    "Lernen / Schularbeit 60–90 Min.": byTitle["Schule"],
+    "Bewerbungen duales Studium abschicken": byTitle["Studium"],
+    "Seminararbeit Physik in Filmen fertigstellen": byTitle["Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)"],
+    "Lesen (ca. 1 Buch/Monat)": byTitle["Kreatives Schaffen"]
+  };
+  (data.tasks || []).forEach(t => { if (reattach[t.title] !== undefined) t.nodeId = reattach[t.title]; });
+  (data.habits || []).forEach(h => { if (reattach[h.title] !== undefined) h.nodeId = reattach[h.title]; });
+
+  data.goalDrivenRestructureApplied = true;
+}
+
 let state = loadData();
 migrateToGoalNodes(state);
 repairCyclicGoalNodes(state);
 migrateBereicheNaming(state);
+migrateReisenToPlanung(state);
+migrateToGoalDrivenStructure(state);
+migrateLearningOrder(state);
 repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
 state.exams = state.exams || [];
@@ -261,7 +521,11 @@ const expandedNodes = new Set(); // Laufzeit-Status des Bereiche-Akkordeons (nic
 
 // ---------- Seed data ----------
 function seedData() {
-  const data = { goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [] };
+  const data = {
+    goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [],
+    // Frische Seed-Daten entsprechen bereits der aktuellen Struktur — alle Migrationen sollen hier no-op sein
+    bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true, learningOrderApplied: true
+  };
   const c = (title, parentId = null, priority = false) => {
     const id = uid();
     data.goalNodes.push({ id, parentId, title, priority });
@@ -293,26 +557,34 @@ function seedData() {
     });
   };
 
+  // Generischer Baum-Aufbau (beliebig tief, siehe LEBENSWISSEN-Format weiter oben)
   const rootId = {};
-  LEBENSWISSEN.forEach(([title, priority, subs]) => {
-    const id = c(title, null, priority);
-    rootId[title] = id;
-    subs.forEach(sub => c(sub, id));
-  });
+  const byTitle = {};
+  function buildNode(node, parentId) {
+    const id = c(node.title, parentId, !!node.priority);
+    byTitle[node.title] = id;
+    (node.children || []).forEach(child => {
+      if (typeof child === "string") { byTitle[child] = c(child, id); }
+      else buildNode(child, id);
+    });
+    return id;
+  }
+  LEBENSWISSEN.forEach(node => { rootId[node.title] = buildNode(node, null); });
 
   const glaube = rootId["Glaube"];
   h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
   h("Abendlektüre 30 Min. vor dem Schlafen", glaube, "daily", { routineOrder: 8 });
   t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, "gross", 5);
 
-  const gesundheit = rootId["Gesundheit"];
-  h("Joggen 5,5 km", gesundheit, "daily", { routineOrder: 5 });
-  h("Ernährung im Rahmen (max. 2.000 kcal)", gesundheit, "daily", { routineOrder: 10 });
+  const gesundheitSport = rootId["Gesundheit & Sport"];
+  h("Joggen 5,5 km", gesundheitSport, "daily", { routineOrder: 5 });
+  h("Ernährung im Rahmen (max. 2.000 kcal)", gesundheitSport, "daily", { routineOrder: 10 });
 
-  const zukunft = rootId["Karriere"];
-  h("Lernen / Schularbeit 60–90 Min.", zukunft, "weekdays", { routineOrder: 6 });
-  t("Bewerbungen duales Studium abschicken", zukunft, "2026-07-13", "gross", 5);
-  t("Seminararbeit Physik in Filmen fertigstellen", zukunft, null, "gross");
+  const schule = byTitle["Schule"];
+  const studium = byTitle["Studium"];
+  h("Lernen / Schularbeit 60–90 Min.", schule, "weekdays", { routineOrder: 6 });
+  t("Bewerbungen duales Studium abschicken", studium, "2026-07-13", "gross", 5);
+  t("Seminararbeit Physik in Filmen fertigstellen", byTitle["Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)"], null, "gross");
   s("Englisch");
   s("Deutsch");
   s("BWL");
@@ -324,7 +596,7 @@ function seedData() {
   h("Handy weglegen 21:30", null, "daily", { routineOrder: 7 });
   h("Skin Care & Anziehen", null, "daily", { routineOrder: 3 });
   h("Tag im Griff", null, "daily", { routineOrder: 9 });
-  h("Lesen (ca. 1 Buch/Monat)", rootId["Kunst"], "daily");
+  h("Lesen (ca. 1 Buch/Monat)", rootId["Kreatives Schaffen"], "daily");
 
   // Aktuelle ToDo's (Stand 21.07.2026)
   td("Montag 27.7.2026 Planen", "2026-07-21", "klein", 4);
@@ -400,6 +672,53 @@ function pieSlicePath(pct) {
   return `M${cx},${cy} L${cx},${cy - R} A${R},${R} 0 ${largeArc} 1 ${ex},${ey} Z`;
 }
 
+// Kleiner, wiederverwendbarer Fortschritts-Ring (z.B. pro Bereiche-Ordner) im selben Gold-Look wie der Wochenkreis
+function miniProgressRing(pct, size = 30) {
+  const inner = Math.round(size * 0.68);
+  const fontSize = Math.max(8, Math.round(size * 0.28));
+  return `
+    <div style="position:relative; width:${size}px; height:${size}px; flex-shrink:0;">
+      <div style="position:absolute; inset:0; border-radius:50%; background:conic-gradient(from -90deg,
+        var(--color-accent-300) 0%, var(--color-accent-600) ${pct}%, var(--color-neutral-800) ${pct}% 100%);"></div>
+      <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
+        <div style="width:${inner}px; height:${inner}px; border-radius:50%; background:var(--color-surface); display:flex; align-items:center; justify-content:center; font-size:${fontSize}px; font-family:var(--font-heading); color:var(--color-accent-200);">${pct}%</div>
+      </div>
+    </div>
+  `;
+}
+
+// Anlassfarben von Stahl: 0-2 Budget-Einheiten = grau (füllt den Ring), danach Farbwechsel bei Überschuss
+const STEEL_STAGES = [
+  { min: 0, color: "#8a93a3", glow: false }, // stahlgrau
+  { min: 2, color: "#e8d577", glow: false }, // strohgelb
+  { min: 3, color: "#d4af37", glow: false }, // gold
+  { min: 4, color: "#8b5a2b", glow: false }, // braun/kupfer
+  { min: 5, color: "#7b3f61", glow: false }, // purpur
+  { min: 6, color: "#3b5b92", glow: false }, // blau
+  { min: 7, color: "#ff6a3d", glow: true }   // glühend
+];
+function steelStageFor(budget) {
+  let stage = STEEL_STAGES[0];
+  STEEL_STAGES.forEach(s => { if (budget >= s.min) stage = s; });
+  return stage;
+}
+function dayBudgetRing(dueCount, doneCount, budget, size = 68) {
+  const pct = Math.min(100, Math.round((budget / 2) * 100));
+  const stage = steelStageFor(budget);
+  const inner = Math.round(size * 0.7);
+  const glowCss = stage.glow ? `box-shadow:0 0 14px 3px ${stage.color}, 0 0 28px 8px ${stage.color}66;` : "";
+  return `
+    <div style="display:flex; justify-content:center; margin-bottom:16px;">
+      <div style="position:relative; width:${size}px; height:${size}px;">
+        <div style="position:absolute; inset:0; border-radius:50%; transition:background 0.4s, box-shadow 0.4s; ${glowCss}
+          background:conic-gradient(from -90deg, ${stage.color} ${pct}%, var(--color-neutral-800) ${pct}% 100%);"></div>
+        <div style="position:absolute; inset:${Math.round((size - inner) / 2)}px; border-radius:50%; background:var(--color-surface);
+          display:flex; align-items:center; justify-content:center; font-size:15px; font-family:var(--font-heading); color:var(--color-neutral-100);">${dueCount}/${doneCount}</div>
+      </div>
+    </div>
+  `;
+}
+
 // ---------- Tabs ----------
 const TAB_ORDER = ["heute", "todo", "zielbereiche", "gebete", "analyse"];
 const TAB_ROT = [-6, 10, -12, 7, -4];
@@ -468,6 +787,22 @@ Object.values(QUICK_ADD_BTN_IDS).flat().forEach(id => {
 const HEADER_ICON_PLUS = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const HEADER_ICON_SEARCH = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 9.5L13 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const HEADER_ICON_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V9.5M4 6.5L7 9.5L10 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 11.5V12.5H12V11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+// ---------- Lernfeldaufgaben: Aufgabentypen mit Icon (statt Klein/Groß, für source="category") ----------
+const LERNTYPEN = [
+  { id: "video", label: "Video schauen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M6 4.8L9.2 7L6 9.2V4.8Z" fill="currentColor"/></svg>' },
+  { id: "podcast", label: "Podcast/Hörbuch anhören", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 6V8M5 4V10M7 2.5V11.5M9 4V10M11.5 6V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>' },
+  { id: "buch", label: "Buch lesen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3.2C6 2.4 4.3 2 2.5 2V10.5C4.3 10.5 6 10.9 7 11.7C8 10.9 9.7 10.5 11.5 10.5V2C9.7 2 8 2.4 7 3.2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M7 3.2V11.7" stroke="currentColor" stroke-width="1.2"/></svg>' },
+  { id: "artikel", label: "Artikel/Wikipedia lesen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2" width="9" height="10" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 5H9.5M4.5 7H9.5M4.5 9H7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>' },
+  { id: "zusammenfassung", label: "Zusammenfassung schreiben", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 11.5L3 9.3L9.3 3L11 4.7L4.7 11L2.5 11.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>' },
+  { id: "erklaeren", label: "Funktionsweise erklären", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5H12V8.5H6.5L4 11V8.5H2V3.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M4.5 6H9.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>' },
+  { id: "mindmap", label: "Mindmap/Diagramm erstellen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="4" r="1.6" stroke="currentColor" stroke-width="1.1"/><circle cx="3" cy="10.5" r="1.6" stroke="currentColor" stroke-width="1.1"/><circle cx="11" cy="10.5" r="1.6" stroke="currentColor" stroke-width="1.1"/><path d="M6 5.3L4 9.1M8 5.3L10 9.1" stroke="currentColor" stroke-width="1.1"/></svg>' },
+  { id: "karteikarten", label: "Karteikarten erstellen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3.5" y="3.5" width="8" height="6" rx="0.8" stroke="currentColor" stroke-width="1.1"/><rect x="2" y="5" width="8" height="6" rx="0.8" fill="var(--color-surface)" stroke="currentColor" stroke-width="1.1"/></svg>' },
+  { id: "quiz", label: "Quiz/Selbsttest machen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2.5" width="9" height="9" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M4.7 7.2L6.2 8.7L9.3 5.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
+  { id: "praktisch", label: "Praktisch üben/anwenden", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 8.5L2 11.5L5 10.5L10.5 5L8.5 3L3 8.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M7 4.5L9 6.5" stroke="currentColor" stroke-width="1.1"/></svg>' },
+  { id: "gespraech", label: "Mit jemandem sprechen/Experten fragen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3H8V7.5H4.5L2 9.5V3Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><path d="M6.5 8.5C6.9 9.6 8 10.3 9.2 10.2L12 12V8.2H10" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>' }
+];
+function lerntypById(id) { return LERNTYPEN.find(l => l.id === id) || LERNTYPEN[0]; }
 
 function updateHeaderPlusButton() {
   const tab = document.body.dataset.tab;
@@ -638,8 +973,8 @@ function isScheduledToday(habit, dateObj = new Date()) {
   }
   if (habit.frequency === "interval") {
     const n = habit.intervalDays || 1;
-    const createdKey = new Date(habit.createdAt).toISOString().slice(0, 10);
-    const dateKey = dateObj.toISOString().slice(0, 10);
+    const createdKey = localDateKey(new Date(habit.createdAt));
+    const dateKey = localDateKey(dateObj);
     const diffDays = Math.round((dateFromKey(dateKey) - dateFromKey(createdKey)) / 86400000);
     return diffDays >= 0 && diffDays % n === 0;
   }
@@ -660,7 +995,7 @@ function habitCompletionRate(habit, days = 30) {
     d.setDate(d.getDate() - i);
     if (new Date(habit.createdAt) > d) continue;
     if (!isScheduledToday(habit, d)) continue;
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     total++;
     if (habit.history[key]) done++;
   }
@@ -681,7 +1016,7 @@ function computeStreak(habit) {
       d.setDate(d.getDate() - 1);
       continue;
     }
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     if (habit.history[key]) {
       streak++;
       d.setDate(d.getDate() - 1);
@@ -708,18 +1043,21 @@ function renderTaskItem(t) {
   const today = todayStr();
   const overdue = !t.done && t.dueDate && t.dueDate < today;
   const node = nodeById(t.nodeId);
-  const metaParts = [t.size === "gross" ? "Groß" : "Klein"];
+  const isLernfeld = t.source === "category" && t.learnType;
+  const lerntyp = isLernfeld ? lerntypById(t.learnType) : null;
+  const metaParts = isLernfeld ? [] : [t.size === "gross" ? "Groß" : "Klein"];
   if (t.dueDate) metaParts.push("fällig " + t.dueDate + (t.dueTime ? " " + t.dueTime : ""));
-  if (node) metaParts.push(node.title);
+  if (node && !isLernfeld) metaParts.push(node.title);
   const el = document.createElement("div");
   el.className = "atlas-row" + (t.done ? " done" : "");
   el.innerHTML = `
     <button class="atlas-check${t.done ? " checked" : ""}" data-task="${t.id}">${t.done ? splatSvg(t.id) : ""}</button>
+    ${isLernfeld ? `<span style="color:var(--color-accent-400); flex-shrink:0;" title="${escapeHtml(lerntyp.label)}">${lerntyp.icon}</span>` : ""}
     <div style="flex:1; min-width:0;">
       <div class="item-title">${escapeHtml(t.title)}</div>
-      <div class="item-meta">${escapeHtml(metaParts.join(" · "))}</div>
+      <div class="item-meta">${escapeHtml((isLernfeld ? [lerntyp.label, ...metaParts] : metaParts).join(" · "))}</div>
     </div>
-    ${t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
+    ${!isLernfeld && t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
     ${overdue ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">ÜBERFÄLLIG</span>' : ""}
     <button class="btn btn-icon btn-ghost" data-del-task="${t.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
   `;
@@ -734,10 +1072,10 @@ function renderTodo() {
 
   const today = todayStr();
   const openTodayTasks = todoTasks.filter(t => t.dueDate === today && !t.done);
-  const budgetUsed = openTodayTasks.reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
+  const doneTodayTasks = todoTasks.filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) === today);
+  const doneTodayBudget = doneTodayTasks.reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
   const ruleEl = document.getElementById("dayRule");
-  ruleEl.textContent = `Regel: 2 kleine oder 1 große Aufgabe/Tag · heute fällig: ${openTodayTasks.length} (Budget ${budgetUsed}/2)`;
-  ruleEl.classList.toggle("over", budgetUsed > 2);
+  ruleEl.innerHTML = dayBudgetRing(openTodayTasks.length, doneTodayTasks.length, doneTodayBudget);
 
   const openTasks = todoTasks
     .filter(t => !t.done)
@@ -859,7 +1197,7 @@ function dateFromKey(key) {
 }
 
 function subjectOfDay(dateObj) {
-  const key = dateObj.toISOString().slice(0, 10);
+  const key = localDateKey(dateObj);
   const overrideId = state.subjectOverride[key];
   if (overrideId) {
     const overridden = state.subjects.find(s => s.id === overrideId);
@@ -900,7 +1238,7 @@ function openSubjectOverrideModal() {
 }
 
 function examOverride(dateObj) {
-  const todayMidnight = dateFromKey(dateObj.toISOString().slice(0, 10));
+  const todayMidnight = dateFromKey(localDateKey(dateObj));
   const upcoming = state.exams
     .map(e => ({ ...e, subject: state.subjects.find(s => s.id === e.subjectId) }))
     .filter(e => e.subject)
@@ -910,16 +1248,97 @@ function examOverride(dateObj) {
   return upcoming[0] || null;
 }
 
-function reorderBtnsHtml(habitId, idx, total) {
+function dragHandleHtml(habitId) {
   if (!quickAddVisible) return "";
   return `
-    <button class="btn btn-icon btn-ghost" data-routine-up="${habitId}" aria-label="Nach oben" ${idx === 0 ? "disabled style=\"opacity:0.3;\"" : ""}>
-      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 7L5.5 3L9.5 7" stroke="var(--color-neutral-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <button class="btn btn-icon btn-ghost" data-routine-down="${habitId}" aria-label="Nach unten" ${idx === total - 1 ? "disabled style=\"opacity:0.3;\"" : ""}>
-      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 4L5.5 8L9.5 4" stroke="var(--color-neutral-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <button class="btn btn-icon btn-ghost routine-drag-handle" data-drag-handle="${habitId}" aria-label="Ziehen zum Verschieben" style="touch-action:none; cursor:grab;">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="4" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="9" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="9" r="1" fill="var(--color-neutral-400)"/></svg>
     </button>
   `;
+}
+
+// ---------- Tagesroutine per Touch/Maus an ihren Platz ziehen (statt Auf/Ab-Klicks) ----------
+function commitRoutineReorder(draggedId, newVisibleIndex, visibleIdsBeforeDrag) {
+  const fullChain = state.habits.filter(h => h.routineOrder != null).sort((a, b) => a.routineOrder - b.routineOrder);
+  const draggedHabit = fullChain.find(h => h.id === draggedId);
+  if (!draggedHabit) return;
+  const withoutDragged = fullChain.filter(h => h.id !== draggedId);
+
+  const newVisibleOrder = visibleIdsBeforeDrag.filter(id => id !== draggedId);
+  newVisibleOrder.splice(newVisibleIndex, 0, draggedId);
+  const beforeId = newVisibleIndex > 0 ? newVisibleOrder[newVisibleIndex - 1] : null;
+
+  const insertAt = beforeId === null ? 0 : withoutDragged.findIndex(h => h.id === beforeId) + 1;
+  withoutDragged.splice(insertAt, 0, draggedHabit);
+  withoutDragged.forEach((h, i) => { h.routineOrder = i; });
+  saveData();
+  renderAll();
+}
+
+function initRoutineDragReorder() {
+  const wrap = document.getElementById("routineChain");
+  let dragEl = null, dragHabitId = null, startY = 0, originalTops = [], heights = [], visibleIds = [], dragOriginalIndex = 0, currentDropIndex = 0;
+
+  function clearDropIndicators() {
+    wrap.querySelectorAll(".atlas-row").forEach(r => r.classList.remove("drag-over-top"));
+  }
+
+  wrap.addEventListener("pointerdown", e => {
+    const handle = e.target.closest("[data-drag-handle]");
+    if (!handle) return;
+    e.preventDefault();
+    dragEl = handle.closest(".atlas-row");
+    dragHabitId = handle.dataset.dragHandle;
+    const rows = [...wrap.querySelectorAll(".atlas-row")];
+    visibleIds = rows.map(r => r.dataset.habitId);
+    originalTops = rows.map(r => r.getBoundingClientRect().top);
+    heights = rows.map(r => r.getBoundingClientRect().height);
+    dragOriginalIndex = visibleIds.indexOf(dragHabitId);
+    currentDropIndex = dragOriginalIndex;
+    startY = e.clientY;
+    dragEl.classList.add("dragging");
+    dragEl.style.zIndex = "50";
+    dragEl.setPointerCapture(e.pointerId);
+  });
+
+  wrap.addEventListener("pointermove", e => {
+    if (!dragEl) return;
+    const dy = e.clientY - startY;
+    dragEl.style.transform = `translateY(${dy}px)`;
+    const dragCenterNow = originalTops[dragOriginalIndex] + heights[dragOriginalIndex] / 2 + dy;
+
+    let newIndex = 0;
+    visibleIds.forEach((id, i) => {
+      if (i === dragOriginalIndex) return;
+      const center = originalTops[i] + heights[i] / 2;
+      if (center < dragCenterNow) newIndex++;
+    });
+    currentDropIndex = newIndex;
+
+    clearDropIndicators();
+    if (newIndex !== dragOriginalIndex) {
+      const rows = [...wrap.querySelectorAll(".atlas-row")];
+      const targetRow = rows.find(r => r.dataset.habitId === visibleIds[newIndex] || (newIndex >= rows.length && r === rows[rows.length - 1]));
+      if (targetRow && targetRow !== dragEl) targetRow.classList.add("drag-over-top");
+    }
+  });
+
+  function endDrag(commit) {
+    if (!dragEl) return;
+    dragEl.classList.remove("dragging");
+    dragEl.style.transform = "";
+    dragEl.style.zIndex = "";
+    clearDropIndicators();
+    const finalIndex = currentDropIndex;
+    const id = dragHabitId;
+    const ids = visibleIds;
+    const changed = finalIndex !== dragOriginalIndex;
+    dragEl = null;
+    if (commit && changed) commitRoutineReorder(id, finalIndex, ids);
+  }
+
+  wrap.addEventListener("pointerup", () => endDrag(true));
+  wrap.addEventListener("pointercancel", () => endDrag(false));
 }
 
 function renderRoutineChain() {
@@ -962,6 +1381,7 @@ function renderRoutineChain() {
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
     el.dataset.type = h.type;
+    el.dataset.habitId = h.id;
     el.innerHTML = `
       ${checkHtml}
       <div style="flex:1; min-width:0;">
@@ -969,7 +1389,7 @@ function renderRoutineChain() {
         ${noteHtml}
       </div>
       ${weightInputHtml}
-      ${reorderBtnsHtml(h.id, idx, chainHabits.length)}
+      ${dragHandleHtml(h.id)}
     `;
     wrap.appendChild(el);
   });
@@ -1071,7 +1491,7 @@ function renderTreeNode(node, depth, searchQuery = "") {
       <svg class="goal-node-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="var(--color-neutral-400)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <div class="card-title" style="font-size:14px;">${escapeHtml(node.title)}</div>
     </div>
-    <div class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">${pct}%</div>
+    ${miniProgressRing(pct, depth === 0 ? 34 : 26)}
   `;
   wrap.appendChild(header);
   const meta = document.createElement("div");
@@ -1080,6 +1500,9 @@ function renderTreeNode(node, depth, searchQuery = "") {
   wrap.appendChild(meta);
 
   if (expanded) {
+    const resources = document.createElement("div");
+    resources.innerHTML = resourceLinksRow(node);
+    wrap.appendChild(resources.firstElementChild);
     if (tasks.length || children.length) {
       const body = document.createElement("div");
       body.className = "goal-node-body";
@@ -1192,7 +1615,7 @@ function habitStatsWindow(habit, days) {
     if (new Date(habit.createdAt) > d) continue;
     if (!isScheduledToday(habit, d)) continue;
     total++;
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     if (habit.history[key]) done++;
   }
   return { total, done, rate: total ? done / total : null };
@@ -1204,7 +1627,7 @@ function weekdayDifficulty(days) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const wd = (d.getDay() + 6) % 7;
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     state.habits.forEach(h => {
       if (new Date(h.createdAt) > d) return;
       if (!isScheduledToday(h, d)) return;
@@ -1221,7 +1644,7 @@ function weekdayDifficulty(days) {
 
 // ---------- Aktivitäts-Heatmap (letzte 7 Wochen) ----------
 function dayCompletionPct(dateObj) {
-  const key = dateObj.toISOString().slice(0, 10);
+  const key = localDateKey(dateObj);
   const scheduled = state.habits.filter(h => new Date(h.createdAt) <= dateObj && isScheduledToday(h, dateObj));
   const done = scheduled.filter(h => h.history[key]).length;
   return scheduled.length ? Math.round((done / scheduled.length) * 100) : null;
@@ -1245,8 +1668,8 @@ function renderActivityHeatmap() {
     cell.style.background = pct === null
       ? "var(--color-neutral-800)"
       : `color-mix(in oklch, var(--color-accent) ${pct}%, var(--color-neutral-800))`;
-    cell.title = `${d.toISOString().slice(0, 10)}${pct === null ? "" : ": " + pct + "%"}`;
-    cell.dataset.date = d.toISOString().slice(0, 10);
+    cell.title = `${localDateKey(d)}${pct === null ? "" : ": " + pct + "%"}`;
+    cell.dataset.date = localDateKey(d);
     wrap.appendChild(cell);
   });
 }
@@ -1295,7 +1718,7 @@ function renderAreaLoad() {
 }
 
 function weekStartKey(dateObj = new Date()) {
-  return mondayOfWeek(dateObj).toISOString().slice(0, 10);
+  return localDateKey(mondayOfWeek(dateObj));
 }
 
 function renderReflection() {
@@ -1389,6 +1812,12 @@ document.addEventListener("click", e => {
   if (e.target.matches("[data-decompose-category]")) {
     copyDecomposePrompt(e.target.dataset.decomposeCategory, e.target);
   }
+  const geminiBtn = e.target.closest("[data-copy-gemini]");
+  if (geminiBtn) copyGeminiPrompt(geminiBtn.dataset.copyGemini, geminiBtn);
+  const monthBtn = e.target.closest("[data-month-test]");
+  if (monthBtn) addMonthTestTask(monthBtn.dataset.monthTest);
+  const cardBtn = e.target.closest("[data-open-card]");
+  if (cardBtn) openKnowledgeCardModal(cardBtn.dataset.openCard);
   const toggleBtn = e.target.closest("[data-toggle-node]");
   if (toggleBtn) {
     const id = toggleBtn.dataset.toggleNode;
@@ -1436,29 +1865,8 @@ document.addEventListener("click", e => {
   if (e.target.matches("[data-change-subject]")) {
     openSubjectOverrideModal();
   }
-  const upBtn = e.target.closest("[data-routine-up]");
-  if (upBtn) {
-    const habit = state.habits.find(h => h.id === upBtn.dataset.routineUp);
-    const chain = state.habits.filter(h => h.routineOrder != null).sort((a, b) => a.routineOrder - b.routineOrder);
-    const idx = chain.findIndex(h => h.id === habit.id);
-    if (idx > 0) {
-      const prev = chain[idx - 1];
-      [habit.routineOrder, prev.routineOrder] = [prev.routineOrder, habit.routineOrder];
-      saveData(); renderAll();
-    }
-  }
-  const downBtn = e.target.closest("[data-routine-down]");
-  if (downBtn) {
-    const habit = state.habits.find(h => h.id === downBtn.dataset.routineDown);
-    const chain = state.habits.filter(h => h.routineOrder != null).sort((a, b) => a.routineOrder - b.routineOrder);
-    const idx = chain.findIndex(h => h.id === habit.id);
-    if (idx < chain.length - 1) {
-      const next = chain[idx + 1];
-      [habit.routineOrder, next.routineOrder] = [next.routineOrder, habit.routineOrder];
-      saveData(); renderAll();
-    }
-  }
 });
+initRoutineDragReorder();
 
 // ---------- Zielbereich-Zerlegung: Copy-Prompt für Chat-Analyse ----------
 function buildDecomposePrompt(node) {
@@ -1514,6 +1922,80 @@ function downloadText(text, filename) {
   URL.revokeObjectURL(url);
 }
 
+// ---------- Wissens-Ressourcen pro Bereich: Wikipedia, YouTube, Gemini-Quiz, 1-Monats-Test, Karteikarte ----------
+const RESOURCE_ICONS = {
+  wikipedia: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 1.5V13.5M1.5 7.5H13.5M2.7 4.2C4.8 5.6 10.2 5.6 12.3 4.2M2.7 10.8C4.8 9.4 10.2 9.4 12.3 10.8" stroke="currentColor" stroke-width="1"/></svg>',
+  youtube: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="3.5" width="12" height="8" rx="2.2" stroke="currentColor" stroke-width="1.2"/><path d="M6.3 5.8L9.5 7.5L6.3 9.2V5.8Z" fill="currentColor"/></svg>',
+  gemini: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1.5C7.5 4.5 9.5 6.5 12.5 6.5C9.5 6.5 7.5 8.5 7.5 11.5C7.5 8.5 5.5 6.5 2.5 6.5C5.5 6.5 7.5 4.5 7.5 1.5Z" fill="currentColor"/></svg>',
+  monat: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="3" width="11" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M2 6H13M5 1.5V4M10 1.5V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  karte: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="4" y="3.5" width="9" height="6.5" rx="0.9" stroke="currentColor" stroke-width="1.1"/><rect x="2" y="5.5" width="9" height="6.5" rx="0.9" fill="var(--color-surface)" stroke="currentColor" stroke-width="1.1"/></svg>'
+};
+
+function wikipediaUrl(title) { return `https://de.wikipedia.org/wiki/Spezial:Suche?search=${encodeURIComponent(title)}`; }
+function youtubeUrl(title) { return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " erklärt")}`; }
+
+function buildGeminiQuizPrompt(node) {
+  const path = nodePath(node.id).map(n => n.title).join(" / ");
+  return `Stelle mir ein kurzes Quiz (5-8 Fragen) zum Thema "${node.title}" (Einordnung: ${path}). Werte danach meine Antworten aus, zeig mir konkret, wo meine Wissenslücken liegen, und erkläre mir diese Lücken verständlich.`;
+}
+
+async function copyGeminiPrompt(nodeId, btn) {
+  const node = nodeById(nodeId);
+  if (!node) return;
+  const prompt = buildGeminiQuizPrompt(node);
+  try {
+    await navigator.clipboard.writeText(prompt);
+    flashButton(btn, "✓");
+  } catch (e) {
+    downloadText(prompt, `Gemini_Quiz_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`);
+  }
+}
+
+function addMonthTestTask(nodeId) {
+  const node = nodeById(nodeId);
+  if (!node) return;
+  const due = new Date();
+  due.setDate(due.getDate() + 30);
+  state.tasks.push({
+    id: uid(), title: `${node.title}: 1 Monat lang anwenden/testen`, nodeId,
+    dueDate: localDateKey(due), dueTime: null, done: false, completedAt: null,
+    createdAt: new Date().toISOString(), size: "gross", priority: 0, source: "category", learnType: "praktisch"
+  });
+  saveData();
+  renderAll();
+}
+
+function openKnowledgeCardModal(nodeId) {
+  const node = nodeById(nodeId);
+  if (!node) return;
+  openModal(`
+    <h3>Karteikarte: ${escapeHtml(node.title)}</h3>
+    <textarea class="input" id="knowledgeCardText" rows="10" placeholder="Kurze Zusammenfassung / wichtigste Punkte zu diesem Thema...">${escapeHtml(node.knowledgeCard || "")}</textarea>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn btn-primary btn-block" id="saveKnowledgeCard">Speichern</button>
+    </div>
+  `, () => {
+    document.getElementById("saveKnowledgeCard").addEventListener("click", () => {
+      node.knowledgeCard = document.getElementById("knowledgeCardText").value.trim();
+      saveData();
+      closeModal();
+      renderAll();
+    });
+  });
+}
+
+function resourceLinksRow(node) {
+  return `
+    <div class="goal-node-resources" style="display:flex; gap:6px; flex-wrap:wrap; padding:0 14px 10px;">
+      <a class="btn btn-icon btn-ghost" href="${wikipediaUrl(node.title)}" target="_blank" rel="noopener" title="Wikipedia">${RESOURCE_ICONS.wikipedia}</a>
+      <a class="btn btn-icon btn-ghost" href="${youtubeUrl(node.title)}" target="_blank" rel="noopener" title="YouTube-Erklärvideo">${RESOURCE_ICONS.youtube}</a>
+      <button class="btn btn-icon btn-ghost" data-copy-gemini="${node.id}" title="Gemini-Quiz-Prompt kopieren">${RESOURCE_ICONS.gemini}</button>
+      <button class="btn btn-icon btn-ghost" data-month-test="${node.id}" title="1-Monats-Test als Aufgabe anlegen">${RESOURCE_ICONS.monat}</button>
+      <button class="btn btn-icon btn-ghost" data-open-card="${node.id}" title="Karteikarte / Zusammenfassung">${RESOURCE_ICONS.karte}</button>
+    </div>
+  `;
+}
+
 // ---------- Add buttons ----------
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
@@ -1562,20 +2044,29 @@ function openCategoryModal(node, parentId = null) {
 
 function openTaskModal(defaultNodeId, source = "todo") {
   const node = defaultNodeId ? nodeById(defaultNodeId) : null;
+  const isLernfeld = source === "category";
   openModal(`
-    <h3>${source === "category" ? "Aufgabe in " + escapeHtml(node ? node.title : "Bereich") : "Aufgabe hinzufügen"}</h3>
+    <h3>${isLernfeld ? "Lernfeldaufgabe in " + escapeHtml(node ? node.title : "Bereich") : "Aufgabe hinzufügen"}</h3>
+    ${isLernfeld ? `
     <div class="field">
-      <label>Titel</label>
-      <input type="text" id="mTaskTitle" placeholder="z.B. Bericht abschicken">
+      <label>Aufgabentyp</label>
+      <select id="mTaskLernType">
+        ${LERNTYPEN.map(l => `<option value="${l.id}">${escapeHtml(l.label)}</option>`).join("")}
+      </select>
+    </div>` : ""}
+    <div class="field">
+      <label>${isLernfeld ? "Konkret: was genau?" : "Titel"}</label>
+      <input type="text" id="mTaskTitle" placeholder="${isLernfeld ? "z.B. 3Blue1Brown Neuronen-Video" : "z.B. Bericht abschicken"}">
     </div>
     <div class="field">
       <label>Fälligkeitsdatum (optional)</label>
-      <input type="date" id="mTaskDate" value="${todayStr()}">
+      <input type="date" id="mTaskDate" value="${isLernfeld ? "" : todayStr()}">
     </div>
     <div class="field">
       <label>Uhrzeit (optional)</label>
       <input type="time" id="mTaskTime">
     </div>
+    ${isLernfeld ? "" : `
     <div class="field">
       <label>Größe (für die Tagesregel: 2 kleine oder 1 große Aufgabe/Tag)</label>
       <select id="mTaskSize">
@@ -1594,7 +2085,6 @@ function openTaskModal(defaultNodeId, source = "todo") {
         <option value="5">5 – höchste</option>
       </select>
     </div>
-    ${source === "category" ? "" : `
     <div class="field">
       <label>Zielbereich (optional, ordnet die Aufgabe zusätzlich dort ein)</label>
       <select id="mTaskCategory">
@@ -1614,10 +2104,18 @@ function openTaskModal(defaultNodeId, source = "todo") {
       if (!title) return;
       const dueDate = body.querySelector("#mTaskDate").value || null;
       const dueTime = body.querySelector("#mTaskTime").value || null;
+      if (isLernfeld) {
+        const learnType = body.querySelector("#mTaskLernType").value;
+        state.tasks.push({ id: uid(), title, nodeId: defaultNodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size: "klein", priority: 0, source, learnType });
+        saveData();
+        closeModal();
+        renderAll();
+        return;
+      }
       const size = body.querySelector("#mTaskSize").value;
       const priority = parseInt(body.querySelector("#mTaskPriority").value, 10) || 0;
       const categorySelect = body.querySelector("#mTaskCategory");
-      const nodeId = source === "category" ? defaultNodeId : (categorySelect ? categorySelect.value || null : null);
+      const nodeId = categorySelect ? categorySelect.value || null : null;
       state.tasks.push({ id: uid(), title, nodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source });
       saveData();
       closeModal();
@@ -1928,7 +2426,7 @@ function exportWeekReview() {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - 6);
-  const fmt = d => d.toISOString().slice(0, 10);
+  const fmt = d => localDateKey(d);
   const longTermDays = 60;
 
   let md = `---\n`;
