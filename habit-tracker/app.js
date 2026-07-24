@@ -49,6 +49,26 @@ const STORAGE_KEY = "habit-tracker-data-v2";
 // Lebensziele SIND die Oberkategorien. Allgemeines Wissen (Kommunikation, Haushaltstechnik, Recht ...)
 // taucht nur noch dort auf, wo ein konkretes Ziel es braucht (z.B. "Guter Ehemann werden" -> Kommunikation).
 // Format: { title, priority?, children: [ "Blatt" | {title, children:[...]} , ... ] } — beliebig tief verschachtelbar.
+
+// Ordnerstruktur der Seminararbeit, aus der im Vault hinterlegten Seminararbeit_Roadmap.md übernommen.
+// Eigene Konstante (statt inline in LEBENSWISSEN), damit migrateSeminararbeitRoadmap() dieselbe Struktur
+// auch nachträglich unter einen bereits bestehenden Seminararbeit-Knoten hängen kann.
+const SEMINARARBEIT_ROADMAP_CHILDREN = [
+  "Themenfindung & Vorbereitung",
+  { title: "Recherche", children: ["Stillsuit-Recherche", "Schild-Recherche", "Exzerpte & Belege"] },
+  { title: "Kapitel 2 – Stillsuit schreiben", children: ["Energiegewinnung", "Wasseraufbereitung", "Thermoregulation", "Bewertung & Fazit Stillsuit"] },
+  { title: "Kapitel 3 – Holtzman-Schild schreiben", children: ["Geschwindigkeitsabhängige Durchlässigkeit", "Absorption kinetischer Energie", "Sauerstoffaustausch", "Optisches Verhalten", "Bewertung & Fazit Schild"] },
+  "Rahmen & Vollfassung",
+  "Überarbeitung & Layout",
+  "Präsentation bauen & üben",
+  "Ruhephase Schuljahr",
+  "Zwischenpräsentation & Teilausfertigung",
+  "Feinschliff bei Bedarf",
+  "Abgabe",
+  "Verteidigung vorbereiten",
+  "Verteidigung"
+];
+
 const LEBENSWISSEN = [
   { title: "Glaube", priority: true, children: [
     "Grundlagen des christlichen Glaubens",
@@ -65,7 +85,7 @@ const LEBENSWISSEN = [
   ]},
   { title: "Karriere", children: [
     { title: "Schule", children: [
-      "Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)",
+      { title: "Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)", children: SEMINARARBEIT_ROADMAP_CHILDREN },
       "Lerntechniken & Prüfungsvorbereitung",
       "Mündliche Beteiligung & Rhetorik"
     ]},
@@ -150,6 +170,134 @@ const LEBENSWISSEN = [
     "Oldtimer-Porsche"
   ]}
 ];
+
+// Checklisten-Aufgaben aus der im Vault hinterlegten Seminararbeit_Roadmap.md, an ihre jeweilige
+// Unterordner-Stelle im Seminararbeit-Zweig gehängt. byTitle muss die Titel dieser Roadmap bereits
+// als goalNodes enthalten (aus der LEBENSWISSEN-Struktur oben aufgebaut).
+function attachSeminararbeitTasks(data, byTitle) {
+  const mk = (title, nodeId, done, dueDate) => {
+    if (!nodeId) return;
+    data.tasks.push({
+      id: uid(), title, nodeId, dueDate: dueDate || null, dueTime: null,
+      done: !!done, completedAt: done ? new Date().toISOString() : null,
+      createdAt: new Date().toISOString(), size: "klein", priority: 0, source: "category"
+    });
+  };
+
+  const themenfindung = byTitle["Themenfindung & Vorbereitung"];
+  mk("Rahmenthema „Physik in Filmen“ eingegrenzt auf Dune", themenfindung, true);
+  mk("Ausschlussverfahren: Tenet (zu breit) und Ornithopter (zu komplex) verworfen", themenfindung, true);
+  mk("Finales Thema festgelegt: Stillsuit + Holtzman-Schild", themenfindung, true);
+  mk("Gliederungsentwurf mit Seminarlehrer absegnen lassen", themenfindung, false);
+  mk("Zitierstil, Seitenzahl-Vorgabe, Deckblatt verbindlich klären", themenfindung, false);
+  mk("Die 18 ausgeliehenen Bücher den Unterkapiteln zuordnen (Exzerpt-Tabelle)", themenfindung, false);
+  mk("Portfolio auf bycs.de anlegen, ersten Eintrag schreiben", themenfindung, false);
+
+  const stillsuitRecherche = byTitle["Stillsuit-Recherche"];
+  mk("Energiebilanz Biomechanik (Tipler, Demtröder)", stillsuitRecherche, false);
+  mk("Umkehrosmose/Filtration (Melin/Rautenbach, Nguyen)", stillsuitRecherche, false);
+  mk("Thermoregulation (Baehr/Cerbe, VDI-Wärmeatlas, Parsons, Physiologie Brandes/Lang/Schmidt)", stillsuitRecherche, false);
+
+  const schildRecherche = byTitle["Schild-Recherche"];
+  mk("Scherverdickung nicht-newtonscher Fluide (Mezger, Sigloch/Oertel)", schildRecherche, false);
+  mk("Impulsübertrag/Kontaktmechanik (Popov/Hess/Willert)", schildRecherche, false);
+  mk("Kinetische Gastheorie (Demtröder, Tipler)", schildRecherche, false);
+
+  const exzerpte = byTitle["Exzerpte & Belege"];
+  mk("Jede Quelle mit Seitenzahl und Kernaussage exzerpieren", exzerpte, false);
+  mk("Bionik/Werkstofftechnik als Fundus für Alternativkonzepte markieren", exzerpte, false);
+
+  const kapitel2 = byTitle["Kapitel 2 – Stillsuit schreiben"];
+  mk("2.1 Filmisches Konzept beschreiben", kapitel2, false);
+
+  const energiegewinnung = byTitle["Energiegewinnung"];
+  mk("Fersenpumpe: reicht Biomechanik/Energieerhaltung rechnerisch aus?", energiegewinnung, false);
+  mk("Lösungsansatz: piezoelektrische Nanodrähte im Gewebe (Bewegung → Strom)", energiegewinnung, false);
+  mk("Lösungsansatz: thermoelektrische Generatoren (Seebeck-Effekt) am Temperaturgradienten Haut/Wüste", energiegewinnung, false);
+
+  const wasseraufbereitung = byTitle["Wasseraufbereitung"];
+  mk("Gegenargument: Umkehrosmose-Druckproblem — Van-'t-Hoff-Gesetz, ~60 bar nötig, Fersenpumpe unwahrscheinlich ausreichend", wasseraufbereitung, false);
+  mk("Gegenargument: Verdunstungs-Kondensations-Falle — 1. Hauptsatz: Netto-Kühleffekt ≈ 0", wasseraufbereitung, false);
+  mk("Lösungsansatz: Graphenoxid-Nanomembranen — atomare Poren lassen H₂O durch, blockieren Na⁺/Cl⁻", wasseraufbereitung, false);
+
+  const thermoregulationKap = byTitle["Thermoregulation"];
+  mk("Zielkonflikt herausarbeiten: gegen Außenhitze isolieren vs. Körperwärme abführen", thermoregulationKap, false);
+  mk("Lösungsansatz: Phasenwechselmaterialien (PCM) — Schmelzenthalpie puffert Körperwärme", thermoregulationKap, false);
+  mk("Lösungsansatz: thermische Dioden — asymmetrische Wärmeleitung (Phononen-Analogon)", thermoregulationKap, false);
+
+  const bewertungStillsuit = byTitle["Bewertung & Fazit Stillsuit"];
+  mk("Gesamtbewertung: mit Metamaterialien/Nanotech tendenziell plausibler als mit reiner heutiger Technik", bewertungStillsuit, false);
+  mk("Fußnoten/Zitate konsolidieren", bewertungStillsuit, false);
+
+  const kapitel3 = byTitle["Kapitel 3 – Holtzman-Schild schreiben"];
+  mk("3.1 Filmisches Konzept/Regel beschreiben", kapitel3, false);
+
+  const geschwindigkeit = byTitle["Geschwindigkeitsabhängige Durchlässigkeit"];
+  mk("Vergleich mit Scherverdickung nicht-newtonscher Fluide", geschwindigkeit, false);
+  mk("Lösungsansatz: Magnetohydrodynamik — Plasmafenster + Wirbelströme/Lorentz-Kraft", geschwindigkeit, false);
+  mk("Optik-Bonus: Bremsstrahlung als Erklärung für den Farbwechsel (rot/blau)", geschwindigkeit, false);
+
+  const absorption = byTitle["Absorption kinetischer Energie"];
+  mk("Gegenargument: Impulserhaltungs-Paradoxon — Rückstoß müsste Träger wegschleudern", absorption, false);
+  mk("Lösungsansatz (spekulativ): lokale Raumzeitkrümmung/Alcubierre-Metrik", absorption, false);
+
+  const sauerstoff = byTitle["Sauerstoffaustausch"];
+  mk("Kinetische Gastheorie: würde der Träger im Schild ersticken?", sauerstoff, false);
+
+  const optisch = byTitle["Optisches Verhalten"];
+  mk("Gegenargument: Brechungsindex-Problem — dichtes Medium müsste Licht nach Snellius verzerren", optisch, false);
+  mk("Mit Seminarlehrer absprechen, ob offiziell in die Gliederung aufgenommen wird", optisch, false);
+
+  const bewertungSchild = byTitle["Bewertung & Fazit Schild"];
+  mk("Gesamtbewertung: bleibt unrealistischer als der Anzug (Impuls-/Optikproblem ungelöst) — noch offen", bewertungSchild, false);
+  mk("Fußnoten/Zitate konsolidieren", bewertungSchild, false);
+
+  const rahmen = byTitle["Rahmen & Vollfassung"];
+  mk("Kapitel 1: Problemstellung, Forschungsfrage, Methodik", rahmen, false);
+  mk("Kapitel 4: Schlussbetrachtung — Gegenüberstellung Anzug/Schild", rahmen, false);
+  mk("Literaturverzeichnis vollständig anlegen", rahmen, false);
+  mk("Alle Fußnoten querchecken", rahmen, false);
+
+  const ueberarbeitung = byTitle["Überarbeitung & Layout"];
+  mk("Themabezug jedes Absatzes prüfen (Themaverfehlung = 0 Punkte)", ueberarbeitung, false);
+  mk("Formatierung final: Schrift, Blocksatz, Seitenzahl, Deckblatt", ueberarbeitung, false);
+  mk("Optional: Zwischenstand an Seminarlehrer schicken", ueberarbeitung, false);
+
+  const praesentation = byTitle["Präsentation bauen & üben"];
+  mk("Folien konzipieren: Anzug (plausibel) vs. Schild (unplausibel) als roter Faden", praesentation, false, "2026-09-13");
+  mk("Folien fertig bauen, Sprechzeit einhalten", praesentation, false, "2026-09-13");
+  mk("Mehrfach frei üben, Fragen des Prüfungsausschusses antizipieren", praesentation, false, "2026-09-13");
+  mk("Portfolio-Einträge vervollständigen", praesentation, false, "2026-09-13");
+
+  const ruhephase = byTitle["Ruhephase Schuljahr"];
+  mk("Kein neuer Inhalt — Vorrang für Klassenarbeiten", ruhephase, false);
+  mk("Präsentation 1×/Woche kurz auffrischen (10–15 Min.)", ruhephase, false);
+  mk("Eventuelles Feedback nur in kleinen, begrenzten Blöcken einarbeiten", ruhephase, false);
+
+  const zwischenpraes = byTitle["Zwischenpräsentation & Teilausfertigung"];
+  mk("Teilausfertigung spätestens 13.11. abgeben (nur noch Layoutcheck)", zwischenpraes, false, "2026-11-13");
+  mk("In der Woche davor: 2–3 volle Probedurchläufe", zwischenpraes, false, "2026-11-20");
+  mk("Präsentation halten, Prüfungsgespräch bestehen", zwischenpraes, false, "2026-11-20");
+  mk("Reflexion direkt danach ins Portfolio", zwischenpraes, false, "2026-11-20");
+
+  const feinschliff = byTitle["Feinschliff bei Bedarf"];
+  mk("Rückmeldungen in einem konzentrierten Block einarbeiten", feinschliff, false);
+  mk("Portfolio inhaltlich abschließen", feinschliff, false);
+  mk("Weihnachtsferien (24.12.–08.01.) bewusst als Erholung einplanen", feinschliff, false);
+
+  const abgabe = byTitle["Abgabe"];
+  mk("Letzte Rechtschreib- und Layoutkontrolle, zweite Person gegenlesen lassen", abgabe, false, "2027-01-13");
+  mk("Datei-/Druckformat prüfen, Sicherungskopie anlegen", abgabe, false, "2027-01-13");
+  mk("Fristgerecht einreichen, Bestätigung aufbewahren", abgabe, false, "2027-01-13");
+
+  const verteidigungVorbereiten = byTitle["Verteidigung vorbereiten"];
+  mk("Gesamte Arbeit noch einmal komplett lesen", verteidigungVorbereiten, false);
+  mk("Erwartbare Fragen durchspielen (z. B. Anzug plausibel vs. Schild unplausibel)", verteidigungVorbereiten, false);
+  mk("Probegespräch mit einer anderen Person simulieren", verteidigungVorbereiten, false);
+
+  const verteidigung = byTitle["Verteidigung"];
+  mk("Prüfungsgespräch ablegen — Ziel erreicht", verteidigung, false, "2027-01-25");
+}
 
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -406,6 +554,38 @@ function migrateLearningOrder(data) {
   data.learningOrderApplied = true;
 }
 
+// ---------- Migration: Seminararbeit-Roadmap aus dem Vault (Seminararbeit_Roadmap.md) nachrüsten ----------
+// Läuft auch dann, wenn goalDrivenRestructureApplied schon gesetzt ist (der Seminararbeit-Knoten existierte
+// dort bislang nur als leeres Blatt) — hängt die Unterordner + Checklisten-Aufgaben nachträglich an.
+function migrateSeminararbeitRoadmap(data) {
+  if (data.seminararbeitRoadmapApplied || !data.goalNodes) return;
+  const seminarNode = data.goalNodes.find(n => n.title === "Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)");
+  if (!seminarNode) { data.seminararbeitRoadmapApplied = true; return; }
+
+  const alreadyHasChildren = data.goalNodes.some(n => n.parentId === seminarNode.id);
+  if (!alreadyHasChildren) {
+    const byTitle = {};
+    function buildNode(node, parentId) {
+      const id = uid();
+      const title = typeof node === "string" ? node : node.title;
+      data.goalNodes.push({ id, parentId, title, priority: false });
+      byTitle[title] = id;
+      const children = typeof node === "string" ? null : node.children;
+      (children || []).forEach(child => buildNode(child, id));
+      return id;
+    }
+    SEMINARARBEIT_ROADMAP_CHILDREN.forEach(child => buildNode(child, seminarNode.id));
+    attachSeminararbeitTasks(data, byTitle);
+
+    // Die alte, jetzt durch die Roadmap ersetzte Platzhalter-Aufgabe entfernen — aber nur, wenn sie nie
+    // erledigt wurde (sonst würde eine echte Erledigung des Nutzers stillschweigend verschwinden).
+    data.tasks = data.tasks.filter(t =>
+      !(t.title === "Seminararbeit Physik in Filmen fertigstellen" && t.nodeId === seminarNode.id && !t.done)
+    );
+  }
+  data.seminararbeitRoadmapApplied = true;
+}
+
 // ---------- Migration: von der enzyklopädischen 18er-Struktur zur zielorientierten Struktur (Phase 7.11) ----------
 // "Glaube" bleibt (ID/Inhalt erhalten, nur neue Unterpunkte ergänzt). Alle anderen alten Wurzeln: wenn
 // irgendwo im Teilbaum Aufgaben/Gewohnheiten hängen, werden sie unter "Archiv (alte Bereiche)" verschoben
@@ -481,6 +661,7 @@ function migrateToGoalDrivenStructure(data) {
     return id;
   }
   LEBENSWISSEN.forEach(node => { if (node.title !== "Glaube" || !glaubeRoot) buildNode(node, null); });
+  attachSeminararbeitTasks(data, byTitle);
 
   // 4) Bekannte Start-Aufgaben/-Gewohnheiten an ihren neuen Platz umhängen
   const reattach = {
@@ -506,6 +687,7 @@ repairCyclicGoalNodes(state);
 migrateBereicheNaming(state);
 migrateReisenToPlanung(state);
 migrateToGoalDrivenStructure(state);
+migrateSeminararbeitRoadmap(state);
 migrateLearningOrder(state);
 repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
@@ -524,7 +706,8 @@ function seedData() {
   const data = {
     goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [],
     // Frische Seed-Daten entsprechen bereits der aktuellen Struktur — alle Migrationen sollen hier no-op sein
-    bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true, learningOrderApplied: true
+    bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true,
+    seminararbeitRoadmapApplied: true, learningOrderApplied: true
   };
   const c = (title, parentId = null, priority = false) => {
     const id = uid();
@@ -570,6 +753,7 @@ function seedData() {
     return id;
   }
   LEBENSWISSEN.forEach(node => { rootId[node.title] = buildNode(node, null); });
+  attachSeminararbeitTasks(data, byTitle);
 
   const glaube = rootId["Glaube"];
   h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
@@ -584,7 +768,6 @@ function seedData() {
   const studium = byTitle["Studium"];
   h("Lernen / Schularbeit 60–90 Min.", schule, "weekdays", { routineOrder: 6 });
   t("Bewerbungen duales Studium abschicken", studium, "2026-07-13", "gross", 5);
-  t("Seminararbeit Physik in Filmen fertigstellen", byTitle["Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)"], null, "gross");
   s("Englisch");
   s("Deutsch");
   s("BWL");
@@ -702,18 +885,48 @@ function steelStageFor(budget) {
   STEEL_STAGES.forEach(s => { if (budget >= s.min) stage = s; });
   return stage;
 }
-function dayBudgetRing(dueCount, doneCount, budget, size = 68) {
+// Metallischer Ring-Farbverlauf im selben 7-Stop-Muster wie der Wochenkreis (dunkel-hell-mittel-hell-dunkel-hell-dunkel),
+// aber für eine beliebige Anlassfarbe statt fix Gold — so bekommt jede Stahl-Stufe denselben glänzenden Metall-Look.
+function metallicRingGradient(base) {
+  const dark = `color-mix(in srgb, ${base} 65%, black)`;
+  const light = `color-mix(in srgb, ${base} 55%, white)`;
+  const lighter = `color-mix(in srgb, ${base} 80%, white)`;
+  return `conic-gradient(from -90deg, ${dark} 0%, ${lighter} 16.6%, ${base} 33.3%, ${light} 50%, ${dark} 66.6%, ${lighter} 83.3%, ${dark} 100%)`;
+}
+
+// ToDo-Ring: exakt dieselbe Ring-Masken-Technik wie der Wochenkreis (renderWeekCircle), nur füllt er sich
+// pro erledigter Aufgabe (klein = halb, groß = ganz) statt nach Tagesroutine-Quote, und startet metallisch
+// stahlgrau glänzend, um sich bei Überschuss durch die Anlassfarben von heißem Stahl bis zum Glühen zu verändern.
+function dayBudgetRing(dueCount, doneCount, budget, size = 200) {
   const pct = Math.min(100, Math.round((budget / 2) * 100));
   const stage = steelStageFor(budget);
-  const inner = Math.round(size * 0.7);
-  const glowCss = stage.glow ? `box-shadow:0 0 14px 3px ${stage.color}, 0 0 28px 8px ${stage.color}66;` : "";
+  const today = new Date();
+  const todayIdx = (today.getDay() + 6) % 7;
+  const maskUrl = `assets/${RING_MASKS[todayIdx]}`;
+  const percentMask = conicPercentMask(pct);
+  const gradient = metallicRingGradient(stage.color);
+  const glowBlur = stage.glow ? 14 : 5;
+  const glowPct = stage.glow ? 90 : 50;
+
   return `
     <div style="display:flex; justify-content:center; margin-bottom:16px;">
       <div style="position:relative; width:${size}px; height:${size}px;">
-        <div style="position:absolute; inset:0; border-radius:50%; transition:background 0.4s, box-shadow 0.4s; ${glowCss}
-          background:conic-gradient(from -90deg, ${stage.color} ${pct}%, var(--color-neutral-800) ${pct}% 100%);"></div>
-        <div style="position:absolute; inset:${Math.round((size - inner) / 2)}px; border-radius:50%; background:var(--color-surface);
-          display:flex; align-items:center; justify-content:center; font-size:15px; font-family:var(--font-heading); color:var(--color-neutral-100);">${dueCount}/${doneCount}</div>
+        <div style="position:absolute; inset:0;
+          background:rgba(255,255,255,0.16);
+          -webkit-mask-image:url('${maskUrl}'); -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat; -webkit-mask-position:center;
+          mask-image:url('${maskUrl}'); mask-size:100% 100%; mask-repeat:no-repeat; mask-position:center;"></div>
+        <div style="position:absolute; inset:0;
+          background:${gradient};
+          -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
+          mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;
+          filter:drop-shadow(0 0 ${glowBlur}px color-mix(in srgb, ${stage.color} ${glowPct}%, transparent));
+          transition:filter 0.4s;"></div>
+        <div style="position:absolute; inset:0;
+          background:radial-gradient(circle at 32% 24%, rgba(255,255,255,0.9), transparent 55%);
+          mix-blend-mode:overlay; opacity:0.6;
+          -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
+          mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;"></div>
+        <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:${Math.round(size * 0.17)}px; font-family:var(--font-heading); color:var(--color-neutral-100); text-shadow:0 1px 4px rgba(0,0,0,0.6);">${dueCount}/${doneCount}</span>
       </div>
     </div>
   `;
@@ -958,14 +1171,6 @@ function nodeOptionsHtml() {
 function rootNodeOptionsHtml() {
   return childNodes(null).map(node => `<option value="${node.id}">${escapeHtml(node.title)}</option>`).join("");
 }
-function removeNode(nodeId) {
-  childNodes(nodeId).forEach(c => removeNode(c.id));
-  state.goalNodes = state.goalNodes.filter(n => n.id !== nodeId);
-  state.tasks.forEach(t => { if (t.nodeId === nodeId) t.nodeId = null; });
-  state.habits.forEach(h => { if (h.nodeId === nodeId) h.nodeId = null; });
-  expandedNodes.delete(nodeId);
-}
-
 function isScheduledToday(habit, dateObj = new Date()) {
   if (habit.frequency === "weekdays") {
     const day = dateObj.getDay(); // 0 So, 6 Sa
@@ -1189,8 +1394,16 @@ function addDeviation(text) {
   renderAll();
 }
 
-const LEARNING_ROUTINE_ORDER = 6;
 const SUBJECT_ROTATION_EPOCH = new Date(2026, 0, 1);
+
+// Findet den Lern-Routine-Schritt über seine Verknüpfung zum "Schule"-Zielbereich statt über
+// eine fixe routineOrder-Position (die sich durchs Ziehen/Umsortieren jederzeit ändern kann).
+function learningRoutineHabit(habits) {
+  return habits.find(h => {
+    const node = nodeById(h.nodeId);
+    return node && node.title === "Schule";
+  }) || null;
+}
 
 function dateFromKey(key) {
   return new Date(key + "T00:00:00");
@@ -1356,12 +1569,14 @@ function renderRoutineChain() {
     return;
   }
 
+  const learningHabit = learningRoutineHabit(chainHabits);
+
   chainHabits.forEach((h, idx) => {
     const rawValue = h.history[today];
     const doneToday = h.type === "weight" ? (rawValue !== undefined && rawValue !== null) : !!rawValue;
 
     let noteHtml = "";
-    if (h.routineOrder === LEARNING_ROUTINE_ORDER) {
+    if (h === learningHabit) {
       const override = examOverride(now);
       if (override) {
         noteHtml = `<div class="routine-step-note">Ganztägig lernen für <strong>${escapeHtml(override.subject.title)}</strong> — Klassenarbeit am ${override.date}</div>`;
@@ -1503,6 +1718,7 @@ function renderTreeNode(node, depth, searchQuery = "") {
     const resources = document.createElement("div");
     resources.innerHTML = resourceLinksRow(node);
     wrap.appendChild(resources.firstElementChild);
+    hydrateResourceLinks(node, wrap);
     if (tasks.length || children.length) {
       const body = document.createElement("div");
       body.className = "goal-node-body";
@@ -1515,17 +1731,6 @@ function renderTreeNode(node, depth, searchQuery = "") {
       children.forEach(child => childrenWrap.appendChild(renderTreeNode(child, depth + 1, searchQuery)));
       wrap.appendChild(childrenWrap);
     }
-
-    const actionsRow = document.createElement("div");
-    actionsRow.className = "goal-node-add-row";
-    actionsRow.innerHTML = `
-      <button class="btn btn-ghost" data-add-subfolder="${node.id}">+ Unterordner</button>
-      <button class="btn btn-ghost" data-add-task-category="${node.id}">+ Aufgabe hier</button>
-      <button class="btn btn-icon btn-ghost" data-edit-category="${node.id}" title="Umbenennen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 11.5l1-3.5 6-6 2.5 2.5-6 6-3.5 1z" stroke="var(--color-neutral-400)" stroke-width="1.2" stroke-linejoin="round"/></svg></button>
-      <button class="btn btn-icon btn-ghost" data-decompose-category="${node.id}" title="Aufgaben vorschlagen">···</button>
-      <button class="btn btn-icon btn-ghost" data-del-category="${node.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
-    `;
-    wrap.appendChild(actionsRow);
   }
 
   return wrap;
@@ -1643,6 +1848,18 @@ function weekdayDifficulty(days) {
 }
 
 // ---------- Aktivitäts-Heatmap (letzte 7 Wochen) ----------
+function lerpColor(hexA, hexB, t) {
+  const a = parseInt(hexA.slice(1), 16), b = parseInt(hexB.slice(1), 16);
+  const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+  const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bl = Math.round(ab + (bb - ab) * t);
+  return `rgb(${r}, ${g}, ${bl})`;
+}
+const HEATMAP_GREY = "#5b6072";
+const HEATMAP_GOLD = "#d4af37";
+
 function dayCompletionPct(dateObj) {
   const key = localDateKey(dateObj);
   const scheduled = state.habits.filter(h => new Date(h.createdAt) <= dateObj && isScheduledToday(h, dateObj));
@@ -1665,9 +1882,10 @@ function renderActivityHeatmap() {
     const pct = dayCompletionPct(d);
     const cell = document.createElement("div");
     cell.className = "heatmap-cell";
-    cell.style.background = pct === null
-      ? "var(--color-neutral-800)"
-      : `color-mix(in oklch, var(--color-accent) ${pct}%, var(--color-neutral-800))`;
+    const t = pct === null ? 0 : pct / 100;
+    const base = lerpColor(HEATMAP_GREY, HEATMAP_GOLD, t);
+    cell.style.background = `linear-gradient(135deg, color-mix(in srgb, ${base} 100%, white 22%) 0%, ${base} 45%, color-mix(in srgb, ${base} 100%, black 25%) 100%)`;
+    cell.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 2px rgba(0,0,0,0.35)";
     cell.title = `${localDateKey(d)}${pct === null ? "" : ": " + pct + "%"}`;
     cell.dataset.date = localDateKey(d);
     wrap.appendChild(cell);
@@ -1799,33 +2017,17 @@ document.addEventListener("click", e => {
     state.habits = state.habits.filter(h => h.id !== e.target.dataset.delHabit);
     saveData(); renderAll();
   }
-  if (e.target.matches("[data-del-category]")) {
-    removeNode(e.target.dataset.delCategory);
-    saveData(); renderAll();
-  }
-  if (e.target.matches("[data-edit-category]")) {
-    openCategoryModal(nodeById(e.target.dataset.editCategory));
-  }
-  if (e.target.matches("[data-add-task-category]")) {
-    openTaskModal(e.target.dataset.addTaskCategory, "category");
-  }
-  if (e.target.matches("[data-decompose-category]")) {
-    copyDecomposePrompt(e.target.dataset.decomposeCategory, e.target);
-  }
   const geminiBtn = e.target.closest("[data-copy-gemini]");
   if (geminiBtn) copyGeminiPrompt(geminiBtn.dataset.copyGemini, geminiBtn);
-  const monthBtn = e.target.closest("[data-month-test]");
-  if (monthBtn) addMonthTestTask(monthBtn.dataset.monthTest);
-  const cardBtn = e.target.closest("[data-open-card]");
-  if (cardBtn) openKnowledgeCardModal(cardBtn.dataset.openCard);
+  const monthBtn = e.target.closest("[data-copy-month-prompt]");
+  if (monthBtn) copyMonthTestPrompt(monthBtn.dataset.copyMonthPrompt, monthBtn);
+  const cardBtn = e.target.closest("[data-copy-card-prompt]");
+  if (cardBtn) copyKnowledgeCardPrompt(cardBtn.dataset.copyCardPrompt, cardBtn);
   const toggleBtn = e.target.closest("[data-toggle-node]");
   if (toggleBtn) {
     const id = toggleBtn.dataset.toggleNode;
     if (expandedNodes.has(id)) expandedNodes.delete(id); else expandedNodes.add(id);
     renderGoalBrowser();
-  }
-  if (e.target.matches("[data-add-subfolder]")) {
-    openCategoryModal(null, e.target.dataset.addSubfolder);
   }
   if (e.target.matches("[data-del-shift]")) {
     state.workShifts = state.workShifts.filter(s => s.id !== e.target.dataset.delShift);
@@ -1868,42 +2070,6 @@ document.addEventListener("click", e => {
 });
 initRoutineDragReorder();
 
-// ---------- Zielbereich-Zerlegung: Copy-Prompt für Chat-Analyse ----------
-function buildDecomposePrompt(node) {
-  const tasks = categoryTasksForNode(node.id);
-  const habits = habitsForNode(node.id);
-  const pct = Math.round(nodeProgress(node) * 100);
-  const path = nodePath(node.id).map(n => n.title).join(" / ");
-
-  let prompt = `Ich möchte im Zielordner "${path}" konkrete, umsetzbare Aufgaben finden, die mich meinem übergeordneten Ziel näherbringen.\n\n`;
-  prompt += `Aktueller Fortschritt: ${pct}%\n`;
-  if (node.priority) prompt += `Priorität: ja\n`;
-
-  if (tasks.length) {
-    prompt += `\nBereits vorhandene Aufgaben:\n`;
-    tasks.forEach(t => { prompt += `- [${t.done ? "x" : " "}] ${t.title}${t.dueDate ? " (fällig " + t.dueDate + ")" : ""}\n`; });
-  }
-  if (habits.length) {
-    prompt += `\nBereits verknüpfte Gewohnheiten:\n`;
-    habits.forEach(h => { prompt += `- ${h.title} (${frequencyLabel(h)})\n`; });
-  }
-
-  prompt += `\nSchlag mir bitte 3-6 konkrete neue Aufgaben oder Unterordner für diesen Zweig vor.`;
-  return prompt;
-}
-
-async function copyDecomposePrompt(nodeId, btn) {
-  const node = nodeById(nodeId);
-  if (!node) return;
-  const prompt = buildDecomposePrompt(node);
-  try {
-    await navigator.clipboard.writeText(prompt);
-    flashButton(btn, "✓");
-  } catch (e) {
-    downloadText(prompt, `Zielbereich_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`);
-  }
-}
-
 function flashButton(btn, tempContent) {
   const original = btn.textContent;
   btn.textContent = tempContent;
@@ -1922,7 +2088,7 @@ function downloadText(text, filename) {
   URL.revokeObjectURL(url);
 }
 
-// ---------- Wissens-Ressourcen pro Bereich: Wikipedia, YouTube, Gemini-Quiz, 1-Monats-Test, Karteikarte ----------
+// ---------- Wissens-Ressourcen pro Bereich: echter Wikipedia-Artikel, echtes YouTube-Video, KI-Prompts ----------
 const RESOURCE_ICONS = {
   wikipedia: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 1.5V13.5M1.5 7.5H13.5M2.7 4.2C4.8 5.6 10.2 5.6 12.3 4.2M2.7 10.8C4.8 9.4 10.2 9.4 12.3 10.8" stroke="currentColor" stroke-width="1"/></svg>',
   youtube: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="3.5" width="12" height="8" rx="2.2" stroke="currentColor" stroke-width="1.2"/><path d="M6.3 5.8L9.5 7.5L6.3 9.2V5.8Z" fill="currentColor"/></svg>',
@@ -1931,67 +2097,102 @@ const RESOURCE_ICONS = {
   karte: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="4" y="3.5" width="9" height="6.5" rx="0.9" stroke="currentColor" stroke-width="1.1"/><rect x="2" y="5.5" width="9" height="6.5" rx="0.9" fill="var(--color-surface)" stroke="currentColor" stroke-width="1.1"/></svg>'
 };
 
-function wikipediaUrl(title) { return `https://de.wikipedia.org/wiki/Spezial:Suche?search=${encodeURIComponent(title)}`; }
-function youtubeUrl(title) { return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " erklärt")}`; }
+// Wikipedia: direkter Artikel statt Suchseite. Erst ein sofort funktionierender Fallback-Link
+// (Direktaufruf des Titels), danach im Hintergrund per Opensearch-API auf den echten Trefferartikel
+// aktualisiert (kein API-Key nötig, CORS-offen).
+const wikiArticleCache = new Map();
+function wikipediaFallbackUrl(title) {
+  return `https://de.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
+}
+async function resolveWikipediaUrl(title) {
+  if (wikiArticleCache.has(title)) return wikiArticleCache.get(title);
+  try {
+    const res = await fetch(`https://de.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(title)}&limit=1&namespace=0&format=json&origin=*`);
+    const data = await res.json();
+    const url = (data && data[3] && data[3][0]) ? data[3][0] : wikipediaFallbackUrl(title);
+    wikiArticleCache.set(title, url);
+    return url;
+  } catch (e) {
+    return wikipediaFallbackUrl(title);
+  }
+}
+
+// YouTube: ohne eigenen Data-API-Key kann kein einzelnes Video zuverlässig aufgelöst werden (keine
+// key-lose offizielle Such-API). Ist ein Key hinterlegt (lokal, optional), wird direkt das Top-Video
+// verlinkt; sonst ein zielgerichteter Such-Link als Fallback.
+const youtubeVideoCache = new Map();
+function youtubeFallbackUrl(title) {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " einfach erklärt")}`;
+}
+function getYoutubeApiKey() { return localStorage.getItem("atlas-youtube-api-key") || ""; }
+async function resolveYoutubeUrl(title) {
+  const key = getYoutubeApiKey();
+  if (!key) return youtubeFallbackUrl(title);
+  if (youtubeVideoCache.has(title)) return youtubeVideoCache.get(title);
+  try {
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&type=video&q=${encodeURIComponent(title + " erklärt")}&key=${key}`);
+    const data = await res.json();
+    const id = data && data.items && data.items[0] && data.items[0].id && data.items[0].id.videoId;
+    const url = id ? `https://www.youtube.com/watch?v=${id}` : youtubeFallbackUrl(title);
+    youtubeVideoCache.set(title, url);
+    return url;
+  } catch (e) {
+    return youtubeFallbackUrl(title);
+  }
+}
+
+function hydrateResourceLinks(node, container) {
+  resolveWikipediaUrl(node.title).then(url => {
+    const a = container.querySelector(`[data-wiki-link="${node.id}"]`);
+    if (a) a.href = url;
+  });
+  resolveYoutubeUrl(node.title).then(url => {
+    const a = container.querySelector(`[data-yt-link="${node.id}"]`);
+    if (a) a.href = url;
+  });
+}
 
 function buildGeminiQuizPrompt(node) {
   const path = nodePath(node.id).map(n => n.title).join(" / ");
   return `Stelle mir ein kurzes Quiz (5-8 Fragen) zum Thema "${node.title}" (Einordnung: ${path}). Werte danach meine Antworten aus, zeig mir konkret, wo meine Wissenslücken liegen, und erkläre mir diese Lücken verständlich.`;
 }
-
 async function copyGeminiPrompt(nodeId, btn) {
   const node = nodeById(nodeId);
   if (!node) return;
-  const prompt = buildGeminiQuizPrompt(node);
-  try {
-    await navigator.clipboard.writeText(prompt);
-    flashButton(btn, "✓");
-  } catch (e) {
-    downloadText(prompt, `Gemini_Quiz_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`);
-  }
+  try { await navigator.clipboard.writeText(buildGeminiQuizPrompt(node)); flashButton(btn, "✓"); }
+  catch (e) { downloadText(buildGeminiQuizPrompt(node), `Quiz_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`); }
 }
 
-function addMonthTestTask(nodeId) {
+function buildMonthTestPrompt(node) {
+  const path = nodePath(node.id).map(n => n.title).join(" / ");
+  return `Schlage mir eine konkrete, klar abgegrenzte Aufgabe vor, mit der ich das Thema "${node.title}" (Einordnung: ${path}) einen Monat lang praktisch teste bzw. anwende. Nenne mir ein messbares Ziel für den Monat und 2-3 Zwischenschritte.`;
+}
+async function copyMonthTestPrompt(nodeId, btn) {
   const node = nodeById(nodeId);
   if (!node) return;
-  const due = new Date();
-  due.setDate(due.getDate() + 30);
-  state.tasks.push({
-    id: uid(), title: `${node.title}: 1 Monat lang anwenden/testen`, nodeId,
-    dueDate: localDateKey(due), dueTime: null, done: false, completedAt: null,
-    createdAt: new Date().toISOString(), size: "gross", priority: 0, source: "category", learnType: "praktisch"
-  });
-  saveData();
-  renderAll();
+  try { await navigator.clipboard.writeText(buildMonthTestPrompt(node)); flashButton(btn, "✓"); }
+  catch (e) { downloadText(buildMonthTestPrompt(node), `Monatstest_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`); }
 }
 
-function openKnowledgeCardModal(nodeId) {
+function buildKnowledgeCardPrompt(node) {
+  const path = nodePath(node.id).map(n => n.title).join(" / ");
+  return `Erstelle mir eine kurze, gebündelte Wissens-Zusammenfassung (wie eine Karteikarte, max. 1 Seite) zum Thema "${node.title}" (Einordnung: ${path}) mit den wichtigsten Fakten, Begriffen und Zusammenhängen, die ich mir merken sollte.`;
+}
+async function copyKnowledgeCardPrompt(nodeId, btn) {
   const node = nodeById(nodeId);
   if (!node) return;
-  openModal(`
-    <h3>Karteikarte: ${escapeHtml(node.title)}</h3>
-    <textarea class="input" id="knowledgeCardText" rows="10" placeholder="Kurze Zusammenfassung / wichtigste Punkte zu diesem Thema...">${escapeHtml(node.knowledgeCard || "")}</textarea>
-    <div style="display:flex; gap:8px; margin-top:12px;">
-      <button class="btn btn-primary btn-block" id="saveKnowledgeCard">Speichern</button>
-    </div>
-  `, () => {
-    document.getElementById("saveKnowledgeCard").addEventListener("click", () => {
-      node.knowledgeCard = document.getElementById("knowledgeCardText").value.trim();
-      saveData();
-      closeModal();
-      renderAll();
-    });
-  });
+  try { await navigator.clipboard.writeText(buildKnowledgeCardPrompt(node)); flashButton(btn, "✓"); }
+  catch (e) { downloadText(buildKnowledgeCardPrompt(node), `Karteikarte_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`); }
 }
 
 function resourceLinksRow(node) {
   return `
     <div class="goal-node-resources" style="display:flex; gap:6px; flex-wrap:wrap; padding:0 14px 10px;">
-      <a class="btn btn-icon btn-ghost" href="${wikipediaUrl(node.title)}" target="_blank" rel="noopener" title="Wikipedia">${RESOURCE_ICONS.wikipedia}</a>
-      <a class="btn btn-icon btn-ghost" href="${youtubeUrl(node.title)}" target="_blank" rel="noopener" title="YouTube-Erklärvideo">${RESOURCE_ICONS.youtube}</a>
-      <button class="btn btn-icon btn-ghost" data-copy-gemini="${node.id}" title="Gemini-Quiz-Prompt kopieren">${RESOURCE_ICONS.gemini}</button>
-      <button class="btn btn-icon btn-ghost" data-month-test="${node.id}" title="1-Monats-Test als Aufgabe anlegen">${RESOURCE_ICONS.monat}</button>
-      <button class="btn btn-icon btn-ghost" data-open-card="${node.id}" title="Karteikarte / Zusammenfassung">${RESOURCE_ICONS.karte}</button>
+      <a class="btn btn-icon btn-ghost" href="${wikipediaFallbackUrl(node.title)}" target="_blank" rel="noopener" title="Wikipedia-Artikel" data-wiki-link="${node.id}">${RESOURCE_ICONS.wikipedia}</a>
+      <a class="btn btn-icon btn-ghost" href="${youtubeFallbackUrl(node.title)}" target="_blank" rel="noopener" title="YouTube-Erklärvideo" data-yt-link="${node.id}">${RESOURCE_ICONS.youtube}</a>
+      <button class="btn btn-icon btn-ghost" data-copy-gemini="${node.id}" title="KI-Quiz-Prompt kopieren">${RESOURCE_ICONS.gemini}</button>
+      <button class="btn btn-icon btn-ghost" data-copy-month-prompt="${node.id}" title="KI-Prompt für 1-Monats-Testaufgabe kopieren">${RESOURCE_ICONS.monat}</button>
+      <button class="btn btn-icon btn-ghost" data-copy-card-prompt="${node.id}" title="KI-Prompt für Wissens-Zusammenfassung kopieren">${RESOURCE_ICONS.karte}</button>
     </div>
   `;
 }
@@ -2005,42 +2206,6 @@ document.getElementById("addDeviationBtn").addEventListener("click", () => {
   addDeviation(input.value);
   input.value = "";
 });
-
-function openCategoryModal(node, parentId = null) {
-  const isEdit = !!node;
-  openModal(`
-    <h3>${isEdit ? "Ordner bearbeiten" : "Unterordner hinzufügen"}</h3>
-    <div class="field">
-      <label>Titel</label>
-      <input type="text" id="mCategoryTitle" value="${isEdit ? escapeHtml(node.title) : ""}" placeholder="z.B. Kreativität">
-    </div>
-    <div class="checkbox-row">
-      <input type="checkbox" id="mCategoryPriority" ${isEdit && node.priority ? "checked" : ""}>
-      <label for="mCategoryPriority">Priorität (wird hervorgehoben)</label>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
-      <button class="btn btn-primary" id="mSave">Speichern</button>
-    </div>
-  `, body => {
-    body.querySelector("#mCategoryTitle").focus();
-    body.querySelector("#mCancel").addEventListener("click", closeModal);
-    body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mCategoryTitle").value.trim();
-      if (!title) return;
-      const priority = body.querySelector("#mCategoryPriority").checked;
-      if (isEdit) {
-        node.title = title;
-        node.priority = priority;
-      } else {
-        state.goalNodes.push({ id: uid(), parentId, title, priority });
-      }
-      saveData();
-      closeModal();
-      renderAll();
-    });
-  });
-}
 
 function openTaskModal(defaultNodeId, source = "todo") {
   const node = defaultNodeId ? nodeById(defaultNodeId) : null;
