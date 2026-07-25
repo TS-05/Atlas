@@ -870,26 +870,24 @@ function miniProgressRing(pct, size = 30) {
   `;
 }
 
-// Anlassfarben von Stahl: 0-2 Budget-Einheiten = grau (füllt den Ring), danach Farbwechsel bei Überschuss
+// Anlassfarben von Stahl (ohne das letzte, für "geglüht" reservierte Stadium, s.u.). Jede erledigte
+// Aufgabe rückt den Ring diesen Verlauf ein Stück weiter, stufenlos ineinander übergehend statt hart
+// springend — bis bei 100% (alle fällig/überfälligen erledigt) der Sonderzustand "glüht" übernimmt.
 const STEEL_STAGES = [
-  { min: 0, color: "#8a93a3" }, // stahlgrau
-  { min: 2, color: "#e8d577" }, // strohgelb
-  { min: 3, color: "#d4af37" }, // gold
-  { min: 4, color: "#8b5a2b" }, // braun/kupfer
-  { min: 5, color: "#7b3f61" }, // purpur
-  { min: 6, color: "#3b5b92" }, // blau
-  { min: 7, color: "#ff6a3d" }  // rotglühend
+  "#8a93a3", // stahlgrau
+  "#e8d577", // strohgelb
+  "#d4af37", // gold
+  "#8b5a2b", // braun/kupfer
+  "#7b3f61", // purpur
+  "#3b5b92"  // blau
 ];
-// Fließender Übergang zwischen den Anlassfarben statt harter Sprünge an den Stufengrenzen.
-function steelColorFor(budget) {
-  for (let i = 0; i < STEEL_STAGES.length - 1; i++) {
-    const cur = STEEL_STAGES[i], next = STEEL_STAGES[i + 1];
-    if (budget < next.min) {
-      const t = (budget - cur.min) / (next.min - cur.min);
-      return lerpColor(cur.color, next.color, Math.max(0, Math.min(1, t)));
-    }
-  }
-  return STEEL_STAGES[STEEL_STAGES.length - 1].color;
+// t = Fortschritt 0..1 (erledigt/fällig), noch NICHT ganz fertig — die eigentliche Glut kommt separat.
+function steelColorForProgress(t) {
+  const clamped = Math.max(0, Math.min(0.999, t));
+  const scaled = clamped * (STEEL_STAGES.length - 1);
+  const i = Math.floor(scaled);
+  const frac = scaled - i;
+  return lerpColor(STEEL_STAGES[i], STEEL_STAGES[Math.min(i + 1, STEEL_STAGES.length - 1)], frac);
 }
 // Metallischer Ring-Farbverlauf im selben 7-Stop-Muster wie der Wochenkreis (dunkel-hell-mittel-hell-dunkel-hell-dunkel),
 // aber für eine beliebige Anlassfarbe statt fix Gold — so bekommt jede Stahl-Stufe denselben glänzenden Metall-Look.
@@ -900,31 +898,34 @@ function metallicRingGradient(base) {
   return `conic-gradient(from -90deg, ${dark} 0%, ${lighter} 16.6%, ${base} 33.3%, ${light} 50%, ${dark} 66.6%, ${lighter} 83.3%, ${dark} 100%)`;
 }
 
-// ToDo-Ring: exakt dieselbe Ring-Masken-Technik wie der Wochenkreis (renderWeekCircle), nur füllt er sich
-// pro erledigter Aufgabe (klein = halb, groß = ganz) statt nach Tagesroutine-Quote, und startet metallisch
-// stahlgrau glänzend, um sich mit fließenden Übergängen durch die Anlassfarben von heißem Stahl zu verändern.
-// Glüht (weißgelb-flüssig mit orangenem Halo, wie echtes glühendes Metall) sobald alle heute fälligen
-// Aufgaben erledigt sind — unabhängig von der Budget-Stufe.
-const MOLTEN_COLOR = "#fff1c4";
+// ToDo-Ring: exakt dieselbe Ring-Masken-Technik wie der Wochenkreis (renderWeekCircle). Füllstand =
+// erledigte / fällige-oder-überfällige Aufgaben (bei 4 fälligen füllt jede erledigte den Ring um 25%,
+// bei 5 fälligen um 20% usw. — unabhängig von Klein/Groß). Startet stahlgrau glänzend und wandert mit
+// jeder erledigten Aufgabe einen Schritt weiter durch die Anlassfarben; bei 100% (alles erledigt) geht
+// der Ring in einen "geglühten" Sonderzustand über: weißgelb-flüssiger Kern + orangener Halo, der über
+// den Rand hinaus ausblutet, plus sanftes Pulsieren.
+const MOLTEN_COLOR = "#fff4d6";
 const MOLTEN_HALO = "#ff7a1a";
 
-function dayBudgetRing(dueCount, doneCount, budget, size = 200) {
-  const pct = Math.min(100, Math.round((budget / 2) * 100));
+function dayBudgetRing(dueCount, doneCount, size = 200) {
+  const t = dueCount > 0 ? doneCount / dueCount : 0;
+  const pct = Math.min(100, Math.round(t * 100));
   const allDueDone = dueCount > 0 && doneCount >= dueCount;
-  const baseColor = allDueDone ? MOLTEN_COLOR : steelColorFor(budget);
+  const baseColor = allDueDone ? MOLTEN_COLOR : steelColorForProgress(t);
   const today = new Date();
   const todayIdx = (today.getDay() + 6) % 7;
   const maskUrl = `assets/${RING_MASKS[todayIdx]}`;
   const percentMask = conicPercentMask(pct);
-  const gradient = metallicRingGradient(baseColor);
-  const haloColor = allDueDone ? MOLTEN_HALO : baseColor;
-  const innerBlur = allDueDone ? 8 : 5;
-  const outerBlur = allDueDone ? 28 : 8;
-  const outerPct = allDueDone ? 85 : 35;
+  const gradient = allDueDone
+    ? `conic-gradient(from -90deg, ${MOLTEN_COLOR} 0%, #ffffff 16.6%, ${MOLTEN_HALO} 33.3%, #ffffff 50%, ${MOLTEN_COLOR} 66.6%, #ffffff 83.3%, ${MOLTEN_HALO} 100%)`
+    : metallicRingGradient(baseColor);
+  const glowFilter = allDueDone
+    ? `drop-shadow(0 0 5px #fff9e8) drop-shadow(0 0 16px ${MOLTEN_HALO}) drop-shadow(0 0 34px color-mix(in srgb, ${MOLTEN_HALO} 75%, transparent)) drop-shadow(0 0 60px color-mix(in srgb, ${MOLTEN_HALO} 45%, transparent))`
+    : `drop-shadow(0 0 4px color-mix(in srgb, ${baseColor} 70%, transparent)) drop-shadow(0 0 11px color-mix(in srgb, ${baseColor} 32%, transparent))`;
 
   return `
     <div style="display:flex; justify-content:center; margin-bottom:16px;">
-      <div style="position:relative; width:${size}px; height:${size}px;">
+      <div class="${allDueDone ? "ring-glow-pulse" : ""}" style="position:relative; width:${size}px; height:${size}px;">
         <div style="position:absolute; inset:0;
           background:rgba(255,255,255,0.16);
           -webkit-mask-image:url('${maskUrl}'); -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat; -webkit-mask-position:center;
@@ -933,11 +934,11 @@ function dayBudgetRing(dueCount, doneCount, budget, size = 200) {
           background:${gradient};
           -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
           mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;
-          filter:drop-shadow(0 0 ${innerBlur}px color-mix(in srgb, ${baseColor} 80%, transparent)) drop-shadow(0 0 ${outerBlur}px color-mix(in srgb, ${haloColor} ${outerPct}%, transparent));
+          filter:${glowFilter};
           transition:filter 0.4s, background 0.4s;"></div>
         <div style="position:absolute; inset:0;
           background:radial-gradient(circle at 32% 24%, rgba(255,255,255,0.9), transparent 55%);
-          mix-blend-mode:overlay; opacity:0.6;
+          mix-blend-mode:overlay; opacity:${allDueDone ? 0.85 : 0.6};
           -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
           mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;"></div>
         <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:${Math.round(size * 0.17)}px; font-family:var(--font-heading); color:var(--color-neutral-100); text-shadow:0 1px 4px rgba(0,0,0,0.6);">${dueCount}/${doneCount}</span>
@@ -1291,15 +1292,12 @@ function renderTodo() {
   const todoTasks = state.tasks.filter(t => (t.source || "todo") !== "category");
 
   const today = todayStr();
-  // Ring-Füllung/Farbstufe: Budget aus HEUTE erledigten Aufgaben (unabhängig vom Fälligkeitsdatum)
-  const doneTodayBudget = todoTasks
-    .filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) === today)
-    .reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
-  // Mittige Zahl + Glüh-Bedingung: heute fällige oder überfällige Aufgaben / davon abgehakte
+  // Ring-Füllung + mittige Zahl + Glüh-Bedingung: heute fällige oder überfällige Aufgaben / davon abgehakte.
+  // Jede erledigte Aufgabe füllt 1/Anzahl-fällig des Rings (bei 4 fälligen also 25% pro Erledigung).
   const dueOrOverdueAll = todoTasks.filter(t => t.dueDate && t.dueDate <= today);
   const dueOrOverdueDoneCount = dueOrOverdueAll.filter(t => t.done).length;
   const ruleEl = document.getElementById("dayRule");
-  ruleEl.innerHTML = dayBudgetRing(dueOrOverdueAll.length, dueOrOverdueDoneCount, doneTodayBudget);
+  ruleEl.innerHTML = dayBudgetRing(dueOrOverdueAll.length, dueOrOverdueDoneCount);
 
   const openTasks = todoTasks
     .filter(t => !t.done)

@@ -141,6 +141,11 @@ textarea.input { min-height: 90px; resize: vertical; }
 .atlas-row.drag-over-top::before { background: var(--color-accent-400); height: 2px; }
 .routine-drag-handle { cursor: grab; }
 .routine-drag-handle:active { cursor: grabbing; }
+@keyframes atlas-glow-pulse {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  50% { filter: brightness(1.22) saturate(1.2); }
+}
+.ring-glow-pulse { animation: atlas-glow-pulse 1.7s ease-in-out infinite; }
 .atlas-check { width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--color-divider); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: transparent; padding: 0; overflow: visible; }
 .atlas-check.checked { border-color: transparent; }
 .atlas-chip { font-size: 10px; padding: 2px 7px; border-radius: 5px; white-space: nowrap; }
