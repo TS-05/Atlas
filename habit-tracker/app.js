@@ -53,11 +53,24 @@ const STORAGE_KEY = "habit-tracker-data-v2";
 // Ordnerstruktur der Seminararbeit, aus der im Vault hinterlegten Seminararbeit_Roadmap.md übernommen.
 // Eigene Konstante (statt inline in LEBENSWISSEN), damit migrateSeminararbeitRoadmap() dieselbe Struktur
 // auch nachträglich unter einen bereits bestehenden Seminararbeit-Knoten hängen kann.
+// v2 (Stand 2026-07-25 im Vault): 5-Kapitel-Gliederung mit Seitenbudget statt der ursprünglichen
+// 4-Kapitel-Fassung — Kapitel-Nummern verschoben (2->3, 3->4), "Sauerstoffaustausch" und
+// "Optisches Verhalten" zu einem gemeinsamen "Optik und Atmung"-Unterpunkt verschmolzen.
 const SEMINARARBEIT_ROADMAP_CHILDREN = [
   "Themenfindung & Vorbereitung",
   { title: "Recherche", children: ["Stillsuit-Recherche", "Schild-Recherche", "Exzerpte & Belege"] },
-  { title: "Kapitel 2 – Stillsuit schreiben", children: ["Energiegewinnung", "Wasseraufbereitung", "Thermoregulation", "Bewertung & Fazit Stillsuit"] },
-  { title: "Kapitel 3 – Holtzman-Schild schreiben", children: ["Geschwindigkeitsabhängige Durchlässigkeit", "Absorption kinetischer Energie", "Sauerstoffaustausch", "Optisches Verhalten", "Bewertung & Fazit Schild"] },
+  { title: "Kapitel 3 – Stillsuit schreiben (ca. 6 Seiten)", children: [
+    "Thermodynamik der Körperkühlung vs. Phasenwechselmaterialien (ca. 2 Seiten)",
+    "Osmotischer Druck der Filtration vs. Graphenoxid-Membranen (ca. 1,5 Seiten)",
+    "Biomechanische Energiegewinnung vs. smarte Textilien (ca. 1 Seite)",
+    "Bewertung der realen Umsetzbarkeit – Stillsuit (ca. 0,5 Seiten)"
+  ]},
+  { title: "Kapitel 4 – Holtzman-Schild schreiben (ca. 6 Seiten)", children: [
+    "Die Geschwindigkeitsbarriere: Newtonsche Mechanik vs. Magnetohydrodynamik (ca. 2 Seiten)",
+    "Kinetische Absorption: Impulserhaltung vs. Raumzeitkrümmung (ca. 1,5 Seiten)",
+    "Optik und Atmung: Bremsstrahlung und kinetische Gastheorie (ca. 1,5 Seiten)",
+    "Bewertung der realen Umsetzbarkeit – Schild (ca. 0,5 Seiten)"
+  ]},
   "Rahmen & Vollfassung",
   "Überarbeitung & Layout",
   "Präsentation bauen & üben",
@@ -207,56 +220,57 @@ function attachSeminararbeitTasks(data, byTitle) {
   mk("Jede Quelle mit Seitenzahl und Kernaussage exzerpieren", exzerpte, false);
   mk("Bionik/Werkstofftechnik als Fundus für Alternativkonzepte markieren", exzerpte, false);
 
-  const kapitel2 = byTitle["Kapitel 2 – Stillsuit schreiben"];
-  mk("2.1 Filmisches Konzept beschreiben", kapitel2, false);
+  const kapitel3 = byTitle["Kapitel 3 – Stillsuit schreiben (ca. 6 Seiten)"];
+  mk("3.1 Filmkonzept und physiologische Grundlagen (ca. 1 Seite) — Anzugkonzept + menschlicher Wasser-/Wärmehaushalt als Vergleichsbasis", kapitel3, false);
 
-  const energiegewinnung = byTitle["Energiegewinnung"];
-  mk("Fersenpumpe: reicht Biomechanik/Energieerhaltung rechnerisch aus?", energiegewinnung, false);
-  mk("Lösungsansatz: piezoelektrische Nanodrähte im Gewebe (Bewegung → Strom)", energiegewinnung, false);
-  mk("Lösungsansatz: thermoelektrische Generatoren (Seebeck-Effekt) am Temperaturgradienten Haut/Wüste", energiegewinnung, false);
+  const thermodynamik = byTitle["Thermodynamik der Körperkühlung vs. Phasenwechselmaterialien (ca. 2 Seiten)"];
+  mk("Problem: Verdunstungs-Kondensations-Falle — 1. Hauptsatz: im geschlossenen System wird beim Kondensieren dieselbe Wärme wieder frei, Netto-Kühleffekt ≈ 0", thermodynamik, false);
+  mk("Problem: Stefan-Boltzmann-Gesetz — Strahlungshaushalt im Wüstenklima", thermodynamik, false);
+  mk("Lösungsansatz: Phasenwechselmaterialien (PCM) — Schmelzenthalpie puffert Körperwärme ohne Temperaturanstieg", thermodynamik, false);
+  mk("Lösungsansatz: Strahlungskühlung als ergänzender Mechanismus", thermodynamik, false);
 
-  const wasseraufbereitung = byTitle["Wasseraufbereitung"];
-  mk("Gegenargument: Umkehrosmose-Druckproblem — Van-'t-Hoff-Gesetz, ~60 bar nötig, Fersenpumpe unwahrscheinlich ausreichend", wasseraufbereitung, false);
-  mk("Gegenargument: Verdunstungs-Kondensations-Falle — 1. Hauptsatz: Netto-Kühleffekt ≈ 0", wasseraufbereitung, false);
-  mk("Lösungsansatz: Graphenoxid-Nanomembranen — atomare Poren lassen H₂O durch, blockieren Na⁺/Cl⁻", wasseraufbereitung, false);
+  const osmotisch = byTitle["Osmotischer Druck der Filtration vs. Graphenoxid-Membranen (ca. 1,5 Seiten)"];
+  mk("Problem: Umkehrosmose-Druckproblem — Van-'t-Hoff-Gesetz, ~60 bar nötig", osmotisch, false);
+  mk("Problem: Abrasivität von Wüstensand für Membrantechnik", osmotisch, false);
+  mk("Lösungsansatz: Graphenoxid-Nanomembranen — atomare Poren lassen H₂O durch, blockieren Na⁺/Cl⁻, senken nötigen Druck drastisch", osmotisch, false);
 
-  const thermoregulationKap = byTitle["Thermoregulation"];
-  mk("Zielkonflikt herausarbeiten: gegen Außenhitze isolieren vs. Körperwärme abführen", thermoregulationKap, false);
-  mk("Lösungsansatz: Phasenwechselmaterialien (PCM) — Schmelzenthalpie puffert Körperwärme", thermoregulationKap, false);
-  mk("Lösungsansatz: thermische Dioden — asymmetrische Wärmeleitung (Phononen-Analogon)", thermoregulationKap, false);
+  const biomechanisch = byTitle["Biomechanische Energiegewinnung vs. smarte Textilien (ca. 1 Seite)"];
+  mk("Problem: Fersenpumpe — reicht Biomechanik/Energieerhaltung rechnerisch aus?", biomechanisch, false);
+  mk("Lösungsansatz: piezoelektrische Nanodrähte im Gewebe (Bewegung → Strom)", biomechanisch, false);
+  mk("Lösungsansatz: thermoelektrische Generatoren (Seebeck-Effekt) am Temperaturgradienten Haut/Wüste", biomechanisch, false);
 
-  const bewertungStillsuit = byTitle["Bewertung & Fazit Stillsuit"];
+  const bewertungStillsuit = byTitle["Bewertung der realen Umsetzbarkeit – Stillsuit (ca. 0,5 Seiten)"];
   mk("Gesamtbewertung: mit Metamaterialien/Nanotech tendenziell plausibler als mit reiner heutiger Technik", bewertungStillsuit, false);
   mk("Fußnoten/Zitate konsolidieren", bewertungStillsuit, false);
 
-  const kapitel3 = byTitle["Kapitel 3 – Holtzman-Schild schreiben"];
-  mk("3.1 Filmisches Konzept/Regel beschreiben", kapitel3, false);
+  const kapitel4 = byTitle["Kapitel 4 – Holtzman-Schild schreiben (ca. 6 Seiten)"];
+  mk("4.1 Das filmische Konzept der selektiven Barriere (ca. 0,5 Seiten) — schnelle Kinetik geblockt, langsame Bewegungen dringen durch", kapitel4, false);
 
-  const geschwindigkeit = byTitle["Geschwindigkeitsabhängige Durchlässigkeit"];
-  mk("Vergleich mit Scherverdickung nicht-newtonscher Fluide", geschwindigkeit, false);
-  mk("Lösungsansatz: Magnetohydrodynamik — Plasmafenster + Wirbelströme/Lorentz-Kraft", geschwindigkeit, false);
-  mk("Optik-Bonus: Bremsstrahlung als Erklärung für den Farbwechsel (rot/blau)", geschwindigkeit, false);
+  const geschwindigkeitsbarriere = byTitle["Die Geschwindigkeitsbarriere: Newtonsche Mechanik vs. Magnetohydrodynamik (ca. 2 Seiten)"];
+  mk("Problem: einfaches „verdichtetes Luftfeld“ erklärt die Geschwindigkeitsschwelle nicht (Vergleich mit Scherverdickung nicht-newtonscher Fluide als Ausgangspunkt)", geschwindigkeitsbarriere, false);
+  mk("Lösungsansatz: Magnetohydrodynamik — Plasmafenster + Wirbelströme/Lorentz-Kraft erklären Geschwindigkeitsschwelle", geschwindigkeitsbarriere, false);
 
-  const absorption = byTitle["Absorption kinetischer Energie"];
-  mk("Gegenargument: Impulserhaltungs-Paradoxon — Rückstoß müsste Träger wegschleudern", absorption, false);
-  mk("Lösungsansatz (spekulativ): lokale Raumzeitkrümmung/Alcubierre-Metrik", absorption, false);
+  const kinetischeAbsorption = byTitle["Kinetische Absorption: Impulserhaltung vs. Raumzeitkrümmung (ca. 1,5 Seiten)"];
+  mk("Problem: Impulserhaltungs-/Rückstoß-Paradoxon — Rückstoß müsste Träger nach Actio=Reactio wegschleudern", kinetischeAbsorption, false);
+  mk("Lösungsansatz (spekulativ): lokale Raumzeitkrümmung/Alcubierre-Metrik — Projektil wird umgeleitet statt klassisch gestoppt, kein Impulsübertrag", kinetischeAbsorption, false);
 
-  const sauerstoff = byTitle["Sauerstoffaustausch"];
-  mk("Kinetische Gastheorie: würde der Träger im Schild ersticken?", sauerstoff, false);
+  const optikAtmung = byTitle["Optik und Atmung: Bremsstrahlung und kinetische Gastheorie (ca. 1,5 Seiten)"];
+  mk("Problem: Brechungsindex — dichtes Feld müsste Licht nach Snellius sichtbar brechen, widerspricht filmischer Transparenz", optikAtmung, false);
+  mk("Problem: kinetische Gastheorie — würde der Träger im Schild ersticken, wenn schnelle O₂-Moleküle geblockt werden?", optikAtmung, false);
+  mk("Gemeinsame Klammer: was passiert mit schnellen, kleinen Teilchen (Photonen/O₂-Moleküle) am Feld?", optikAtmung, false);
+  mk("Möglicher Erklärungsansatz: Bremsstrahlung als Ursache des im Film gezeigten Farbwechsels", optikAtmung, false);
 
-  const optisch = byTitle["Optisches Verhalten"];
-  mk("Gegenargument: Brechungsindex-Problem — dichtes Medium müsste Licht nach Snellius verzerren", optisch, false);
-  mk("Mit Seminarlehrer absprechen, ob offiziell in die Gliederung aufgenommen wird", optisch, false);
-
-  const bewertungSchild = byTitle["Bewertung & Fazit Schild"];
-  mk("Gesamtbewertung: bleibt unrealistischer als der Anzug (Impuls-/Optikproblem ungelöst) — noch offen", bewertungSchild, false);
+  const bewertungSchild = byTitle["Bewertung der realen Umsetzbarkeit – Schild (ca. 0,5 Seiten)"];
+  mk("Gesamtbewertung: bleibt trotz kreativer Lösungsansätze grundlegend unrealistischer als der Anzug (Impuls- und Optikproblem bleiben ungelöst) — noch offen, nicht vorwegnehmen", bewertungSchild, false);
   mk("Fußnoten/Zitate konsolidieren", bewertungSchild, false);
 
   const rahmen = byTitle["Rahmen & Vollfassung"];
-  mk("Kapitel 1: Problemstellung, Forschungsfrage, Methodik", rahmen, false);
-  mk("Kapitel 4: Schlussbetrachtung — Gegenüberstellung Anzug/Schild", rahmen, false);
+  mk("Kapitel 1: Einleitung (ca. 1 Seite) — Hinführung/Motivation, keine Forschungsfrage vorwegnehmen", rahmen, false);
+  mk("Kapitel 2: Problemstellung und methodisches Vorgehen (ca. 0,5 Seiten) — Forschungsfrage + deduktiver Ansatz + Methodik-Hinweis (Film statt Roman als Primärquelle)", rahmen, false);
+  mk("Kapitel 5: Schlussbetrachtung und Ausblick (ca. 1,5 Seiten) — Gegenüberstellung Anzug/Schild anhand der tatsächlichen Ergebnisse (Ausgang offen)", rahmen, false);
   mk("Literaturverzeichnis vollständig anlegen", rahmen, false);
   mk("Alle Fußnoten querchecken", rahmen, false);
+  mk("Seitenbudget gegenchecken: 1 + 0,5 + 6 + 6 + 1,5 = 15 Seiten Zielumfang", rahmen, false);
 
   const ueberarbeitung = byTitle["Überarbeitung & Layout"];
   mk("Themabezug jedes Absatzes prüfen (Themaverfehlung = 0 Punkte)", ueberarbeitung, false);
@@ -586,6 +600,67 @@ function migrateSeminararbeitRoadmap(data) {
   data.seminararbeitRoadmapApplied = true;
 }
 
+// ---------- Migration: Seminararbeit-Roadmap v2 (5-Kapitel-Gliederung mit Seitenbudget, Stand 2026-07-25) ----------
+// Ersetzt die v1-Unterordner (Kapitel 2/3, alte Unterpunkt-Titel) durch die neue Gliederung. Unterordner
+// mit bereits erledigten Aufgaben werden archiviert statt gelöscht, damit keine echte Arbeit verschwindet.
+function migrateSeminararbeitRoadmapV2(data) {
+  if (data.seminararbeitRoadmapV2Applied || !data.goalNodes) return;
+  if (!data.seminararbeitRoadmapApplied) { data.seminararbeitRoadmapV2Applied = true; return; }
+
+  const seminarNode = data.goalNodes.find(n => n.title === "Seminararbeit (wissenschaftliches Schreiben, Recherche, Zitieren)");
+  if (!seminarNode) { data.seminararbeitRoadmapV2Applied = true; return; }
+
+  function subtreeHasDoneTask(nodeId, seen = new Set()) {
+    if (seen.has(nodeId)) return false;
+    seen.add(nodeId);
+    if (data.tasks.some(t => t.nodeId === nodeId && t.done)) return true;
+    return data.goalNodes.filter(n => n.parentId === nodeId).some(c => subtreeHasDoneTask(c.id, seen));
+  }
+
+  let archiveRootId = null;
+  function ensureArchiveRoot() {
+    if (archiveRootId) return archiveRootId;
+    archiveRootId = uid();
+    data.goalNodes.push({ id: archiveRootId, parentId: null, title: "Archiv (alte Seminararbeit-Gliederung)", priority: false });
+    return archiveRootId;
+  }
+
+  const oldChildren = data.goalNodes.filter(n => n.parentId === seminarNode.id);
+  const idsToDelete = new Set();
+  oldChildren.forEach(child => {
+    if (subtreeHasDoneTask(child.id)) {
+      child.parentId = ensureArchiveRoot();
+      child.title = child.title + " (alt)";
+    } else {
+      const stack = [child.id];
+      idsToDelete.add(child.id);
+      while (stack.length) {
+        const id = stack.pop();
+        data.goalNodes.filter(n => n.parentId === id).forEach(c => { idsToDelete.add(c.id); stack.push(c.id); });
+      }
+    }
+  });
+  if (idsToDelete.size) {
+    data.tasks = data.tasks.filter(t => !idsToDelete.has(t.nodeId));
+    data.goalNodes = data.goalNodes.filter(n => !idsToDelete.has(n.id));
+  }
+
+  const byTitle = {};
+  function buildNode(node, parentId) {
+    const id = uid();
+    const title = typeof node === "string" ? node : node.title;
+    data.goalNodes.push({ id, parentId, title, priority: false });
+    byTitle[title] = id;
+    const children = typeof node === "string" ? null : node.children;
+    (children || []).forEach(child => buildNode(child, id));
+    return id;
+  }
+  SEMINARARBEIT_ROADMAP_CHILDREN.forEach(child => buildNode(child, seminarNode.id));
+  attachSeminararbeitTasks(data, byTitle);
+
+  data.seminararbeitRoadmapV2Applied = true;
+}
+
 // ---------- Migration: von der enzyklopädischen 18er-Struktur zur zielorientierten Struktur (Phase 7.11) ----------
 // "Glaube" bleibt (ID/Inhalt erhalten, nur neue Unterpunkte ergänzt). Alle anderen alten Wurzeln: wenn
 // irgendwo im Teilbaum Aufgaben/Gewohnheiten hängen, werden sie unter "Archiv (alte Bereiche)" verschoben
@@ -688,6 +763,7 @@ migrateBereicheNaming(state);
 migrateReisenToPlanung(state);
 migrateToGoalDrivenStructure(state);
 migrateSeminararbeitRoadmap(state);
+migrateSeminararbeitRoadmapV2(state);
 migrateLearningOrder(state);
 repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
@@ -707,7 +783,7 @@ function seedData() {
     goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [],
     // Frische Seed-Daten entsprechen bereits der aktuellen Struktur — alle Migrationen sollen hier no-op sein
     bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true,
-    seminararbeitRoadmapApplied: true, learningOrderApplied: true
+    seminararbeitRoadmapApplied: true, seminararbeitRoadmapV2Applied: true, learningOrderApplied: true
   };
   const c = (title, parentId = null, priority = false) => {
     const id = uid();
