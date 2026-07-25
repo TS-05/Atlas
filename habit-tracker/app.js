@@ -1295,11 +1295,11 @@ function renderTodo() {
   const doneTodayBudget = todoTasks
     .filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) === today)
     .reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
-  // Mittige Zahl + Glüh-Bedingung: heute fällig / davon heute erledigt
-  const dueTodayAll = todoTasks.filter(t => t.dueDate === today);
-  const dueTodayDoneCount = dueTodayAll.filter(t => t.done).length;
+  // Mittige Zahl + Glüh-Bedingung: heute fällige oder überfällige Aufgaben / davon abgehakte
+  const dueOrOverdueAll = todoTasks.filter(t => t.dueDate && t.dueDate <= today);
+  const dueOrOverdueDoneCount = dueOrOverdueAll.filter(t => t.done).length;
   const ruleEl = document.getElementById("dayRule");
-  ruleEl.innerHTML = dayBudgetRing(dueTodayAll.length, dueTodayDoneCount, doneTodayBudget);
+  ruleEl.innerHTML = dayBudgetRing(dueOrOverdueAll.length, dueOrOverdueDoneCount, doneTodayBudget);
 
   const openTasks = todoTasks
     .filter(t => !t.done)
