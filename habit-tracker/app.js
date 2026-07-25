@@ -872,18 +872,24 @@ function miniProgressRing(pct, size = 30) {
 
 // Anlassfarben von Stahl: 0-2 Budget-Einheiten = grau (füllt den Ring), danach Farbwechsel bei Überschuss
 const STEEL_STAGES = [
-  { min: 0, color: "#8a93a3", glow: false }, // stahlgrau
-  { min: 2, color: "#e8d577", glow: false }, // strohgelb
-  { min: 3, color: "#d4af37", glow: false }, // gold
-  { min: 4, color: "#8b5a2b", glow: false }, // braun/kupfer
-  { min: 5, color: "#7b3f61", glow: false }, // purpur
-  { min: 6, color: "#3b5b92", glow: false }, // blau
-  { min: 7, color: "#ff6a3d", glow: true }   // glühend
+  { min: 0, color: "#8a93a3" }, // stahlgrau
+  { min: 2, color: "#e8d577" }, // strohgelb
+  { min: 3, color: "#d4af37" }, // gold
+  { min: 4, color: "#8b5a2b" }, // braun/kupfer
+  { min: 5, color: "#7b3f61" }, // purpur
+  { min: 6, color: "#3b5b92" }, // blau
+  { min: 7, color: "#ff6a3d" }  // rotglühend
 ];
-function steelStageFor(budget) {
-  let stage = STEEL_STAGES[0];
-  STEEL_STAGES.forEach(s => { if (budget >= s.min) stage = s; });
-  return stage;
+// Fließender Übergang zwischen den Anlassfarben statt harter Sprünge an den Stufengrenzen.
+function steelColorFor(budget) {
+  for (let i = 0; i < STEEL_STAGES.length - 1; i++) {
+    const cur = STEEL_STAGES[i], next = STEEL_STAGES[i + 1];
+    if (budget < next.min) {
+      const t = (budget - cur.min) / (next.min - cur.min);
+      return lerpColor(cur.color, next.color, Math.max(0, Math.min(1, t)));
+    }
+  }
+  return STEEL_STAGES[STEEL_STAGES.length - 1].color;
 }
 // Metallischer Ring-Farbverlauf im selben 7-Stop-Muster wie der Wochenkreis (dunkel-hell-mittel-hell-dunkel-hell-dunkel),
 // aber für eine beliebige Anlassfarbe statt fix Gold — so bekommt jede Stahl-Stufe denselben glänzenden Metall-Look.
@@ -896,17 +902,25 @@ function metallicRingGradient(base) {
 
 // ToDo-Ring: exakt dieselbe Ring-Masken-Technik wie der Wochenkreis (renderWeekCircle), nur füllt er sich
 // pro erledigter Aufgabe (klein = halb, groß = ganz) statt nach Tagesroutine-Quote, und startet metallisch
-// stahlgrau glänzend, um sich bei Überschuss durch die Anlassfarben von heißem Stahl bis zum Glühen zu verändern.
+// stahlgrau glänzend, um sich mit fließenden Übergängen durch die Anlassfarben von heißem Stahl zu verändern.
+// Glüht (weißgelb-flüssig mit orangenem Halo, wie echtes glühendes Metall) sobald alle heute fälligen
+// Aufgaben erledigt sind — unabhängig von der Budget-Stufe.
+const MOLTEN_COLOR = "#fff1c4";
+const MOLTEN_HALO = "#ff7a1a";
+
 function dayBudgetRing(dueCount, doneCount, budget, size = 200) {
   const pct = Math.min(100, Math.round((budget / 2) * 100));
-  const stage = steelStageFor(budget);
+  const allDueDone = dueCount > 0 && doneCount >= dueCount;
+  const baseColor = allDueDone ? MOLTEN_COLOR : steelColorFor(budget);
   const today = new Date();
   const todayIdx = (today.getDay() + 6) % 7;
   const maskUrl = `assets/${RING_MASKS[todayIdx]}`;
   const percentMask = conicPercentMask(pct);
-  const gradient = metallicRingGradient(stage.color);
-  const glowBlur = stage.glow ? 14 : 5;
-  const glowPct = stage.glow ? 90 : 50;
+  const gradient = metallicRingGradient(baseColor);
+  const haloColor = allDueDone ? MOLTEN_HALO : baseColor;
+  const innerBlur = allDueDone ? 8 : 5;
+  const outerBlur = allDueDone ? 28 : 8;
+  const outerPct = allDueDone ? 85 : 35;
 
   return `
     <div style="display:flex; justify-content:center; margin-bottom:16px;">
@@ -919,8 +933,8 @@ function dayBudgetRing(dueCount, doneCount, budget, size = 200) {
           background:${gradient};
           -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
           mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;
-          filter:drop-shadow(0 0 ${glowBlur}px color-mix(in srgb, ${stage.color} ${glowPct}%, transparent));
-          transition:filter 0.4s;"></div>
+          filter:drop-shadow(0 0 ${innerBlur}px color-mix(in srgb, ${baseColor} 80%, transparent)) drop-shadow(0 0 ${outerBlur}px color-mix(in srgb, ${haloColor} ${outerPct}%, transparent));
+          transition:filter 0.4s, background 0.4s;"></div>
         <div style="position:absolute; inset:0;
           background:radial-gradient(circle at 32% 24%, rgba(255,255,255,0.9), transparent 55%);
           mix-blend-mode:overlay; opacity:0.6;
@@ -1253,8 +1267,9 @@ function renderTaskItem(t) {
   const metaParts = isLernfeld ? [] : [t.size === "gross" ? "Groß" : "Klein"];
   if (t.dueDate) metaParts.push("fällig " + t.dueDate + (t.dueTime ? " " + t.dueTime : ""));
   if (node && !isLernfeld) metaParts.push(node.title);
+  const dueToday = t.dueDate === today;
   const el = document.createElement("div");
-  el.className = "atlas-row" + (t.done ? " done" : "");
+  el.className = "atlas-row" + (t.done ? " done" : "") + (dueToday ? " gold-frame" : "");
   el.innerHTML = `
     <button class="atlas-check${t.done ? " checked" : ""}" data-task="${t.id}">${t.done ? splatSvg(t.id) : ""}</button>
     ${isLernfeld ? `<span style="color:var(--color-accent-400); flex-shrink:0;" title="${escapeHtml(lerntyp.label)}">${lerntyp.icon}</span>` : ""}
@@ -1276,11 +1291,15 @@ function renderTodo() {
   const todoTasks = state.tasks.filter(t => (t.source || "todo") !== "category");
 
   const today = todayStr();
-  const openTodayTasks = todoTasks.filter(t => t.dueDate === today && !t.done);
-  const doneTodayTasks = todoTasks.filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) === today);
-  const doneTodayBudget = doneTodayTasks.reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
+  // Ring-Füllung/Farbstufe: Budget aus HEUTE erledigten Aufgaben (unabhängig vom Fälligkeitsdatum)
+  const doneTodayBudget = todoTasks
+    .filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) === today)
+    .reduce((sum, t) => sum + (t.size === "gross" ? 2 : 1), 0);
+  // Mittige Zahl + Glüh-Bedingung: heute fällig / davon heute erledigt
+  const dueTodayAll = todoTasks.filter(t => t.dueDate === today);
+  const dueTodayDoneCount = dueTodayAll.filter(t => t.done).length;
   const ruleEl = document.getElementById("dayRule");
-  ruleEl.innerHTML = dayBudgetRing(openTodayTasks.length, doneTodayTasks.length, doneTodayBudget);
+  ruleEl.innerHTML = dayBudgetRing(dueTodayAll.length, dueTodayDoneCount, doneTodayBudget);
 
   const openTasks = todoTasks
     .filter(t => !t.done)
