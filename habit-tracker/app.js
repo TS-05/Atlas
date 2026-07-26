@@ -1121,7 +1121,7 @@ function updateHeaderPlusButton() {
   const btn = document.getElementById("headerPlusBtn");
   if (tab === "zielbereiche") {
     icon.innerHTML = HEADER_ICON_SEARCH;
-    btn.setAttribute("aria-label", "Bereiche durchsuchen");
+    btn.setAttribute("aria-label", "Roadmap durchsuchen");
   } else if (tab === "analyse") {
     icon.innerHTML = HEADER_ICON_DOWNLOAD;
     btn.setAttribute("aria-label", "Wochendaten herunterladen");
@@ -1766,7 +1766,7 @@ function renderGoalBrowser() {
   const q = bereicheSearchQuery.trim().toLowerCase();
   const roots = q ? childNodes(null).filter(n => subtreeMatchesQuery(n, q)) : childNodes(null);
   if (roots.length === 0) {
-    wrap.innerHTML = q ? '<div class="empty-hint">Keine Bereiche gefunden.</div>' : '<div class="empty-hint">Noch keine Bereiche angelegt.</div>';
+    wrap.innerHTML = q ? '<div class="empty-hint">Keine Roadmap-Punkte gefunden.</div>' : '<div class="empty-hint">Noch keine Roadmap angelegt.</div>';
     return;
   }
   roots.forEach(node => wrap.appendChild(renderTreeNode(node, 0, q)));
