@@ -2050,6 +2050,51 @@ function isOnTime(task) {
 }
 
 // ---------- Render all ----------
+// ---------- Benachrichtigung: 2x hintereinander verpasste Tagesroutine ----------
+// Zählt rückwärts ab gestern, wie viele SCHEDULED Tage in Folge ein Routine-Schritt nicht erledigt wurde
+// (heute zählt bewusst nicht mit, da der Tag noch nicht vorbei ist).
+function consecutiveMissedDays(habit) {
+  let count = 0;
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const createdDate = new Date(habit.createdAt);
+  let guard = 0;
+  while (guard++ < 60) {
+    if (d < createdDate) break;
+    if (!isScheduledToday(habit, d)) { d.setDate(d.getDate() - 1); continue; }
+    const key = localDateKey(d);
+    if (habit.history[key]) break;
+    count++;
+    d.setDate(d.getDate() - 1);
+  }
+  return count;
+}
+
+function checkMissedRoutineStreaks() {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  let changed = false;
+  state.habits.filter(h => h.routineOrder != null).forEach(h => {
+    const missed = consecutiveMissedDays(h);
+    if (missed >= 2) {
+      if (!h.missNotified) {
+        new Notification("Atlas – Tagesroutine", { body: `„${h.title}" wurde 2x hintereinander nicht erledigt.` });
+        h.missNotified = true;
+        changed = true;
+      }
+    } else if (h.missNotified) {
+      h.missNotified = false;
+      changed = true;
+    }
+  });
+  if (changed) saveData();
+}
+
+function updateNotifPermissionUI() {
+  const row = document.getElementById("notifPermissionRow");
+  if (!row) return;
+  row.style.display = ("Notification" in window && Notification.permission === "default") ? "flex" : "none";
+}
+
 function renderAll() {
   renderWeekCircle();
   renderDeviationLog();
@@ -2061,6 +2106,8 @@ function renderAll() {
   renderPlanning();
   renderPrayers();
   renderWeekStats();
+  updateNotifPermissionUI();
+  checkMissedRoutineStreaks();
 }
 
 // ---------- Event delegation ----------
@@ -2097,7 +2144,7 @@ document.addEventListener("click", e => {
     const habit = state.habits.find(h => h.id === habitCheck.dataset.habit);
     const key = todayStr();
     if (habit.history[key]) delete habit.history[key];
-    else habit.history[key] = true;
+    else { habit.history[key] = true; habit.missNotified = false; }
     saveData();
     renderAll();
     return;
@@ -2298,6 +2345,13 @@ document.getElementById("addDeviationBtn").addEventListener("click", () => {
   const input = document.getElementById("deviationInput");
   addDeviation(input.value);
   input.value = "";
+});
+document.getElementById("enableNotifBtn").addEventListener("click", () => {
+  if (!("Notification" in window)) return;
+  Notification.requestPermission().then(() => {
+    updateNotifPermissionUI();
+    checkMissedRoutineStreaks();
+  });
 });
 
 function openTaskModal(defaultNodeId, source = "todo") {
