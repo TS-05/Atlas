@@ -783,6 +783,7 @@ state.deviations = state.deviations || [];
 state.weeklyReflection = state.weeklyReflection || {};
 state.prayers = state.prayers || [];
 state.subjectOverride = state.subjectOverride || {};
+state.badDayMode = state.badDayMode || false;
 saveData();
 
 const expandedNodes = new Set(); // Laufzeit-Status des Bereiche-Akkordeons (nicht persistiert)
@@ -1457,8 +1458,10 @@ function renderWeekCircle() {
   const todayKey = todayStr();
   const todayIdx = (today.getDay() + 6) % 7; // Mo=0 ... So=6
 
-  // Nur die Tagesroutine zählt für den Wochenkreis, weitere Gewohnheiten nicht
-  const scheduled = state.habits.filter(h => h.routineOrder != null && new Date(h.createdAt) <= today && isScheduledToday(h, today));
+  // Nur die Tagesroutine zählt für den Wochenkreis, weitere Gewohnheiten nicht.
+  // An einem "schlechten Tag" zählt nur die als Mindestversion markierte Teilmenge (falls vorhanden).
+  let scheduled = state.habits.filter(h => h.routineOrder != null && new Date(h.createdAt) <= today && isScheduledToday(h, today));
+  if (state.badDayMode && scheduled.some(h => h.essential)) scheduled = scheduled.filter(h => h.essential);
   const done = scheduled.filter(h => {
     const v = h.history[todayKey];
     return h.type === "weight" ? (v !== undefined && v !== null) : !!v;
@@ -1595,6 +1598,18 @@ function dragHandleHtml(habitId) {
   return `
     <button class="btn btn-icon btn-ghost routine-drag-handle" data-drag-handle="${habitId}" aria-label="Ziehen zum Verschieben" style="touch-action:none; cursor:grab;">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="4" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="9" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="9" r="1" fill="var(--color-neutral-400)"/></svg>
+    </button>
+  `;
+}
+
+// Stern zum Markieren, ob ein Routine-Schritt zur "Mindestversion für schlechte Tage" gehört
+// (nur im Bearbeiten-Modus sichtbar, wie der Zieh-Griff).
+function essentialToggleHtml(habit) {
+  if (!quickAddVisible) return "";
+  const on = !!habit.essential;
+  return `
+    <button class="btn btn-icon btn-ghost" data-toggle-essential="${habit.id}" aria-label="Zur Mindestversion für schlechte Tage" title="Zur Mindestversion für schlechte Tage" style="color:${on ? "var(--color-accent-300)" : "var(--color-neutral-500)"};">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="${on ? "currentColor" : "none"}"><path d="M7 1.5L8.6 5L12.5 5.5L9.7 8.1L10.4 12L7 10.1L3.6 12L4.3 8.1L1.5 5.5L5.4 5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
     </button>
   `;
 }
@@ -1786,12 +1801,16 @@ function renderRoutineChain() {
   const today = todayStr();
   const now = new Date();
 
-  const chainHabits = state.habits
+  let chainHabits = state.habits
     .filter(h => h.routineOrder != null && isScheduledToday(h, now))
     .sort((a, b) => a.routineOrder - b.routineOrder);
+  const badDayFiltered = state.badDayMode && chainHabits.some(h => h.essential);
+  if (badDayFiltered) chainHabits = chainHabits.filter(h => h.essential);
 
   if (chainHabits.length === 0) {
-    wrap.innerHTML = '<div class="empty-hint">Keine Routine-Schritte für heute konfiguriert.</div>';
+    wrap.innerHTML = state.badDayMode
+      ? '<div class="empty-hint">Keine Mindest-Punkte markiert — markiere Routine-Schritte mit dem Stern, um sie hier an schlechten Tagen zu behalten.</div>'
+      : '<div class="empty-hint">Keine Routine-Schritte für heute konfiguriert.</div>';
     return;
   }
 
@@ -1830,6 +1849,7 @@ function renderRoutineChain() {
         ${noteHtml}
       </div>
       ${weightInputHtml}
+      ${essentialToggleHtml(h)}
       ${dragHandleHtml(h.id)}
     `;
     wrap.appendChild(el);
@@ -2229,6 +2249,7 @@ function updateNotifPermissionUI() {
 }
 
 function renderAll() {
+  updateBadDayToggleUI();
   renderWeekCircle();
   renderDeviationLog();
   renderRoutineChain();
@@ -2280,6 +2301,13 @@ document.addEventListener("click", e => {
     else { habit.history[key] = true; habit.missNotified = false; }
     saveData();
     renderAll();
+    return;
+  }
+  const essentialBtn = e.target.closest("[data-toggle-essential]");
+  if (essentialBtn) {
+    const habit = state.habits.find(h => h.id === essentialBtn.dataset.toggleEssential);
+    if (habit) habit.essential = !habit.essential;
+    saveData(); renderAll();
     return;
   }
   if (e.target.matches("[data-del-task]")) {
@@ -2488,6 +2516,18 @@ document.getElementById("enableNotifBtn").addEventListener("click", () => {
     checkMissedRoutineStreaks();
   });
 });
+document.getElementById("badDayToggleBtn").addEventListener("click", () => {
+  state.badDayMode = !state.badDayMode;
+  saveData();
+  renderAll();
+});
+function updateBadDayToggleUI() {
+  const btn = document.getElementById("badDayToggleBtn");
+  if (!btn) return;
+  btn.classList.toggle("btn-primary", state.badDayMode);
+  btn.classList.toggle("btn-secondary", !state.badDayMode);
+  btn.textContent = state.badDayMode ? "Schlechter Tag ✓" : "Schlechter Tag";
+}
 
 function openTaskModal(defaultNodeId, source = "todo") {
   const node = defaultNodeId ? nodeById(defaultNodeId) : null;
