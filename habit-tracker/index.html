@@ -110,17 +110,30 @@
     <section id="tab-gebete" class="tab-panel">
       <h1>Gebete</h1>
 
-      <div class="card elev-sm hidden" id="prayerAddCard" style="margin-bottom: 14px; flex-direction: row; gap: 8px; display:none;">
+      <div class="card elev-sm hidden" id="prayerAddCard" style="margin-bottom: 14px; flex-direction: column; gap: 8px; display:none;">
         <input class="input" id="prayerInput" placeholder="Wofür möchtest du beten?">
-        <button class="btn btn-primary" id="savePrayerBtn">Speichern</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary" id="prayerTypeBitte" data-prayer-type-btn="bitte" style="flex:1;">Bitte</button>
+          <button class="btn btn-secondary" id="prayerTypeDank" data-prayer-type-btn="dank" style="flex:1;">Dank</button>
+        </div>
+        <button class="btn btn-primary btn-block" id="savePrayerBtn">Speichern</button>
       </div>
 
-      <div id="prayerList" class="list" style="margin-bottom: 18px;"></div>
+      <h6 class="metal-gold">Bitte</h6>
+      <div id="prayerListBitte" class="list" style="margin-bottom: 18px;"></div>
 
-      <div class="card elev-sm">
+      <h6 class="metal-gold">Dank</h6>
+      <div id="prayerListDank" class="list" style="margin-bottom: 18px;"></div>
+
+      <div class="card elev-sm" style="margin-bottom: 14px;">
         <div class="card-title" style="font-size: 14px;">Erhörungen</div>
         <p class="card-body">Beantwortete Anliegen mit Datum, Text und Anhang.</p>
         <div id="prayerArchive" class="list"></div>
+      </div>
+
+      <div class="card elev-sm">
+        <div class="card-title" style="font-size: 14px;">Nicht mehr relevant</div>
+        <div id="prayerIrrelevantList" class="list"></div>
       </div>
     </section>
 

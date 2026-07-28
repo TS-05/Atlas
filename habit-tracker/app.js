@@ -193,7 +193,7 @@ function attachSeminararbeitTasks(data, byTitle) {
     data.tasks.push({
       id: uid(), title, nodeId, dueDate: dueDate || null, dueTime: null,
       done: !!done, completedAt: done ? new Date().toISOString() : null,
-      createdAt: new Date().toISOString(), size: "klein", priority: 0, source: "category"
+      createdAt: new Date().toISOString(), size: 2, priority: 0, source: "category"
     });
   };
 
@@ -661,6 +661,15 @@ function migrateSeminararbeitRoadmapV2(data) {
   data.seminararbeitRoadmapV2Applied = true;
 }
 
+// ---------- Migration: Aufgaben-Größe "klein"/"groß" -> 5-stufige Aufwandsskala ----------
+function migrateTaskEffortLevels(data) {
+  if (data.taskEffortLevelsApplied || !data.tasks) return;
+  data.tasks.forEach(t => {
+    if (typeof t.size === "string") t.size = t.size === "gross" ? 4 : 2;
+  });
+  data.taskEffortLevelsApplied = true;
+}
+
 // ---------- Migration: von der enzyklopädischen 18er-Struktur zur zielorientierten Struktur (Phase 7.11) ----------
 // "Glaube" bleibt (ID/Inhalt erhalten, nur neue Unterpunkte ergänzt). Alle anderen alten Wurzeln: wenn
 // irgendwo im Teilbaum Aufgaben/Gewohnheiten hängen, werden sie unter "Archiv (alte Bereiche)" verschoben
@@ -764,6 +773,7 @@ migrateReisenToPlanung(state);
 migrateToGoalDrivenStructure(state);
 migrateSeminararbeitRoadmap(state);
 migrateSeminararbeitRoadmapV2(state);
+migrateTaskEffortLevels(state);
 migrateLearningOrder(state);
 repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
@@ -783,7 +793,7 @@ function seedData() {
     goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [],
     // Frische Seed-Daten entsprechen bereits der aktuellen Struktur — alle Migrationen sollen hier no-op sein
     bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true,
-    seminararbeitRoadmapApplied: true, seminararbeitRoadmapV2Applied: true, learningOrderApplied: true
+    seminararbeitRoadmapApplied: true, seminararbeitRoadmapV2Applied: true, taskEffortLevelsApplied: true, learningOrderApplied: true
   };
   const c = (title, parentId = null, priority = false) => {
     const id = uid();
@@ -797,10 +807,10 @@ function seedData() {
       type: extra.type || "check"
     });
   };
-  const t = (title, nodeId, dueDate, size = "klein", priority = 0) => {
+  const t = (title, nodeId, dueDate, size = 1, priority = 0) => {
     data.tasks.push({ id: uid(), title, nodeId, dueDate, dueTime: null, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source: "category" });
   };
-  const td = (title, dueDate, size = "klein", priority = 0, done = false) => {
+  const td = (title, dueDate, size = 1, priority = 0, done = false) => {
     data.tasks.push({
       id: uid(), title, nodeId: null, dueDate, dueTime: null, done,
       completedAt: done ? new Date().toISOString() : null,
@@ -834,7 +844,7 @@ function seedData() {
   const glaube = rootId["Glaube"];
   h("Bibellese / stille Zeit", glaube, "daily", { routineOrder: 4 });
   h("Abendlektüre 30 Min. vor dem Schlafen", glaube, "daily", { routineOrder: 8 });
-  t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, "gross", 5);
+  t("Glaubenskurs \"Fest gegründet\" fertigstellen (~1,5 Std. Restaufwand)", glaube, null, 3, 5);
 
   const gesundheitSport = rootId["Gesundheit & Sport"];
   h("Joggen 5,5 km", gesundheitSport, "daily", { routineOrder: 5 });
@@ -843,7 +853,7 @@ function seedData() {
   const schule = byTitle["Schule"];
   const studium = byTitle["Studium"];
   h("Lernen / Schularbeit 60–90 Min.", schule, "weekdays", { routineOrder: 6 });
-  t("Bewerbungen duales Studium abschicken", studium, "2026-07-13", "gross", 5);
+  t("Bewerbungen duales Studium abschicken", studium, "2026-07-13", 3, 5);
   s("Englisch");
   s("Deutsch");
   s("BWL");
@@ -858,19 +868,19 @@ function seedData() {
   h("Lesen (ca. 1 Buch/Monat)", rootId["Kreatives Schaffen"], "daily");
 
   // Aktuelle ToDo's (Stand 21.07.2026)
-  td("Montag 27.7.2026 Planen", "2026-07-21", "klein", 4);
-  td("Bewerbung Porsche", "2026-07-21", "klein", 2);
-  td("Bewerbung BMW", "2026-07-21", "klein", 2);
-  td("Themenfrage und Gliederung abklären", "2026-07-24", "klein", 5);
-  td("Portfolio ausfüllen", "2026-07-24", "gross", 4);
-  td("App inhalt machen für Bereiche", "2026-07-26", "gross", 1);
-  td("Fertige Gliederung", "2026-07-31", "gross", 5);
-  td("Buch fertig", "2026-07-31", "gross", 5);
-  td("Gefühle Kapitel 2", "2026-07-31", "klein", 2);
-  td("Gefühle Kapitel 2", "2026-08-01", "klein", 2);
-  td("Arbeitsheft Gefühle bis Kapitel 3", "2026-08-02", "klein", 2);
-  td("Fertige Themenfrage", "2026-07-31", "gross", 5, true);
-  td("Anja klären Montag 27.7.", "2026-07-21", "klein", 5, true);
+  td("Montag 27.7.2026 Planen", "2026-07-21", 1, 4);
+  td("Bewerbung Porsche", "2026-07-21", 2, 2);
+  td("Bewerbung BMW", "2026-07-21", 2, 2);
+  td("Themenfrage und Gliederung abklären", "2026-07-24", 2, 5);
+  td("Portfolio ausfüllen", "2026-07-24", 3, 4);
+  td("App inhalt machen für Bereiche", "2026-07-26", 4, 1);
+  td("Fertige Gliederung", "2026-07-31", 3, 5);
+  td("Buch fertig", "2026-07-31", 5, 5);
+  td("Gefühle Kapitel 2", "2026-07-31", 2, 2);
+  td("Gefühle Kapitel 2", "2026-08-01", 2, 2);
+  td("Arbeitsheft Gefühle bis Kapitel 3", "2026-08-02", 2, 2);
+  td("Fertige Themenfrage", "2026-07-31", 3, 5, true);
+  td("Anja klären Montag 27.7.", "2026-07-21", 1, 5, true);
 
   // Aktuelle Gebetsanliegen (Stand 21.07.2026)
   pr("Geld um Versicherung und Schilden zurück zu Zahlen");
@@ -992,9 +1002,11 @@ function dayBudgetRing(dueCount, doneCount, size = 200) {
   const todayIdx = (today.getDay() + 6) % 7;
   const maskUrl = `assets/${RING_MASKS[todayIdx]}`;
   const percentMask = conicPercentMask(pct);
-  const gradient = allDueDone
-    ? `conic-gradient(from -90deg, ${MOLTEN_COLOR} 0%, #ffffff 16.6%, ${MOLTEN_HALO} 33.3%, #ffffff 50%, ${MOLTEN_COLOR} 66.6%, #ffffff 83.3%, ${MOLTEN_HALO} 100%)`
-    : metallicRingGradient(baseColor);
+  // Bei 100% (glühend) denselben nahtlosen Metall-Verlauf wie sonst nutzen (erster/letzter Stop
+  // identisch, kein harter Rand bei 0°) statt eines eigenen Musters mit Orange-Bändern im Ring
+  // selbst — das Orange gehört nur in den nach außen auslaufenden Halo (drop-shadow unten), der
+  // Ring selbst bleibt gleichmäßig gelblich-weiß glühend.
+  const gradient = metallicRingGradient(baseColor);
   const glowFilter = allDueDone
     ? `drop-shadow(0 0 5px #fff9e8) drop-shadow(0 0 16px ${MOLTEN_HALO}) drop-shadow(0 0 34px color-mix(in srgb, ${MOLTEN_HALO} 75%, transparent)) drop-shadow(0 0 60px color-mix(in srgb, ${MOLTEN_HALO} 45%, transparent))`
     : `drop-shadow(0 0 4px color-mix(in srgb, ${baseColor} 70%, transparent)) drop-shadow(0 0 11px color-mix(in srgb, ${baseColor} 32%, transparent))`;
@@ -1093,6 +1105,19 @@ const HEADER_ICON_SEARCH = '<svg width="14" height="14" viewBox="0 0 14 14" fill
 const HEADER_ICON_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V9.5M4 6.5L7 9.5L10 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 11.5V12.5H12V11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
 // ---------- Lernfeldaufgaben: Aufgabentypen mit Icon (statt Klein/Groß, für source="category") ----------
+// Aufwandsstufen für Aufgaben (task.size): fünf Stufen mit grobem Zeitrahmen statt nur klein/groß.
+const EFFORT_LEVELS = [
+  { level: 1, label: "Erster Gedanke", time: "1–5 Min." },
+  { level: 2, label: "Kurzaufgabe", time: "5–30 Min." },
+  { level: 3, label: "Mittlere Aufgabe", time: "30 Min. – 2 Std." },
+  { level: 4, label: "Größere Aufgabe", time: "halber – 1 Tag" },
+  { level: 5, label: "Große Aufgabe", time: "1 – 1,5 Wochen" }
+];
+function effortLevelInfo(size) {
+  const n = typeof size === "number" ? size : (size === "gross" ? 4 : 1);
+  return EFFORT_LEVELS.find(e => e.level === n) || EFFORT_LEVELS[0];
+}
+
 const LERNTYPEN = [
   { id: "video", label: "Video schauen", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M6 4.8L9.2 7L6 9.2V4.8Z" fill="currentColor"/></svg>' },
   { id: "podcast", label: "Podcast/Hörbuch anhören", icon: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 6V8M5 4V10M7 2.5V11.5M9 4V10M11.5 6V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>' },
@@ -1161,6 +1186,17 @@ document.getElementById("bereicheSearchInput").addEventListener("input", e => {
 document.getElementById("addRoutineBtn").addEventListener("click", () => openHabitModal(true));
 document.getElementById("savePrayerBtn").addEventListener("click", savePrayerFromInline);
 document.getElementById("prayerInput").addEventListener("keydown", e => { if (e.key === "Enter") savePrayerFromInline(); });
+
+let prayerAddType = "bitte";
+function updatePrayerTypeButtons() {
+  document.getElementById("prayerTypeBitte").classList.toggle("btn-primary", prayerAddType === "bitte");
+  document.getElementById("prayerTypeBitte").classList.toggle("btn-secondary", prayerAddType !== "bitte");
+  document.getElementById("prayerTypeDank").classList.toggle("btn-primary", prayerAddType === "dank");
+  document.getElementById("prayerTypeDank").classList.toggle("btn-secondary", prayerAddType !== "dank");
+}
+document.getElementById("prayerTypeBitte").addEventListener("click", () => { prayerAddType = "bitte"; updatePrayerTypeButtons(); });
+document.getElementById("prayerTypeDank").addEventListener("click", () => { prayerAddType = "dank"; updatePrayerTypeButtons(); });
+updatePrayerTypeButtons();
 
 document.getElementById("todayLabel").textContent = new Date().toLocaleDateString("de-DE", {
   weekday: "long", day: "2-digit", month: "long", year: "numeric"
@@ -1341,7 +1377,7 @@ function renderTaskItem(t) {
   const node = nodeById(t.nodeId);
   const isLernfeld = t.source === "category" && t.learnType;
   const lerntyp = isLernfeld ? lerntypById(t.learnType) : null;
-  const metaParts = isLernfeld ? [] : [t.size === "gross" ? "Groß" : "Klein"];
+  const metaParts = isLernfeld ? [] : [`${effortLevelInfo(t.size).level} · ${effortLevelInfo(t.size).label}`];
   if (t.dueDate) metaParts.push("fällig " + t.dueDate + (t.dueTime ? " " + t.dueTime : ""));
   if (node && !isLernfeld) metaParts.push(node.title);
   const dueToday = t.dueDate === today;
@@ -1645,6 +1681,103 @@ function initRoutineDragReorder() {
 
   wrap.addEventListener("pointerup", () => endDrag(true));
   wrap.addEventListener("pointercancel", () => endDrag(false));
+}
+
+// ---------- Generischer Drag-Reorder für einfache, flache Listen (z.B. Gebete) — gleiche
+// Pointer-Technik wie initRoutineDragReorder, nur parametrisiert über Container/Attribute. ----------
+function initDragReorder(containerId, handleAttr, rowIdAttr, onCommit) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  let dragEl = null, dragId = null, startY = 0, originalTops = [], heights = [], visibleIds = [], dragOriginalIndex = 0, currentDropIndex = 0;
+
+  function clearDropIndicators() {
+    wrap.querySelectorAll(".atlas-row").forEach(r => r.classList.remove("drag-over-top"));
+  }
+
+  wrap.addEventListener("pointerdown", e => {
+    const handle = e.target.closest(`[${handleAttr}]`);
+    if (!handle) return;
+    e.preventDefault();
+    dragEl = handle.closest(".atlas-row");
+    dragId = handle.getAttribute(handleAttr);
+    const rows = [...wrap.querySelectorAll(".atlas-row")];
+    visibleIds = rows.map(r => r.getAttribute(rowIdAttr));
+    originalTops = rows.map(r => r.getBoundingClientRect().top);
+    heights = rows.map(r => r.getBoundingClientRect().height);
+    dragOriginalIndex = visibleIds.indexOf(dragId);
+    currentDropIndex = dragOriginalIndex;
+    startY = e.clientY;
+    dragEl.classList.add("dragging");
+    dragEl.style.zIndex = "50";
+    dragEl.setPointerCapture(e.pointerId);
+  });
+
+  wrap.addEventListener("pointermove", e => {
+    if (!dragEl) return;
+    const dy = e.clientY - startY;
+    dragEl.style.transform = `translateY(${dy}px)`;
+    const dragCenterNow = originalTops[dragOriginalIndex] + heights[dragOriginalIndex] / 2 + dy;
+
+    let newIndex = 0;
+    visibleIds.forEach((id, i) => {
+      if (i === dragOriginalIndex) return;
+      const center = originalTops[i] + heights[i] / 2;
+      if (center < dragCenterNow) newIndex++;
+    });
+    currentDropIndex = newIndex;
+
+    clearDropIndicators();
+    if (newIndex !== dragOriginalIndex) {
+      const rows = [...wrap.querySelectorAll(".atlas-row")];
+      const targetRow = rows.find(r => r.getAttribute(rowIdAttr) === visibleIds[newIndex] || (newIndex >= rows.length && r === rows[rows.length - 1]));
+      if (targetRow && targetRow !== dragEl) targetRow.classList.add("drag-over-top");
+    }
+  });
+
+  function endDrag(commit) {
+    if (!dragEl) return;
+    dragEl.classList.remove("dragging");
+    dragEl.style.transform = "";
+    dragEl.style.zIndex = "";
+    clearDropIndicators();
+    const finalIndex = currentDropIndex;
+    const id = dragId;
+    const ids = visibleIds;
+    const changed = finalIndex !== dragOriginalIndex;
+    dragEl = null;
+    if (commit && changed) onCommit(id, finalIndex, ids);
+  }
+
+  wrap.addEventListener("pointerup", () => endDrag(true));
+  wrap.addEventListener("pointercancel", () => endDrag(false));
+}
+
+// Verschiebt ein Gebet innerhalb seiner Bitte/Dank-Gruppe an eine neue Position (Reihenfolge steckt
+// einfach in der Position innerhalb von state.prayers, wie bei den goalNodes).
+function commitPrayerReorder(type, draggedId, newVisibleIndex, visibleIdsBeforeDrag) {
+  const dragged = state.prayers.find(p => p.id === draggedId);
+  if (!dragged) return;
+
+  const newVisibleOrder = visibleIdsBeforeDrag.filter(id => id !== draggedId);
+  newVisibleOrder.splice(newVisibleIndex, 0, draggedId);
+  const beforeId = newVisibleIndex > 0 ? newVisibleOrder[newVisibleIndex - 1] : null;
+
+  state.prayers = state.prayers.filter(p => p.id !== draggedId);
+  if (beforeId === null) {
+    const firstSiblingIdx = state.prayers.findIndex(p => p.status === "open" && (p.type || "bitte") === type);
+    if (firstSiblingIdx === -1) state.prayers.push(dragged);
+    else state.prayers.splice(firstSiblingIdx, 0, dragged);
+  } else {
+    const beforeIdx = state.prayers.findIndex(p => p.id === beforeId);
+    state.prayers.splice(beforeIdx + 1, 0, dragged);
+  }
+  saveData();
+  renderAll();
+}
+
+function initPrayerDragReorder() {
+  initDragReorder("prayerListBitte", "data-drag-handle-prayer", "data-prayer-id", (id, idx, ids) => commitPrayerReorder("bitte", id, idx, ids));
+  initDragReorder("prayerListDank", "data-drag-handle-prayer", "data-prayer-id", (id, idx, ids) => commitPrayerReorder("dank", id, idx, ids));
 }
 
 function renderRoutineChain() {
@@ -2197,7 +2330,8 @@ document.addEventListener("click", e => {
   }
   const irrelevantBtn = e.target.closest("[data-prayer-irrelevant]");
   if (irrelevantBtn) {
-    state.prayers = state.prayers.filter(p => p.id !== irrelevantBtn.dataset.prayerIrrelevant);
+    const prayer = state.prayers.find(p => p.id === irrelevantBtn.dataset.prayerIrrelevant);
+    if (prayer) { prayer.status = "irrelevant"; prayer.irrelevantAt = new Date().toISOString(); }
     saveData(); renderAll();
   }
   const heatmapCell = e.target.closest(".heatmap-cell");
@@ -2209,6 +2343,7 @@ document.addEventListener("click", e => {
   }
 });
 initRoutineDragReorder();
+initPrayerDragReorder();
 
 function flashButton(btn, tempContent) {
   const original = btn.textContent;
@@ -2380,10 +2515,9 @@ function openTaskModal(defaultNodeId, source = "todo") {
     </div>
     ${isLernfeld ? "" : `
     <div class="field">
-      <label>Größe (für die Tagesregel: 2 kleine oder 1 große Aufgabe/Tag)</label>
+      <label>Aufwandsstufe</label>
       <select id="mTaskSize">
-        <option value="klein">klein</option>
-        <option value="gross">groß</option>
+        ${EFFORT_LEVELS.map(e => `<option value="${e.level}">${e.level} · ${escapeHtml(e.label)} (${escapeHtml(e.time)})</option>`).join("")}
       </select>
     </div>
     <div class="field">
@@ -2418,13 +2552,13 @@ function openTaskModal(defaultNodeId, source = "todo") {
       const dueTime = body.querySelector("#mTaskTime").value || null;
       if (isLernfeld) {
         const learnType = body.querySelector("#mTaskLernType").value;
-        state.tasks.push({ id: uid(), title, nodeId: defaultNodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size: "klein", priority: 0, source, learnType });
+        state.tasks.push({ id: uid(), title, nodeId: defaultNodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size: 2, priority: 0, source, learnType });
         saveData();
         closeModal();
         renderAll();
         return;
       }
-      const size = body.querySelector("#mTaskSize").value;
+      const size = parseInt(body.querySelector("#mTaskSize").value, 10) || 1;
       const priority = parseInt(body.querySelector("#mTaskPriority").value, 10) || 0;
       const categorySelect = body.querySelector("#mTaskCategory");
       const nodeId = categorySelect ? categorySelect.value || null : null;
@@ -2642,22 +2776,33 @@ const CHECK_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" 
 const REFRESH_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-neutral-400)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 4v3h-3M6 20v-3h3"/></svg>';
 const CROSS_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-neutral-500)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
+function prayerRowHtml(p) {
+  return `
+    <div class="atlas-row" data-prayer-id="${p.id}">
+      <button class="btn btn-icon btn-ghost routine-drag-handle" data-drag-handle-prayer="${p.id}" aria-label="Ziehen zum Verschieben" style="touch-action:none; flex-shrink:0;">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="4" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="9" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="9" r="1" fill="var(--color-neutral-400)"/></svg>
+      </button>
+      <div style="flex:1; min-width:0;">
+        <div class="item-title">${escapeHtml(p.title)}</div>
+        ${p.deferredCount ? `<div class="item-meta">${p.deferredCount}× auf nächste Woche verschoben</div>` : ""}
+      </div>
+      <button class="btn btn-icon btn-ghost" data-prayer-fulfilled="${p.id}" title="Erfüllt" style="width:26px; height:26px;">${CHECK_ICON}</button>
+      <button class="btn btn-icon btn-ghost" data-prayer-defer="${p.id}" title="Nächste Woche" style="width:26px; height:26px;">${REFRESH_ICON}</button>
+      <button class="btn btn-icon btn-ghost" data-prayer-irrelevant="${p.id}" title="Nicht mehr relevant" style="width:26px; height:26px;">${CROSS_ICON}</button>
+    </div>
+  `;
+}
+
 function renderPrayers() {
-  const listWrap = document.getElementById("prayerList");
   const openPrayers = state.prayers.filter(p => p.status === "open");
-  listWrap.innerHTML = openPrayers.length
-    ? openPrayers.map(p => `
-        <div class="atlas-row">
-          <div style="flex:1; min-width:0;">
-            <div class="item-title">${escapeHtml(p.title)}</div>
-            ${p.deferredCount ? `<div class="item-meta">${p.deferredCount}× auf nächste Woche verschoben</div>` : ""}
-          </div>
-          <button class="btn btn-icon btn-ghost" data-prayer-fulfilled="${p.id}" title="Erfüllt" style="width:26px; height:26px;">${CHECK_ICON}</button>
-          <button class="btn btn-icon btn-ghost" data-prayer-defer="${p.id}" title="Nächste Woche" style="width:26px; height:26px;">${REFRESH_ICON}</button>
-          <button class="btn btn-icon btn-ghost" data-prayer-irrelevant="${p.id}" title="Nicht mehr relevant" style="width:26px; height:26px;">${CROSS_ICON}</button>
-        </div>
-      `).join("")
-    : '<div class="empty-hint">Keine offenen Anliegen.</div>';
+  const bitte = openPrayers.filter(p => (p.type || "bitte") === "bitte");
+  const dank = openPrayers.filter(p => (p.type || "bitte") === "dank");
+
+  const bitteWrap = document.getElementById("prayerListBitte");
+  bitteWrap.innerHTML = bitte.length ? bitte.map(prayerRowHtml).join("") : '<div class="empty-hint">Keine offenen Bitten.</div>';
+
+  const dankWrap = document.getElementById("prayerListDank");
+  dankWrap.innerHTML = dank.length ? dank.map(prayerRowHtml).join("") : '<div class="empty-hint">Kein Dank eingetragen.</div>';
 
   const archiveWrap = document.getElementById("prayerArchive");
   const fulfilled = state.prayers
@@ -2676,13 +2821,26 @@ function renderPrayers() {
         </div>
       `).join("")
     : '<div class="empty-hint">Noch keine Erhörungen festgehalten.</div>';
+
+  const irrelevantWrap = document.getElementById("prayerIrrelevantList");
+  const irrelevant = state.prayers
+    .filter(p => p.status === "irrelevant")
+    .sort((a, b) => (b.irrelevantAt || "").localeCompare(a.irrelevantAt || ""));
+  irrelevantWrap.innerHTML = irrelevant.length
+    ? irrelevant.map(p => `
+        <div class="prayer-archive-entry">
+          <div class="item-meta">${(p.irrelevantAt || "").slice(0, 10)}</div>
+          <div class="item-title">${escapeHtml(p.title)}</div>
+        </div>
+      `).join("")
+    : '<div class="empty-hint">Nichts als nicht mehr relevant markiert.</div>';
 }
 
 function savePrayerFromInline() {
   const input = document.getElementById("prayerInput");
   const title = input.value.trim();
   if (!title) return;
-  state.prayers.push({ id: uid(), title, createdAt: new Date().toISOString(), status: "open", deferredCount: 0 });
+  state.prayers.push({ id: uid(), title, type: prayerAddType, createdAt: new Date().toISOString(), status: "open", deferredCount: 0 });
   saveData();
   input.value = "";
   quickAddVisible = false;
