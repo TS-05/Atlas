@@ -113,13 +113,13 @@
     <section id="tab-gebete" class="tab-panel">
       <h1>Gebete</h1>
 
-      <div class="card elev-sm hidden" id="prayerAddCard" style="margin-bottom: 14px; flex-direction: column; gap: 8px; display:none;">
+      <div class="card hidden" id="prayerAddCard" style="margin-bottom: 14px; flex-direction: column; gap: 8px; display:none;">
         <input class="input" id="prayerInput" placeholder="Wofür möchtest du beten?">
         <div style="display:flex; gap:8px;">
           <button class="btn btn-secondary" id="prayerTypeBitte" data-prayer-type-btn="bitte" style="flex:1;">Bitte</button>
           <button class="btn btn-secondary" id="prayerTypeDank" data-prayer-type-btn="dank" style="flex:1;">Dank</button>
         </div>
-        <button class="btn btn-primary btn-block" id="savePrayerBtn">Speichern</button>
+        <button class="btn btn-secondary btn-block" id="savePrayerBtn">Speichern</button>
       </div>
 
       <h6 class="metal-gold">Bitte</h6>
@@ -145,6 +145,14 @@
       <h1>Analyse</h1>
 
       <h6 class="metal-gold">Reflexion dieser Woche</h6>
+      <ul class="text-muted" style="font-size:12.5px; line-height:1.7; margin:0 0 10px; padding-left:18px;">
+        <li>Was lief gut?</li>
+        <li>Was lief schlecht?</li>
+        <li>Was mache ich besser?</li>
+        <li>Wie ist meine Beziehung zu Gott?</li>
+        <li>Wie wurde ich meinem Ideal näher?</li>
+        <li>Alle Ziele mit Fortschritt vergleichen</li>
+      </ul>
       <textarea class="input reflection-textarea" id="reflectionText" placeholder="Wie lief die Woche? Was nimmst du mit?" style="margin-bottom: 28px;"></textarea>
 
       <div class="stats-grid" id="statsGrid"></div>

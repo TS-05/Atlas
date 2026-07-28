@@ -1190,10 +1190,8 @@ document.getElementById("prayerInput").addEventListener("keydown", e => { if (e.
 
 let prayerAddType = "bitte";
 function updatePrayerTypeButtons() {
-  document.getElementById("prayerTypeBitte").classList.toggle("btn-primary", prayerAddType === "bitte");
-  document.getElementById("prayerTypeBitte").classList.toggle("btn-secondary", prayerAddType !== "bitte");
-  document.getElementById("prayerTypeDank").classList.toggle("btn-primary", prayerAddType === "dank");
-  document.getElementById("prayerTypeDank").classList.toggle("btn-secondary", prayerAddType !== "dank");
+  document.getElementById("prayerTypeBitte").classList.toggle("toggle-minimal-active", prayerAddType === "bitte");
+  document.getElementById("prayerTypeDank").classList.toggle("toggle-minimal-active", prayerAddType === "dank");
 }
 document.getElementById("prayerTypeBitte").addEventListener("click", () => { prayerAddType = "bitte"; updatePrayerTypeButtons(); });
 document.getElementById("prayerTypeDank").addEventListener("click", () => { prayerAddType = "dank"; updatePrayerTypeButtons(); });
@@ -2350,12 +2348,6 @@ document.addEventListener("click", e => {
   if (fulfilledBtn) {
     openPrayerFulfillModal(fulfilledBtn.dataset.prayerFulfilled);
   }
-  const deferBtn = e.target.closest("[data-prayer-defer]");
-  if (deferBtn) {
-    const prayer = state.prayers.find(p => p.id === deferBtn.dataset.prayerDefer);
-    if (prayer) prayer.deferredCount = (prayer.deferredCount || 0) + 1;
-    saveData(); renderAll();
-  }
   const irrelevantBtn = e.target.closest("[data-prayer-irrelevant]");
   if (irrelevantBtn) {
     const prayer = state.prayers.find(p => p.id === irrelevantBtn.dataset.prayerIrrelevant);
@@ -2813,21 +2805,25 @@ function renderPlanning() {
 
 // ---------- Gebetsanliegen ----------
 const CHECK_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-300)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
-const REFRESH_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-neutral-400)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 4v3h-3M6 20v-3h3"/></svg>';
 const CROSS_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-neutral-500)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+function prayerDragHandleHtml(prayerId) {
+  if (!quickAddVisible) return "";
+  return `
+    <button class="btn btn-icon btn-ghost routine-drag-handle" data-drag-handle-prayer="${prayerId}" aria-label="Ziehen zum Verschieben" style="touch-action:none; flex-shrink:0;">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="4" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="9" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="9" r="1" fill="var(--color-neutral-400)"/></svg>
+    </button>
+  `;
+}
 
 function prayerRowHtml(p) {
   return `
     <div class="atlas-row" data-prayer-id="${p.id}">
-      <button class="btn btn-icon btn-ghost routine-drag-handle" data-drag-handle-prayer="${p.id}" aria-label="Ziehen zum Verschieben" style="touch-action:none; flex-shrink:0;">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="4" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="9" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="9" r="1" fill="var(--color-neutral-400)"/></svg>
-      </button>
+      ${prayerDragHandleHtml(p.id)}
       <div style="flex:1; min-width:0;">
         <div class="item-title">${escapeHtml(p.title)}</div>
-        ${p.deferredCount ? `<div class="item-meta">${p.deferredCount}× auf nächste Woche verschoben</div>` : ""}
       </div>
       <button class="btn btn-icon btn-ghost" data-prayer-fulfilled="${p.id}" title="Erfüllt" style="width:26px; height:26px;">${CHECK_ICON}</button>
-      <button class="btn btn-icon btn-ghost" data-prayer-defer="${p.id}" title="Nächste Woche" style="width:26px; height:26px;">${REFRESH_ICON}</button>
       <button class="btn btn-icon btn-ghost" data-prayer-irrelevant="${p.id}" title="Nicht mehr relevant" style="width:26px; height:26px;">${CROSS_ICON}</button>
     </div>
   `;

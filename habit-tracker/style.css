@@ -94,6 +94,8 @@ p { margin: 0 0 var(--space-3); }
 .btn svg { display: block; }
 .btn-secondary { border-color: var(--color-divider); }
 .btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+/* Dezenter aktiver Zustand ohne Gold-Fläche (z.B. Bitte/Dank-Umschalter) */
+.toggle-minimal-active { border-color: var(--color-text); color: var(--color-text); background: color-mix(in srgb, var(--color-text) 9%, transparent); }
 .btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
 .btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
 .btn-icon { width: 36px; height: 36px; padding: 0; }
