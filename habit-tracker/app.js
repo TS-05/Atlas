@@ -786,7 +786,6 @@ state.subjectOverride = state.subjectOverride || {};
 state.badDayMode = state.badDayMode || false;
 saveData();
 
-const expandedNodes = new Set(); // Laufzeit-Status des Bereiche-Akkordeons (nicht persistiert)
 
 // ---------- Seed data ----------
 function seedData() {
@@ -1096,6 +1095,15 @@ const QUICK_ADD_BTN_IDS = { heute: ["addRoutineBtn", "addHabitBtn"], todo: ["add
 let quickAddVisible = false;
 let bereicheSearchVisible = false;
 let bereicheSearchQuery = "";
+
+// ---------- Roadmap-Navigation (Dashboard -> Kategorie -> Pfad), rein Laufzeit-Status ----------
+// Greift ausschließlich auf die bestehenden goalNodes/tasks-Datenfunktionen zu (nodeProgress,
+// childNodes, categoryTasksForNode, das bestehende data-task-Toggle) — es wird keine neue
+// Datenstruktur eingeführt und ToDo/Tagesroutine/Gebete bleiben davon komplett unberührt.
+let roadmapView = "dashboard"; // "dashboard" | "category" | "path"
+let roadmapRootId = null;
+let roadmapSubtabId = null;
+let roadmapPathId = null;
 Object.values(QUICK_ADD_BTN_IDS).flat().forEach(id => {
   const el = document.getElementById(id);
   if (el) el.style.display = "none";
@@ -1911,72 +1919,154 @@ function subtreeMatchesQuery(node, q, seen = new Set()) {
   return childNodes(node.id).some(c => subtreeMatchesQuery(c, q, seen));
 }
 
+// ---------- Roadmap: Dashboard (Ebene 1) -> Kategorie (Ebene 2) -> Pfad (Ebene 3) ----------
+function roadmapRingSvg(pct, size = 62) {
+  const r = 26, c = 2 * Math.PI * r;
+  const offset = (c * (1 - Math.min(100, pct) / 100)).toFixed(1);
+  return `
+    <div style="position:relative; width:${size}px; height:${size}px; margin:0 auto;">
+      <svg viewBox="0 0 64 64" width="${size}" height="${size}">
+        <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--color-neutral-800)" stroke-width="5"/>
+        <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--color-accent)" stroke-width="5" stroke-linecap="round"
+          stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset}" transform="rotate(-90 32 32)"
+          style="filter:drop-shadow(0 0 4px color-mix(in srgb, var(--color-accent) 60%, transparent));"/>
+      </svg>
+      <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:${Math.round(size * 0.22)}px; font-weight:700; font-family:var(--font-heading); color:var(--color-accent-200);">${Math.round(pct)}%</div>
+    </div>
+  `;
+}
+
 function renderGoalBrowser() {
   const wrap = document.getElementById("goalTree");
   wrap.innerHTML = "";
-  const q = bereicheSearchQuery.trim().toLowerCase();
-  const roots = q ? childNodes(null).filter(n => subtreeMatchesQuery(n, q)) : childNodes(null);
-  if (roots.length === 0) {
-    wrap.innerHTML = q ? '<div class="empty-hint">Keine Roadmap-Punkte gefunden.</div>' : '<div class="empty-hint">Noch keine Roadmap angelegt.</div>';
-    return;
+  if (roadmapView === "path" && roadmapPathId && nodeById(roadmapPathId)) {
+    wrap.appendChild(renderRoadmapPath(roadmapPathId));
+  } else if (roadmapView === "category" && roadmapRootId && nodeById(roadmapRootId)) {
+    wrap.appendChild(renderRoadmapCategory(roadmapRootId));
+  } else {
+    roadmapView = "dashboard";
+    wrap.appendChild(renderRoadmapDashboard());
   }
-  roots.forEach(node => wrap.appendChild(renderTreeNode(node, 0, q)));
 }
 
-function renderTreeNode(node, depth, searchQuery = "") {
-  const expanded = !!searchQuery || expandedNodes.has(node.id);
-  const pct = Math.round(nodeProgress(node) * 100);
-  const children = searchQuery ? childNodes(node.id).filter(c => subtreeMatchesQuery(c, searchQuery)) : childNodes(node.id);
-  const tasks = categoryTasksForNode(node.id);
-  const priority = isPriority(node.id);
+function renderRoadmapDashboard() {
+  const q = bereicheSearchQuery.trim().toLowerCase();
+  const roots = q ? childNodes(null).filter(n => subtreeMatchesQuery(n, q)) : childNodes(null);
+  const wrap = document.createElement("div");
+  if (roots.length === 0) {
+    wrap.innerHTML = q ? '<div class="empty-hint">Keine Roadmap-Punkte gefunden.</div>' : '<div class="empty-hint">Noch keine Roadmap angelegt.</div>';
+    return wrap;
+  }
+  wrap.className = "roadmap-folder-grid";
+  roots.forEach(node => {
+    const pct = Math.round(nodeProgress(node) * 100);
+    const card = document.createElement("button");
+    card.className = "roadmap-folder-card";
+    card.dataset.openRoadmapRoot = node.id;
+    card.innerHTML = `
+      <div class="roadmap-folder-name">${escapeHtml(node.title)}</div>
+      ${roadmapRingSvg(pct)}
+    `;
+    wrap.appendChild(card);
+  });
+  return wrap;
+}
+
+function renderRoadmapCategory(rootId) {
+  const root = nodeById(rootId);
+  const subtabs = childNodes(rootId);
+  if (!roadmapSubtabId || !subtabs.some(s => s.id === roadmapSubtabId)) {
+    roadmapSubtabId = subtabs[0] ? subtabs[0].id : null;
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "roadmap-category";
+  wrap.innerHTML = `
+    <div class="roadmap-crumb"><button data-roadmap-crumb-home>Roadmap</button> <span>&rsaquo;</span> <b>${escapeHtml(root.title)}</b></div>
+    <div class="roadmap-subtabs">${subtabs.map(s => `<button class="roadmap-subtab${s.id === roadmapSubtabId ? " active" : ""}" data-roadmap-subtab="${s.id}">${escapeHtml(s.title)}</button>`).join("") || ""}</div>
+    <div class="roadmap-card-list" id="roadmapCardList"></div>
+  `;
+  const list = wrap.querySelector("#roadmapCardList");
+  const activeSubtab = roadmapSubtabId ? nodeById(roadmapSubtabId) : null;
+  if (!activeSubtab) {
+    list.innerHTML = '<div class="empty-hint">Noch keine Unterkategorien.</div>';
+  } else {
+    const projects = childNodes(activeSubtab.id);
+    const targets = projects.length ? projects : [activeSubtab];
+    targets.forEach(p => {
+      const pct = Math.round(nodeProgress(p) * 100);
+      const children = childNodes(p.id);
+      const tasks = categoryTasksForNode(p.id);
+      const stepCount = children.length || tasks.length;
+      const doneCount = children.length
+        ? children.filter(c => Math.round(nodeProgress(c) * 100) >= 100).length
+        : tasks.filter(t => t.done).length;
+      const card = document.createElement("button");
+      card.className = "roadmap-card";
+      card.dataset.openRoadmapPath = p.id;
+      card.innerHTML = `
+        ${miniProgressRing(pct, 34)}
+        <div class="roadmap-card-body">
+          <div class="roadmap-card-title">${escapeHtml(p.title)}</div>
+          <div class="roadmap-card-meta">${doneCount} / ${stepCount} Etappen</div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="flex-shrink:0; color:var(--color-neutral-500);"><path d="M7.5 4.5L13 10L7.5 15.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      `;
+      list.appendChild(card);
+    });
+  }
+  return wrap;
+}
+
+function renderRoadmapPath(nodeId) {
+  const node = nodeById(nodeId);
+  const ancestry = nodePath(nodeId);
+  const children = childNodes(nodeId);
+  const tasks = categoryTasksForNode(nodeId);
+  const steps = children.length
+    ? children.map(c => ({ id: c.id, title: c.title, kind: "node", done: Math.round(nodeProgress(c) * 100) >= 100 }))
+    : tasks.map(t => ({ id: t.id, title: t.title, kind: "task", done: t.done }));
+
+  let currentIdx = steps.findIndex(s => !s.done);
+  if (currentIdx === -1) currentIdx = steps.length;
+  const doneCount = steps.filter(s => s.done).length;
+  const pct = steps.length ? Math.round((doneCount / steps.length) * 100) : 0;
 
   const wrap = document.createElement("div");
-  wrap.className = "card elev-sm goal-node" + (priority ? " gold-frame" : "") + (expanded ? " expanded" : "");
-  wrap.style.setProperty("--depth", depth);
-  wrap.style.padding = "0";
-
-  const header = document.createElement("button");
-  header.className = "goal-node-header";
-  header.style.width = "100%";
-  header.style.background = "none";
-  header.style.border = "none";
-  header.style.color = "inherit";
-  header.style.font = "inherit";
-  header.style.textAlign = "left";
-  header.style.cursor = "pointer";
-  header.dataset.toggleNode = node.id;
-  header.innerHTML = `
-    <div class="goal-node-header-left">
-      <svg class="goal-node-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="var(--color-neutral-400)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div class="card-title" style="font-size:14px;">${escapeHtml(node.title)}</div>
+  wrap.className = "roadmap-path-screen";
+  const crumbHtml = ancestry.map((n, i) =>
+    i === ancestry.length - 1 ? `<b>${escapeHtml(n.title)}</b>` : `<button data-roadmap-crumb-node="${n.id}">${escapeHtml(n.title)}</button>`
+  ).join(' <span>&rsaquo;</span> ');
+  wrap.innerHTML = `
+    <div class="roadmap-crumb"><button data-roadmap-crumb-home>Roadmap</button> <span>&rsaquo;</span> ${crumbHtml}</div>
+    <div class="card-title" style="font-size:19px; margin-bottom:8px;">${escapeHtml(node.title)}</div>
+    <div class="roadmap-progress-row">
+      <div class="roadmap-progress-outer"><div class="roadmap-progress-inner" style="width:${pct}%"></div></div>
+      <div class="roadmap-progress-label">${doneCount} / ${steps.length} Schritte</div>
     </div>
-    ${miniProgressRing(pct, depth === 0 ? 34 : 26)}
+    <div class="roadmap-path" id="roadmapPathSteps"></div>
+    <div class="roadmap-footer-tools">${resourceLinksRow(node)}</div>
   `;
-  wrap.appendChild(header);
-  const meta = document.createElement("div");
-  meta.className = "goal-node-meta";
-  meta.textContent = `${children.length} Unterordner, ${tasks.length} Aufgabe(n)`;
-  wrap.appendChild(meta);
-
-  if (expanded) {
-    const resources = document.createElement("div");
-    resources.innerHTML = resourceLinksRow(node);
-    wrap.appendChild(resources.firstElementChild);
-    hydrateResourceLinks(node, wrap);
-    if (tasks.length || children.length) {
-      const body = document.createElement("div");
-      body.className = "goal-node-body";
-      tasks.forEach(t => body.appendChild(renderTaskItem(t)));
-      wrap.appendChild(body);
-    }
-    if (children.length) {
-      const childrenWrap = document.createElement("div");
-      childrenWrap.className = "goal-node-children";
-      children.forEach(child => childrenWrap.appendChild(renderTreeNode(child, depth + 1, searchQuery)));
-      wrap.appendChild(childrenWrap);
-    }
+  hydrateResourceLinks(node, wrap);
+  const stepsWrap = wrap.querySelector("#roadmapPathSteps");
+  if (steps.length === 0) {
+    stepsWrap.innerHTML = '<div class="empty-hint">Noch keine Schritte.</div>';
+  } else {
+    steps.forEach((s, i) => {
+      const status = i < currentIdx ? "done" : i === currentIdx ? "current" : "future";
+      const el = document.createElement("div");
+      el.className = "roadmap-step " + status;
+      const dotAttr = s.kind === "node" ? `data-open-roadmap-path="${s.id}"` : `data-task="${s.id}"`;
+      el.innerHTML = `
+        <div class="roadmap-step-rail">
+          <button class="roadmap-dot" ${dotAttr} aria-label="${escapeHtml(s.title)}">${status === "done" ? "&#10003;" : (i + 1)}</button>
+        </div>
+        <div class="roadmap-step-body">
+          <div class="roadmap-step-title" ${s.kind === "node" ? `data-open-roadmap-path="${s.id}"` : ""}>${i + 1}. ${escapeHtml(s.title)}</div>
+        </div>
+      `;
+      stepsWrap.appendChild(el);
+    });
   }
-
   return wrap;
 }
 
@@ -2322,10 +2412,41 @@ document.addEventListener("click", e => {
   if (monthBtn) copyMonthTestPrompt(monthBtn.dataset.copyMonthPrompt, monthBtn);
   const cardBtn = e.target.closest("[data-copy-card-prompt]");
   if (cardBtn) copyKnowledgeCardPrompt(cardBtn.dataset.copyCardPrompt, cardBtn);
-  const toggleBtn = e.target.closest("[data-toggle-node]");
-  if (toggleBtn) {
-    const id = toggleBtn.dataset.toggleNode;
-    if (expandedNodes.has(id)) expandedNodes.delete(id); else expandedNodes.add(id);
+  const openRootBtn = e.target.closest("[data-open-roadmap-root]");
+  if (openRootBtn) {
+    roadmapRootId = openRootBtn.dataset.openRoadmapRoot;
+    roadmapSubtabId = null;
+    roadmapView = "category";
+    renderGoalBrowser();
+  }
+  const subtabBtn = e.target.closest("[data-roadmap-subtab]");
+  if (subtabBtn) {
+    roadmapSubtabId = subtabBtn.dataset.roadmapSubtab;
+    renderGoalBrowser();
+  }
+  const openPathBtn = e.target.closest("[data-open-roadmap-path]");
+  if (openPathBtn) {
+    roadmapPathId = openPathBtn.dataset.openRoadmapPath;
+    roadmapView = "path";
+    renderGoalBrowser();
+  }
+  const crumbHomeBtn = e.target.closest("[data-roadmap-crumb-home]");
+  if (crumbHomeBtn) {
+    roadmapView = "dashboard";
+    roadmapRootId = null; roadmapSubtabId = null; roadmapPathId = null;
+    renderGoalBrowser();
+  }
+  const crumbNodeBtn = e.target.closest("[data-roadmap-crumb-node]");
+  if (crumbNodeBtn) {
+    const id = crumbNodeBtn.dataset.roadmapCrumbNode;
+    const n = nodeById(id);
+    if (n && n.parentId === null) {
+      roadmapView = "category";
+      roadmapRootId = id;
+    } else {
+      roadmapView = "path";
+      roadmapPathId = id;
+    }
     renderGoalBrowser();
   }
   if (e.target.matches("[data-del-shift]")) {
