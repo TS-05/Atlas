@@ -82,6 +82,12 @@
       <h6 class="metal-gold" style="margin-top: 26px;">Weitere Gewohnheiten</h6>
       <div id="todayHabits"></div>
       <button class="btn btn-ghost btn-block" id="addHabitBtn">+ Gewohnheit hinzufügen</button>
+
+      <h6 class="metal-gold" style="margin-top: 26px;">Klassenarbeiten</h6>
+      <div class="card elev-sm" style="margin-bottom: 14px;">
+        <div id="examsList" class="list"></div>
+        <button class="btn btn-secondary btn-block" id="addExamBtn" style="height:38px;">+ Klassenarbeit eintragen</button>
+      </div>
     </section>
 
     <!-- TODO -->
@@ -92,6 +98,34 @@
       <div id="todoList" class="list"></div>
     </section>
 
+    <!-- FINANZPLANUNG -->
+    <section id="tab-finanzen" class="tab-panel">
+      <h1>Finanzplanung</h1>
+
+      <h6 class="metal-gold">Vermögensübersicht</h6>
+      <div class="card elev-sm" style="margin-bottom: 14px;">
+        <div class="stat-num" id="financeNetWorth" style="font-size: 26px;">0 €</div>
+        <div class="stat-label">Gesamtvermögen</div>
+      </div>
+      <div id="financeAccountsList" class="list"></div>
+      <button class="btn btn-ghost btn-block" id="addAccountBtn">+ Konto/Vermögenswert hinzufügen</button>
+
+      <h6 class="metal-gold" style="margin-top: 26px;">Budget &amp; Ausgaben</h6>
+      <div class="card elev-sm" style="margin-bottom: 14px;">
+        <div class="stat-num" id="financeMonthSpent" style="font-size: 20px;">0 € / 0 €</div>
+        <div class="stat-label">Ausgaben diesen Monat</div>
+      </div>
+      <div id="financeCategoriesList" style="display:flex; flex-direction:column; gap:12px; margin-bottom:14px;"></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-secondary" style="flex:1;" id="addExpenseBtn">+ Ausgabe erfassen</button>
+        <button class="btn btn-ghost" style="flex:1;" id="addCategoryBtn">+ Kategorie</button>
+      </div>
+
+      <h6 class="metal-gold" style="margin-top: 26px;">Sparziele</h6>
+      <div id="savingsGoalsList" class="list"></div>
+      <button class="btn btn-ghost btn-block" id="addSavingsGoalBtn">+ Sparziel hinzufügen</button>
+    </section>
+
     <!-- BEREICHE -->
     <section id="tab-zielbereiche" class="tab-panel">
       <h1>Roadmap</h1>
@@ -100,18 +134,12 @@
         <input class="input" id="bereicheSearchInput" placeholder="Bereich oder Thema suchen …">
       </div>
 
-      <div class="card elev-sm" style="margin-bottom: 14px;">
-        <div class="card-title" style="font-size: 14px;">Klassenarbeiten</div>
-        <div id="examsList" class="list"></div>
-        <button class="btn btn-secondary btn-block" id="addExamBtn" style="height:38px;">+ Klassenarbeit eintragen</button>
-      </div>
-
       <div id="goalTree" class="goal-tree"></div>
     </section>
 
     <!-- GEBETE -->
     <section id="tab-gebete" class="tab-panel">
-      <h1>Gebete</h1>
+      <h1 class="metal-gold">Gebete</h1>
 
       <div class="card hidden" id="prayerAddCard" style="margin-bottom: 14px; flex-direction: column; gap: 8px; display:none;">
         <input class="input" id="prayerInput" placeholder="Wofür möchtest du beten?">
@@ -146,12 +174,12 @@
 
       <h6 class="metal-gold">Reflexion dieser Woche</h6>
       <ul class="text-muted" style="font-size:12.5px; line-height:1.7; margin:0 0 10px; padding-left:18px;">
-        <li>Was lief gut?</li>
-        <li>Was lief schlecht?</li>
-        <li>Was mache ich besser?</li>
+        <li>Was lief gut/schlecht?</li>
+        <li>Was mache ich beim nächsten Mal besser?</li>
         <li>Wie ist meine Beziehung zu Gott?</li>
-        <li>Wie wurde ich meinem Ideal näher?</li>
-        <li>Alle Ziele mit Fortschritt vergleichen</li>
+        <li>Wie würde mein Idealbild handeln?</li>
+        <li>Bin ich meinem Ziel näher gekommen?</li>
+        <li>Habe ich meine Werte eingehalten?</li>
       </ul>
       <textarea class="input reflection-textarea" id="reflectionText" placeholder="Wie lief die Woche? Was nimmst du mit?" style="margin-bottom: 28px;"></textarea>
 
@@ -185,6 +213,10 @@
     <button class="tab-btn" data-tab="todo">
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M4 5H16M4 10H16M4 15H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       <span>ToDo</span>
+    </button>
+    <button class="tab-btn" data-tab="finanzen">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.3" stroke="currentColor" stroke-width="1.4"/><path d="M10 6V14M7.6 8.4C7.6 7.4 8.6 6.8 10 6.8C11.4 6.8 12.4 7.5 12.4 8.5C12.4 10.8 7.6 9.3 7.6 11.6C7.6 12.6 8.6 13.3 10 13.3C11.4 13.3 12.4 12.7 12.4 11.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <span>Finanzen</span>
     </button>
     <button class="tab-btn" data-tab="zielbereiche">
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.3" stroke="currentColor" stroke-width="1.4"/><path d="M13 6.5L11 10.2L7 13.5L9 9.8L13 6.5Z" fill="currentColor"/></svg>

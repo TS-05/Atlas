@@ -784,6 +784,10 @@ state.weeklyReflection = state.weeklyReflection || {};
 state.prayers = state.prayers || [];
 state.subjectOverride = state.subjectOverride || {};
 state.badDayMode = state.badDayMode || false;
+state.financeAccounts = state.financeAccounts || [];
+state.financeCategories = state.financeCategories || [];
+state.financeExpenses = state.financeExpenses || [];
+state.savingsGoals = state.savingsGoals || [];
 saveData();
 
 
@@ -791,6 +795,7 @@ saveData();
 function seedData() {
   const data = {
     goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [],
+    financeAccounts: [], financeCategories: [], financeExpenses: [], savingsGoals: [],
     // Frische Seed-Daten entsprechen bereits der aktuellen Struktur — alle Migrationen sollen hier no-op sein
     bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true,
     seminararbeitRoadmapApplied: true, seminararbeitRoadmapV2Applied: true, taskEffortLevelsApplied: true, learningOrderApplied: true
@@ -905,7 +910,9 @@ const SPLATS = [
 const TAB_SPLATS = [
   SPLATS[0], SPLATS[1], SPLATS[2], SPLATS[3],
   { path: 'M9,3 L12,4.5 L14,2.5 L14,6.5 L18,7 L15,9.5 L18,13 L14,13 L15,17 L11,14.5 L9,19 L7.5,15 L3,16.5 L6,12.5 L2,10 L6.5,8.5 L4,4.5 L8,6 Z',
-    dots: [[17,3,0.8],[2,17,1]] }
+    dots: [[17,3,0.8],[2,17,1]] },
+  { path: 'M10,2.5 L11.5,5.5 L15,4.5 L13.5,8 L17.5,9 L14,11.5 L17,15 L12.5,14.5 L13.5,18.5 L9.5,16 L7,19.5 L6.5,15.5 L2.5,16.5 L5,12.5 L1.5,10 L5.5,9 L3.5,5 L7.5,6.5 Z',
+    dots: [[18,2,0.7],[2,4,0.9],[19,17,0.6],[1,19,0.8]] }
 ];
 function splatFor(id) {
   // deterministischer Splat je nach (String-)ID, wie im Design-Prototyp
@@ -1036,9 +1043,9 @@ function dayBudgetRing(dueCount, doneCount, size = 200) {
 }
 
 // ---------- Tabs ----------
-const TAB_ORDER = ["heute", "todo", "zielbereiche", "gebete", "analyse"];
-const TAB_ROT = [-6, 10, -12, 7, -4];
-const TAB_SCALE = [1.05, 0.92, 1.1, 0.95, 1.02];
+const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "analyse"];
+const TAB_ROT = [-6, 10, 5, -12, 7, -4];
+const TAB_SCALE = [1.05, 0.92, 1, 1.1, 0.95, 1.02];
 const tabBtns = Array.from(document.querySelectorAll(".tab-btn"));
 const tabIndicator = document.getElementById("tabIndicator");
 let dropTimer = null;
@@ -1102,7 +1109,6 @@ let bereicheSearchQuery = "";
 // Datenstruktur eingeführt und ToDo/Tagesroutine/Gebete bleiben davon komplett unberührt.
 let roadmapView = "dashboard"; // "dashboard" | "category" | "path"
 let roadmapRootId = null;
-let roadmapSubtabId = null;
 let roadmapPathId = null;
 Object.values(QUICK_ADD_BTN_IDS).flat().forEach(id => {
   const el = document.getElementById(id);
@@ -1222,6 +1228,7 @@ function openModal(html, onMount, mode = "dialog") {
 function closeModal() {
   overlay.classList.add("hidden");
   modalBody.innerHTML = "";
+  currentDaySheetKey = null;
 }
 overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
 
@@ -1458,6 +1465,33 @@ function conicPercentMask(pct, feather = 10) {
     ` transparent 360deg)`;
 }
 
+// Der "Tageskreis"-Look: Wochentag-Tinten-Maske + goldenes Conic-Gradient + weicher Glanz-Overlay.
+// Wird für den Wochenkreis (Heute) UND für die Roadmap-Ebene-1-Kreise verwendet — exakt dasselbe Design.
+function goldRingHtml(pct, size = 200, maskIdx = 0, fontSize = null) {
+  const maskUrl = `assets/${RING_MASKS[maskIdx % RING_MASKS.length]}`;
+  const percentMask = conicPercentMask(pct);
+  const fs = fontSize || Math.round(size * 0.17);
+  return `
+    <div style="position:relative; width:${size}px; height:${size}px;">
+      <div style="position:absolute; inset:0;
+        background:rgba(255,255,255,0.16);
+        -webkit-mask-image:url('${maskUrl}'); -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat; -webkit-mask-position:center;
+        mask-image:url('${maskUrl}'); mask-size:100% 100%; mask-repeat:no-repeat; mask-position:center;"></div>
+      <div style="position:absolute; inset:0;
+        background:conic-gradient(from -90deg, var(--color-accent-700) 0%, var(--color-accent-100) 16.6%, var(--color-accent-600) 33.3%, var(--color-accent-200) 50%, var(--color-accent-700) 66.6%, var(--color-accent-300) 83.3%, var(--color-accent-700) 100%);
+        -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
+        mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;
+        filter:drop-shadow(0 0 5px color-mix(in srgb, var(--color-accent) 50%, transparent));"></div>
+      <div style="position:absolute; inset:0;
+        background:radial-gradient(circle at 32% 24%, rgba(255,255,255,0.9), transparent 55%);
+        mix-blend-mode:overlay; opacity:0.6;
+        -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
+        mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;"></div>
+      <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:${fs}px; font-family:var(--font-heading); color:var(--color-neutral-100); text-shadow:0 1px 4px rgba(0,0,0,0.6);">${Math.round(pct)}%</span>
+    </div>
+  `;
+}
+
 function renderWeekCircle() {
   const wrap = document.getElementById("weekCircle");
   const today = new Date();
@@ -1474,30 +1508,11 @@ function renderWeekCircle() {
   }).length;
   const pct = scheduled.length ? Math.round((done / scheduled.length) * 100) : 0;
 
-  const maskUrl = `assets/${RING_MASKS[todayIdx]}`;
-  const percentMask = conicPercentMask(pct);
-
   wrap.title = `${todayKey}: ${scheduled.length ? done + "/" + scheduled.length + " Routine-Schritte" : "keine Routine-Schritte fällig"}`;
   wrap.innerHTML = `
     <div style="display:flex; justify-content:center; margin-bottom:30px;">
       <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
-        <div style="position:relative; width:200px; height:200px;">
-          <div style="position:absolute; inset:0;
-            background:rgba(255,255,255,0.16);
-            -webkit-mask-image:url('${maskUrl}'); -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat; -webkit-mask-position:center;
-            mask-image:url('${maskUrl}'); mask-size:100% 100%; mask-repeat:no-repeat; mask-position:center;"></div>
-          <div style="position:absolute; inset:0;
-            background:conic-gradient(from -90deg, var(--color-accent-700) 0%, var(--color-accent-100) 16.6%, var(--color-accent-600) 33.3%, var(--color-accent-200) 50%, var(--color-accent-700) 66.6%, var(--color-accent-300) 83.3%, var(--color-accent-700) 100%);
-            -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
-            mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;
-            filter:drop-shadow(0 0 5px color-mix(in srgb, var(--color-accent) 50%, transparent));"></div>
-          <div style="position:absolute; inset:0;
-            background:radial-gradient(circle at 32% 24%, rgba(255,255,255,0.9), transparent 55%);
-            mix-blend-mode:overlay; opacity:0.6;
-            -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
-            mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;"></div>
-          <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:34px; font-family:var(--font-heading); color:var(--color-neutral-100); text-shadow:0 1px 4px rgba(0,0,0,0.6);">${pct}%</span>
-        </div>
+        ${goldRingHtml(pct, 200, todayIdx, 34)}
         <span style="font-size:11px; font-family:var(--font-heading); color:var(--color-accent-300);">${WEEKDAY_LABELS[todayIdx]}</span>
       </div>
     </div>
@@ -1836,6 +1851,9 @@ function renderRoutineChain() {
         noteHtml = `<div class="routine-step-note">Heutiges Hauptfach: <strong>${subj ? escapeHtml(subj.title) : "–"}</strong>${quickAddVisible ? ' <button class="btn btn-ghost" style="font-size:11px; padding:0 4px; height:auto;" data-change-subject="1">ändern</button>' : ""}</div>`;
       }
     }
+    if (state.badDayMode && h.minVersion) {
+      noteHtml += `<div class="routine-step-note">Mindestversion: <strong>${escapeHtml(h.minVersion)}</strong></div>`;
+    }
 
     const checkHtml = h.type === "weight"
       ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1">${doneToday ? splatSvg(h.id) : ""}</button>`
@@ -1843,6 +1861,9 @@ function renderRoutineChain() {
     const weightInputHtml = h.type === "weight"
       ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:72px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
       : "";
+    const titleHtml = quickAddVisible
+      ? `<div class="item-title" data-edit-habit="${h.id}" style="cursor:pointer; text-decoration:underline dotted;">${escapeHtml(h.title)}</div>`
+      : `<div class="item-title">${escapeHtml(h.title)}</div>`;
 
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
@@ -1851,11 +1872,12 @@ function renderRoutineChain() {
     el.innerHTML = `
       ${checkHtml}
       <div style="flex:1; min-width:0;">
-        <div class="item-title">${escapeHtml(h.title)}</div>
+        ${titleHtml}
         ${noteHtml}
       </div>
       ${weightInputHtml}
       ${essentialToggleHtml(h)}
+      ${quickAddVisible ? `<button class="btn btn-icon btn-ghost" data-del-habit="${h.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>` : ""}
       ${dragHandleHtml(h.id)}
     `;
     wrap.appendChild(el);
@@ -1896,13 +1918,20 @@ function renderOtherHabits() {
     const doneToday = !!h.history[today];
     const streak = computeStreak(h);
     const priority = isPriority(h.nodeId);
+    const minVersionHtml = (state.badDayMode && h.minVersion)
+      ? `<div class="routine-step-note">Mindestversion: <strong>${escapeHtml(h.minVersion)}</strong></div>`
+      : "";
+    const titleHtml = quickAddVisible
+      ? `<div class="item-title" data-edit-habit="${h.id}" style="cursor:pointer; text-decoration:underline dotted;">${escapeHtml(h.title)}</div>`
+      : `<div class="item-title">${escapeHtml(h.title)}</div>`;
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
     el.innerHTML = `
       <button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}">${doneToday ? splatSvg(h.id) : ""}</button>
       <div style="flex:1; min-width:0;">
-        <div class="item-title">${escapeHtml(h.title)}</div>
+        ${titleHtml}
         <div class="item-meta">${frequencyLabel(h)} · Serie: ${streak}</div>
+        ${minVersionHtml}
       </div>
       ${priority ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">Priorität</span>' : ""}
       <button class="btn btn-icon btn-ghost" data-del-habit="${h.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
@@ -1920,21 +1949,6 @@ function subtreeMatchesQuery(node, q, seen = new Set()) {
 }
 
 // ---------- Roadmap: Dashboard (Ebene 1) -> Kategorie (Ebene 2) -> Pfad (Ebene 3) ----------
-function roadmapRingSvg(pct, size = 62) {
-  const r = 26, c = 2 * Math.PI * r;
-  const offset = (c * (1 - Math.min(100, pct) / 100)).toFixed(1);
-  return `
-    <div style="position:relative; width:${size}px; height:${size}px; margin:0 auto;">
-      <svg viewBox="0 0 64 64" width="${size}" height="${size}">
-        <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--color-neutral-800)" stroke-width="5"/>
-        <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--color-accent)" stroke-width="5" stroke-linecap="round"
-          stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset}" transform="rotate(-90 32 32)"
-          style="filter:drop-shadow(0 0 4px color-mix(in srgb, var(--color-accent) 60%, transparent));"/>
-      </svg>
-      <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:${Math.round(size * 0.22)}px; font-weight:700; font-family:var(--font-heading); color:var(--color-accent-200);">${Math.round(pct)}%</div>
-    </div>
-  `;
-}
 
 function renderGoalBrowser() {
   const wrap = document.getElementById("goalTree");
@@ -1949,6 +1963,32 @@ function renderGoalBrowser() {
   }
 }
 
+// Eine Ebene in der Roadmap zurück (Pfad -> Kategorie -> Dashboard). Gibt true zurück, wenn es
+// etwas zum Zurückgehen gab (für die Kanten-Wisch-Geste).
+function roadmapGoBack() {
+  if (roadmapView === "path" && roadmapPathId) {
+    const ancestry = nodePath(roadmapPathId);
+    const rootId = ancestry[0] ? ancestry[0].id : null;
+    roadmapPathId = null;
+    if (rootId) {
+      roadmapView = "category";
+      roadmapRootId = rootId;
+    } else {
+      roadmapView = "dashboard";
+      roadmapRootId = null;
+    }
+    renderGoalBrowser();
+    return true;
+  }
+  if (roadmapView === "category") {
+    roadmapView = "dashboard";
+    roadmapRootId = null;
+    renderGoalBrowser();
+    return true;
+  }
+  return false;
+}
+
 function renderRoadmapDashboard() {
   const q = bereicheSearchQuery.trim().toLowerCase();
   const roots = q ? childNodes(null).filter(n => subtreeMatchesQuery(n, q)) : childNodes(null);
@@ -1958,62 +1998,60 @@ function renderRoadmapDashboard() {
     return wrap;
   }
   wrap.className = "roadmap-folder-grid";
-  roots.forEach(node => {
+  roots.forEach((node, i) => {
     const pct = Math.round(nodeProgress(node) * 100);
     const card = document.createElement("button");
     card.className = "roadmap-folder-card";
     card.dataset.openRoadmapRoot = node.id;
     card.innerHTML = `
       <div class="roadmap-folder-name">${escapeHtml(node.title)}</div>
-      ${roadmapRingSvg(pct)}
+      <div style="display:flex; justify-content:center;">${goldRingHtml(pct, 88, i)}</div>
     `;
     wrap.appendChild(card);
   });
   return wrap;
 }
 
+function roadmapCardHtml(p) {
+  const pct = Math.round(nodeProgress(p) * 100);
+  const children = childNodes(p.id);
+  const tasks = categoryTasksForNode(p.id);
+  const stepCount = children.length || tasks.length;
+  const doneCount = children.length
+    ? children.filter(c => Math.round(nodeProgress(c) * 100) >= 100).length
+    : tasks.filter(t => t.done).length;
+  return `
+    <button class="roadmap-card" data-open-roadmap-path="${p.id}">
+      ${miniProgressRing(pct, 34)}
+      <div class="roadmap-card-body">
+        <div class="roadmap-card-title">${escapeHtml(p.title)}</div>
+        <div class="roadmap-card-meta">${doneCount} / ${stepCount} Etappen</div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="flex-shrink:0; color:var(--color-neutral-500);"><path d="M7.5 4.5L13 10L7.5 15.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  `;
+}
+
+// Ebene 2: alle Themen dieses Teilbereichs untereinander als Liste, kein Links-Rechts-Slide mehr.
 function renderRoadmapCategory(rootId) {
   const root = nodeById(rootId);
-  const subtabs = childNodes(rootId);
-  if (!roadmapSubtabId || !subtabs.some(s => s.id === roadmapSubtabId)) {
-    roadmapSubtabId = subtabs[0] ? subtabs[0].id : null;
-  }
+  const themes = childNodes(rootId);
   const wrap = document.createElement("div");
   wrap.className = "roadmap-category";
+  const sectionsHtml = themes.length
+    ? themes.map(theme => {
+        const projects = childNodes(theme.id);
+        const targets = projects.length ? projects : [theme];
+        return `
+          <h6 class="metal-gold" style="margin:22px 0 8px;">${escapeHtml(theme.title)}</h6>
+          <div class="roadmap-card-list">${targets.map(roadmapCardHtml).join("")}</div>
+        `;
+      }).join("")
+    : '<div class="empty-hint">Noch keine Unterkategorien.</div>';
   wrap.innerHTML = `
     <div class="roadmap-crumb"><button data-roadmap-crumb-home>Roadmap</button> <span>&rsaquo;</span> <b>${escapeHtml(root.title)}</b></div>
-    <div class="roadmap-subtabs">${subtabs.map(s => `<button class="roadmap-subtab${s.id === roadmapSubtabId ? " active" : ""}" data-roadmap-subtab="${s.id}">${escapeHtml(s.title)}</button>`).join("") || ""}</div>
-    <div class="roadmap-card-list" id="roadmapCardList"></div>
+    ${sectionsHtml}
   `;
-  const list = wrap.querySelector("#roadmapCardList");
-  const activeSubtab = roadmapSubtabId ? nodeById(roadmapSubtabId) : null;
-  if (!activeSubtab) {
-    list.innerHTML = '<div class="empty-hint">Noch keine Unterkategorien.</div>';
-  } else {
-    const projects = childNodes(activeSubtab.id);
-    const targets = projects.length ? projects : [activeSubtab];
-    targets.forEach(p => {
-      const pct = Math.round(nodeProgress(p) * 100);
-      const children = childNodes(p.id);
-      const tasks = categoryTasksForNode(p.id);
-      const stepCount = children.length || tasks.length;
-      const doneCount = children.length
-        ? children.filter(c => Math.round(nodeProgress(c) * 100) >= 100).length
-        : tasks.filter(t => t.done).length;
-      const card = document.createElement("button");
-      card.className = "roadmap-card";
-      card.dataset.openRoadmapPath = p.id;
-      card.innerHTML = `
-        ${miniProgressRing(pct, 34)}
-        <div class="roadmap-card-body">
-          <div class="roadmap-card-title">${escapeHtml(p.title)}</div>
-          <div class="roadmap-card-meta">${doneCount} / ${stepCount} Etappen</div>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="flex-shrink:0; color:var(--color-neutral-500);"><path d="M7.5 4.5L13 10L7.5 15.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      `;
-      list.appendChild(card);
-    });
-  }
   return wrap;
 }
 
@@ -2196,9 +2234,18 @@ const HEATMAP_GOLD = "#d4af37";
 
 function dayCompletionPct(dateObj) {
   const key = localDateKey(dateObj);
-  const scheduled = state.habits.filter(h => new Date(h.createdAt) <= dateObj && isScheduledToday(h, dateObj));
-  const done = scheduled.filter(h => h.history[key]).length;
-  return scheduled.length ? Math.round((done / scheduled.length) * 100) : null;
+  const scheduled = state.habits.filter(h => localDateKey(new Date(h.createdAt)) <= key && isScheduledToday(h, dateObj));
+  const totalPoints = scheduled.reduce((sum, h) => sum + (h.points ?? 1), 0);
+  const earnedPoints = scheduled.filter(h => h.history[key]).reduce((sum, h) => sum + (h.points ?? 1), 0);
+  return totalPoints ? Math.round((earnedPoints / totalPoints) * 100) : null;
+}
+
+// Unter 25% erreichten Punkten voll Blau/Grau, ab 80% bereits voll Gold.
+function heatmapColorT(pct) {
+  if (pct === null) return 0;
+  if (pct <= 25) return 0;
+  if (pct >= 80) return 1;
+  return (pct - 25) / (80 - 25);
 }
 
 function renderActivityHeatmap() {
@@ -2216,7 +2263,7 @@ function renderActivityHeatmap() {
     const pct = dayCompletionPct(d);
     const cell = document.createElement("div");
     cell.className = "heatmap-cell";
-    const t = pct === null ? 0 : pct / 100;
+    const t = heatmapColorT(pct);
     const base = lerpColor(HEATMAP_GREY, HEATMAP_GOLD, t);
     cell.style.background = `linear-gradient(135deg, color-mix(in srgb, ${base} 100%, white 22%) 0%, ${base} 45%, color-mix(in srgb, ${base} 100%, black 25%) 100%)`;
     cell.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 2px rgba(0,0,0,0.35)";
@@ -2226,7 +2273,42 @@ function renderActivityHeatmap() {
   });
 }
 
+let currentDaySheetKey = null;
+
+function dayHabitsList(dateObj) {
+  const key = localDateKey(dateObj);
+  return state.habits
+    .filter(h => localDateKey(new Date(h.createdAt)) <= key && isScheduledToday(h, dateObj))
+    .sort((a, b) => (a.routineOrder ?? 999) - (b.routineOrder ?? 999) || a.title.localeCompare(b.title, "de"));
+}
+
+function renderDaySheetHabits(dateObj) {
+  const key = localDateKey(dateObj);
+  const habits = dayHabitsList(dateObj);
+  if (!habits.length) return '<div class="empty-hint">Keine Gewohnheiten an diesem Tag fällig.</div>';
+  return habits.map(h => {
+    const rawValue = h.history[key];
+    const doneToday = h.type === "weight" ? (rawValue !== undefined && rawValue !== null) : !!rawValue;
+    const checkHtml = h.type === "weight"
+      ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1">${doneToday ? splatSvg(h.id) : ""}</button>`
+      : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" data-date="${key}">${doneToday ? splatSvg(h.id) : ""}</button>`;
+    const weightInputHtml = h.type === "weight"
+      ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:72px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" data-date="${key}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
+      : "";
+    return `
+      <div class="atlas-row${doneToday ? " done" : ""}">
+        ${checkHtml}
+        <div style="flex:1; min-width:0;">
+          <div class="item-title">${escapeHtml(h.title)}</div>
+        </div>
+        ${weightInputHtml}
+      </div>
+    `;
+  }).join("");
+}
+
 function openDaySheet(dateKey) {
+  currentDaySheetKey = dateKey;
   const d = dateFromKey(dateKey);
   const pct = dayCompletionPct(d);
   const weekday = d.toLocaleDateString("de-DE", { weekday: "long" });
@@ -2240,7 +2322,8 @@ function openDaySheet(dateKey) {
       </button>
     </div>
     <div class="metal-gold" style="font-size:15px; font-family:var(--font-heading); margin-top:10px;">${levelLabel}</div>
-    <p class="text-muted" style="font-size:13px; margin:10px 0 0;">Detailansicht pro Tag folgt, sobald Tagesverläufe gespeichert werden.</p>
+    <p class="text-muted" style="font-size:12px; margin:8px 0 12px;">Tippe eine Gewohnheit an, um sie für diesen Tag nachzutragen oder zu korrigieren.</p>
+    <div style="display:flex; flex-direction:column; gap:8px;">${renderDaySheetHabits(d)}</div>
   `, body => { body.querySelector("#mCloseSheet").addEventListener("click", closeModal); }, "sheet");
 }
 
@@ -2346,6 +2429,7 @@ function renderAll() {
   renderTodo();
   renderGoalBrowser();
   renderPlanning();
+  renderFinance();
   renderPrayers();
   renderWeekStats();
   updateNotifPermissionUI();
@@ -2357,12 +2441,13 @@ document.addEventListener("change", e => {
   if (e.target.matches("[data-weight-habit]")) {
     const id = e.target.dataset.weightHabit;
     const habit = state.habits.find(h => h.id === id);
-    const key = todayStr();
+    const key = e.target.dataset.date || todayStr();
     const val = e.target.value === "" ? null : parseFloat(e.target.value);
     if (val === null || isNaN(val) || val < 0) delete habit.history[key];
     else habit.history[key] = val;
     saveData();
     renderAll();
+    if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
   }
   if (e.target.matches("#reflectionText")) {
     const key = e.target.dataset.weekKey || weekStartKey();
@@ -2384,11 +2469,12 @@ document.addEventListener("click", e => {
   const habitCheck = e.target.closest("[data-habit]");
   if (habitCheck) {
     const habit = state.habits.find(h => h.id === habitCheck.dataset.habit);
-    const key = todayStr();
+    const key = habitCheck.dataset.date || todayStr();
     if (habit.history[key]) delete habit.history[key];
     else { habit.history[key] = true; habit.missNotified = false; }
     saveData();
     renderAll();
+    if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
     return;
   }
   const essentialBtn = e.target.closest("[data-toggle-essential]");
@@ -2396,6 +2482,12 @@ document.addEventListener("click", e => {
     const habit = state.habits.find(h => h.id === essentialBtn.dataset.toggleEssential);
     if (habit) habit.essential = !habit.essential;
     saveData(); renderAll();
+    return;
+  }
+  const editHabitEl = e.target.closest("[data-edit-habit]");
+  if (editHabitEl) {
+    const habit = state.habits.find(h => h.id === editHabitEl.dataset.editHabit);
+    if (habit) openHabitModal(false, habit);
     return;
   }
   if (e.target.matches("[data-del-task]")) {
@@ -2415,13 +2507,7 @@ document.addEventListener("click", e => {
   const openRootBtn = e.target.closest("[data-open-roadmap-root]");
   if (openRootBtn) {
     roadmapRootId = openRootBtn.dataset.openRoadmapRoot;
-    roadmapSubtabId = null;
     roadmapView = "category";
-    renderGoalBrowser();
-  }
-  const subtabBtn = e.target.closest("[data-roadmap-subtab]");
-  if (subtabBtn) {
-    roadmapSubtabId = subtabBtn.dataset.roadmapSubtab;
     renderGoalBrowser();
   }
   const openPathBtn = e.target.closest("[data-open-roadmap-path]");
@@ -2433,7 +2519,7 @@ document.addEventListener("click", e => {
   const crumbHomeBtn = e.target.closest("[data-roadmap-crumb-home]");
   if (crumbHomeBtn) {
     roadmapView = "dashboard";
-    roadmapRootId = null; roadmapSubtabId = null; roadmapPathId = null;
+    roadmapRootId = null; roadmapPathId = null;
     renderGoalBrowser();
   }
   const crumbNodeBtn = e.target.closest("[data-roadmap-crumb-node]");
@@ -2460,6 +2546,43 @@ document.addEventListener("click", e => {
   if (e.target.matches("[data-del-exam]")) {
     state.exams = state.exams.filter(x => x.id !== e.target.dataset.delExam);
     saveData(); renderAll();
+  }
+  const delAccountBtn = e.target.closest("[data-del-account]");
+  if (delAccountBtn) {
+    state.financeAccounts = state.financeAccounts.filter(a => a.id !== delAccountBtn.dataset.delAccount);
+    saveData(); renderAll();
+    return;
+  }
+  const editAccountEl = e.target.closest("[data-edit-account]");
+  if (editAccountEl) {
+    const account = state.financeAccounts.find(a => a.id === editAccountEl.dataset.editAccount);
+    if (account) openAccountModal(account);
+    return;
+  }
+  const delCategoryBtn = e.target.closest("[data-del-category]");
+  if (delCategoryBtn) {
+    state.financeCategories = state.financeCategories.filter(c => c.id !== delCategoryBtn.dataset.delCategory);
+    state.financeExpenses = state.financeExpenses.filter(ex => ex.categoryId !== delCategoryBtn.dataset.delCategory);
+    saveData(); renderAll();
+    return;
+  }
+  const editCategoryEl = e.target.closest("[data-edit-category]");
+  if (editCategoryEl) {
+    const category = state.financeCategories.find(c => c.id === editCategoryEl.dataset.editCategory);
+    if (category) openCategoryModal(category);
+    return;
+  }
+  const delGoalBtn = e.target.closest("[data-del-goal]");
+  if (delGoalBtn) {
+    state.savingsGoals = state.savingsGoals.filter(g => g.id !== delGoalBtn.dataset.delGoal);
+    saveData(); renderAll();
+    return;
+  }
+  const editGoalEl = e.target.closest("[data-edit-goal]");
+  if (editGoalEl) {
+    const goal = state.savingsGoals.find(g => g.id === editGoalEl.dataset.editGoal);
+    if (goal) openSavingsGoalModal(goal);
+    return;
   }
   if (e.target.matches("[data-del-deviation]")) {
     state.deviations = state.deviations.filter(d => d.id !== e.target.dataset.delDeviation);
@@ -2617,6 +2740,10 @@ function resourceLinksRow(node) {
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
 document.getElementById("addExamBtn").addEventListener("click", () => openExamModal());
+document.getElementById("addAccountBtn").addEventListener("click", () => openAccountModal());
+document.getElementById("addExpenseBtn").addEventListener("click", () => openExpenseModal());
+document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal());
+document.getElementById("addSavingsGoalBtn").addEventListener("click", () => openSavingsGoalModal());
 document.getElementById("addDeviationBtn").addEventListener("click", () => {
   const input = document.getElementById("deviationInput");
   addDeviation(input.value);
@@ -2723,15 +2850,16 @@ function openTaskModal(defaultNodeId, source = "todo") {
   });
 }
 
-function openHabitModal(forceRoutine = false) {
+function openHabitModal(forceRoutine = false, editHabit = null) {
+  const isEdit = !!editHabit;
   openModal(`
-    <h3>${forceRoutine ? "Routine-Schritt hinzufügen" : "Gewohnheit hinzufügen"}</h3>
+    <h3>${isEdit ? "Gewohnheit bearbeiten" : (forceRoutine ? "Routine-Schritt hinzufügen" : "Gewohnheit hinzufügen")}</h3>
     <div class="field">
       <label>Titel</label>
-      <input type="text" id="mHabitTitle" placeholder="z.B. 30 Min lesen">
+      <input type="text" id="mHabitTitle" placeholder="z.B. 30 Min lesen" value="${isEdit ? escapeHtml(editHabit.title) : ""}">
     </div>
     <div class="checkbox-row">
-      <input type="checkbox" id="mHabitRoutine" ${forceRoutine ? "checked" : ""}>
+      <input type="checkbox" id="mHabitRoutine" ${(isEdit ? editHabit.routineOrder != null : forceRoutine) ? "checked" : ""}>
       <label for="mHabitRoutine">Teil der festen Tagesroutine (Reihenfolge im Heute-Tab)</label>
     </div>
     <div class="field">
@@ -2745,7 +2873,7 @@ function openHabitModal(forceRoutine = false) {
     </div>
     <div class="field" id="mHabitIntervalField" style="display:none">
       <label>Alle wie viele Tage?</label>
-      <input type="number" id="mHabitIntervalDays" min="2" value="3">
+      <input type="number" id="mHabitIntervalDays" min="2" value="${isEdit ? (editHabit.intervalDays || 3) : 3}">
     </div>
     <div class="field" id="mHabitWeeklyField" style="display:none">
       <label>Wochentag</label>
@@ -2759,7 +2887,7 @@ function openHabitModal(forceRoutine = false) {
         <option value="0">Sonntag</option>
       </select>
       <label>Alle wie viele Wochen?</label>
-      <input type="number" id="mHabitEveryNWeeks" min="1" value="2">
+      <input type="number" id="mHabitEveryNWeeks" min="1" value="${isEdit ? (editHabit.everyNWeeks || 2) : 2}">
     </div>
     <div class="field">
       <label>Zielbereich (optional)</label>
@@ -2767,6 +2895,14 @@ function openHabitModal(forceRoutine = false) {
         <option value="">– keiner –</option>
         ${nodeOptionsHtml()}
       </select>
+    </div>
+    <div class="field">
+      <label>Punkte</label>
+      <input type="number" id="mHabitPoints" min="1" step="1" value="${isEdit ? (editHabit.points ?? 1) : 1}">
+    </div>
+    <div class="field">
+      <label>Mindestversion für schlechte Tage (optional)</label>
+      <input type="text" id="mHabitMinVersion" placeholder="z.B. 5 Liegestütze statt 10" value="${isEdit ? escapeHtml(editHabit.minVersion || "") : ""}">
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
@@ -2778,6 +2914,12 @@ function openHabitModal(forceRoutine = false) {
     const freqSelect = body.querySelector("#mHabitFrequency");
     const intervalField = body.querySelector("#mHabitIntervalField");
     const weeklyField = body.querySelector("#mHabitWeeklyField");
+    if (isEdit) freqSelect.value = editHabit.frequency;
+    const catSelect = body.querySelector("#mHabitCategory");
+    if (isEdit && editHabit.nodeId) catSelect.value = editHabit.nodeId;
+    intervalField.style.display = freqSelect.value === "interval" ? "" : "none";
+    weeklyField.style.display = freqSelect.value === "weekly-on" ? "" : "none";
+    if (isEdit) body.querySelector("#mHabitWeekday").value = String(editHabit.weekday ?? 0);
     freqSelect.addEventListener("change", () => {
       intervalField.style.display = freqSelect.value === "interval" ? "" : "none";
       weeklyField.style.display = freqSelect.value === "weekly-on" ? "" : "none";
@@ -2785,7 +2927,7 @@ function openHabitModal(forceRoutine = false) {
     body.querySelector("#mSave").addEventListener("click", () => {
       const title = body.querySelector("#mHabitTitle").value.trim();
       if (!title) return;
-      const nodeId = body.querySelector("#mHabitCategory").value || null;
+      const nodeId = catSelect.value || null;
       const frequency = freqSelect.value;
       const extra = {};
       if (frequency === "interval") extra.intervalDays = parseInt(body.querySelector("#mHabitIntervalDays").value, 10) || 1;
@@ -2794,8 +2936,25 @@ function openHabitModal(forceRoutine = false) {
         extra.everyNWeeks = parseInt(body.querySelector("#mHabitEveryNWeeks").value, 10) || 1;
       }
       const isRoutine = body.querySelector("#mHabitRoutine").checked;
-      const routineOrder = isRoutine ? state.habits.reduce((max, h) => Math.max(max, h.routineOrder ?? -1), -1) + 1 : null;
-      state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check" });
+      const points = parseInt(body.querySelector("#mHabitPoints").value, 10) || 1;
+      const minVersion = body.querySelector("#mHabitMinVersion").value.trim() || null;
+      if (isEdit) {
+        editHabit.title = title;
+        editHabit.nodeId = nodeId;
+        editHabit.frequency = frequency;
+        delete editHabit.intervalDays; delete editHabit.weekday; delete editHabit.everyNWeeks;
+        Object.assign(editHabit, extra);
+        editHabit.points = points;
+        editHabit.minVersion = minVersion;
+        if (isRoutine && editHabit.routineOrder == null) {
+          editHabit.routineOrder = state.habits.reduce((max, h) => Math.max(max, h.routineOrder ?? -1), -1) + 1;
+        } else if (!isRoutine) {
+          editHabit.routineOrder = null;
+        }
+      } else {
+        const routineOrder = isRoutine ? state.habits.reduce((max, h) => Math.max(max, h.routineOrder ?? -1), -1) + 1 : null;
+        state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check", points, minVersion });
+      }
       saveData();
       closeModal();
       renderAll();
@@ -2903,6 +3062,14 @@ function openExamModal() {
   });
 }
 
+function examCountdownLabel(dateKey) {
+  const daysUntil = Math.round((dateFromKey(dateKey) - dateFromKey(todayStr())) / 86400000);
+  if (daysUntil === 0) return "heute";
+  if (daysUntil === 1) return "morgen";
+  if (daysUntil > 1) return `in ${daysUntil} Tagen`;
+  return `vor ${Math.abs(daysUntil)} Tag${Math.abs(daysUntil) === 1 ? "" : "en"}`;
+}
+
 function renderPlanning() {
   const examsWrap = document.getElementById("examsList");
   if (examsWrap) {
@@ -2910,18 +3077,254 @@ function renderPlanning() {
     examsWrap.innerHTML = sorted.length
       ? sorted.map(e => {
           const subject = state.subjects.find(s => s.id === e.subjectId);
+          const daysUntil = Math.round((dateFromKey(e.date) - dateFromKey(todayStr())) / 86400000);
           return `
             <div class="atlas-row">
               <div style="flex:1; min-width:0;">
                 <div class="item-title">${subject ? escapeHtml(subject.title) : "Unbekanntes Fach"}</div>
                 <div class="item-meta">${e.date}</div>
               </div>
+              <span class="atlas-chip" style="background:${daysUntil <= 0 ? "var(--color-accent-900)" : "var(--color-neutral-800)"}; color:${daysUntil <= 0 ? "var(--color-accent-300)" : "var(--color-neutral-300)"};">${examCountdownLabel(e.date)}</span>
               <button class="btn btn-icon btn-ghost" data-del-exam="${e.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
             </div>
           `;
         }).join("")
       : '<div class="empty-hint">Noch keine Klassenarbeiten eingetragen.</div>';
   }
+}
+
+// ---------- Finanzplanung ----------
+function formatEuro(n) {
+  return (n || 0).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+}
+function financeMonthKey(d = new Date()) { return localDateKey(d).slice(0, 7); }
+
+const DEL_ICON = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg>';
+
+function renderFinance() {
+  const netWorthEl = document.getElementById("financeNetWorth");
+  if (!netWorthEl) return;
+
+  const totalNetWorth = state.financeAccounts.reduce((s, a) => s + (a.balance || 0), 0);
+  netWorthEl.textContent = formatEuro(totalNetWorth);
+
+  const accountsWrap = document.getElementById("financeAccountsList");
+  accountsWrap.innerHTML = state.financeAccounts.length
+    ? state.financeAccounts.map(a => `
+        <div class="atlas-row">
+          <div style="flex:1; min-width:0; cursor:pointer;" data-edit-account="${a.id}">
+            <div class="item-title">${escapeHtml(a.title)}</div>
+          </div>
+          <div style="font-family:var(--font-heading); font-weight:600;">${formatEuro(a.balance || 0)}</div>
+          <button class="btn btn-icon btn-ghost" data-del-account="${a.id}" aria-label="Löschen">${DEL_ICON}</button>
+        </div>
+      `).join("")
+    : '<div class="empty-hint">Noch keine Konten/Vermögenswerte angelegt.</div>';
+
+  const monthKey = financeMonthKey();
+  const monthExpenses = state.financeExpenses.filter(e => e.date.slice(0, 7) === monthKey);
+  const totalSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
+  const totalLimit = state.financeCategories.reduce((s, c) => s + (c.limit || 0), 0);
+  document.getElementById("financeMonthSpent").textContent = `${formatEuro(totalSpent)} / ${formatEuro(totalLimit)}`;
+
+  const categoriesWrap = document.getElementById("financeCategoriesList");
+  categoriesWrap.innerHTML = state.financeCategories.length
+    ? state.financeCategories.map(c => {
+        const spent = monthExpenses.filter(e => e.categoryId === c.id).reduce((s, e) => s + e.amount, 0);
+        const pct = c.limit ? Math.min(100, Math.round((spent / c.limit) * 100)) : 0;
+        const over = c.limit > 0 && spent > c.limit;
+        return `
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+              <div class="item-title" style="cursor:pointer;" data-edit-category="${c.id}">${escapeHtml(c.title)}</div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="item-meta" style="${over ? "color:var(--color-accent-300);" : ""}">${formatEuro(spent)} / ${formatEuro(c.limit || 0)}</span>
+                <button class="btn btn-icon btn-ghost" data-del-category="${c.id}" aria-label="Löschen">${DEL_ICON}</button>
+              </div>
+            </div>
+            <div class="progress-outer" style="margin-bottom:0;"><div class="progress-inner" style="width:${pct}%; ${over ? "background:var(--color-accent-300);" : ""}"></div></div>
+          </div>
+        `;
+      }).join("")
+    : '<div class="empty-hint">Noch keine Budget-Kategorien angelegt.</div>';
+
+  const goalsWrap = document.getElementById("savingsGoalsList");
+  goalsWrap.innerHTML = state.savingsGoals.length
+    ? state.savingsGoals.map(g => {
+        const pct = g.target ? Math.min(100, Math.round(((g.current || 0) / g.target) * 100)) : 0;
+        return `
+          <div class="atlas-row">
+            <div style="cursor:pointer; display:flex; align-items:center; gap:12px; flex:1; min-width:0;" data-edit-goal="${g.id}">
+              ${miniProgressRing(pct, 34)}
+              <div style="flex:1; min-width:0;">
+                <div class="item-title">${escapeHtml(g.title)}</div>
+                <div class="item-meta">${formatEuro(g.current || 0)} / ${formatEuro(g.target || 0)}${g.dueDate ? " · bis " + g.dueDate : ""}</div>
+              </div>
+            </div>
+            <button class="btn btn-icon btn-ghost" data-del-goal="${g.id}" aria-label="Löschen">${DEL_ICON}</button>
+          </div>
+        `;
+      }).join("")
+    : '<div class="empty-hint">Noch keine Sparziele angelegt.</div>';
+}
+
+function openAccountModal(editAccount = null) {
+  const isEdit = !!editAccount;
+  openModal(`
+    <h3>${isEdit ? "Konto bearbeiten" : "Konto/Vermögenswert hinzufügen"}</h3>
+    <div class="field">
+      <label>Titel</label>
+      <input type="text" id="mAccountTitle" placeholder="z.B. Girokonto, Depot, Bargeld" value="${isEdit ? escapeHtml(editAccount.title) : ""}">
+    </div>
+    <div class="field">
+      <label>Aktueller Kontostand (€)</label>
+      <input type="number" step="0.01" id="mAccountBalance" value="${isEdit ? (editAccount.balance || 0) : ""}">
+    </div>
+    <div class="modal-actions">
+      ${isEdit ? `<button class="btn btn-ghost" id="mDelete" style="color:var(--color-accent-300); margin-right:auto;">Löschen</button>` : ""}
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mAccountTitle").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    if (isEdit) body.querySelector("#mDelete").addEventListener("click", () => {
+      state.financeAccounts = state.financeAccounts.filter(a => a.id !== editAccount.id);
+      saveData(); closeModal(); renderAll();
+    });
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const title = body.querySelector("#mAccountTitle").value.trim();
+      if (!title) return;
+      const balance = parseFloat(body.querySelector("#mAccountBalance").value) || 0;
+      if (isEdit) { editAccount.title = title; editAccount.balance = balance; }
+      else state.financeAccounts.push({ id: uid(), title, balance });
+      saveData(); closeModal(); renderAll();
+    });
+  });
+}
+
+function openCategoryModal(editCategory = null) {
+  const isEdit = !!editCategory;
+  openModal(`
+    <h3>${isEdit ? "Kategorie bearbeiten" : "Budget-Kategorie hinzufügen"}</h3>
+    <div class="field">
+      <label>Titel</label>
+      <input type="text" id="mCategoryTitle" placeholder="z.B. Lebensmittel" value="${isEdit ? escapeHtml(editCategory.title) : ""}">
+    </div>
+    <div class="field">
+      <label>Monatliches Limit (€)</label>
+      <input type="number" step="0.01" min="0" id="mCategoryLimit" value="${isEdit ? (editCategory.limit || 0) : ""}">
+    </div>
+    <div class="modal-actions">
+      ${isEdit ? `<button class="btn btn-ghost" id="mDelete" style="color:var(--color-accent-300); margin-right:auto;">Löschen</button>` : ""}
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mCategoryTitle").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    if (isEdit) body.querySelector("#mDelete").addEventListener("click", () => {
+      state.financeCategories = state.financeCategories.filter(c => c.id !== editCategory.id);
+      state.financeExpenses = state.financeExpenses.filter(e => e.categoryId !== editCategory.id);
+      saveData(); closeModal(); renderAll();
+    });
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const title = body.querySelector("#mCategoryTitle").value.trim();
+      if (!title) return;
+      const limit = parseFloat(body.querySelector("#mCategoryLimit").value) || 0;
+      if (isEdit) { editCategory.title = title; editCategory.limit = limit; }
+      else state.financeCategories.push({ id: uid(), title, limit });
+      saveData(); closeModal(); renderAll();
+    });
+  });
+}
+
+function openExpenseModal() {
+  if (state.financeCategories.length === 0) {
+    openCategoryModal();
+    return;
+  }
+  openModal(`
+    <h3>Ausgabe erfassen</h3>
+    <div class="field">
+      <label>Kategorie</label>
+      <select id="mExpenseCategory">
+        ${state.financeCategories.map(c => `<option value="${c.id}">${escapeHtml(c.title)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="field">
+      <label>Betrag (€)</label>
+      <input type="number" step="0.01" min="0" id="mExpenseAmount" placeholder="0.00">
+    </div>
+    <div class="field">
+      <label>Datum</label>
+      <input type="date" id="mExpenseDate" value="${todayStr()}">
+    </div>
+    <div class="field">
+      <label>Notiz (optional)</label>
+      <input type="text" id="mExpenseNote" placeholder="z.B. Wocheneinkauf">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const categoryId = body.querySelector("#mExpenseCategory").value;
+      const amount = parseFloat(body.querySelector("#mExpenseAmount").value);
+      const date = body.querySelector("#mExpenseDate").value;
+      const note = body.querySelector("#mExpenseNote").value.trim() || null;
+      if (!categoryId || !amount || amount <= 0 || !date) return;
+      state.financeExpenses.push({ id: uid(), categoryId, amount, date, note });
+      saveData(); closeModal(); renderAll();
+    });
+  });
+}
+
+function openSavingsGoalModal(editGoal = null) {
+  const isEdit = !!editGoal;
+  openModal(`
+    <h3>${isEdit ? "Sparziel bearbeiten" : "Sparziel hinzufügen"}</h3>
+    <div class="field">
+      <label>Titel</label>
+      <input type="text" id="mGoalTitle" placeholder="z.B. Notgroschen" value="${isEdit ? escapeHtml(editGoal.title) : ""}">
+    </div>
+    <div class="field">
+      <label>Zielbetrag (€)</label>
+      <input type="number" step="0.01" min="0" id="mGoalTarget" value="${isEdit ? (editGoal.target || 0) : ""}">
+    </div>
+    <div class="field">
+      <label>Aktuell gespart (€)</label>
+      <input type="number" step="0.01" min="0" id="mGoalCurrent" value="${isEdit ? (editGoal.current || 0) : 0}">
+    </div>
+    <div class="field">
+      <label>Ziel-Datum (optional)</label>
+      <input type="date" id="mGoalDate" value="${isEdit && editGoal.dueDate ? editGoal.dueDate : ""}">
+    </div>
+    <div class="modal-actions">
+      ${isEdit ? `<button class="btn btn-ghost" id="mDelete" style="color:var(--color-accent-300); margin-right:auto;">Löschen</button>` : ""}
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mGoalTitle").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    if (isEdit) body.querySelector("#mDelete").addEventListener("click", () => {
+      state.savingsGoals = state.savingsGoals.filter(g => g.id !== editGoal.id);
+      saveData(); closeModal(); renderAll();
+    });
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const title = body.querySelector("#mGoalTitle").value.trim();
+      if (!title) return;
+      const target = parseFloat(body.querySelector("#mGoalTarget").value) || 0;
+      const current = parseFloat(body.querySelector("#mGoalCurrent").value) || 0;
+      const dueDate = body.querySelector("#mGoalDate").value || null;
+      if (isEdit) { editGoal.title = title; editGoal.target = target; editGoal.current = current; editGoal.dueDate = dueDate; }
+      else state.savingsGoals.push({ id: uid(), title, target, current, dueDate });
+      saveData(); closeModal(); renderAll();
+    });
+  });
 }
 
 // ---------- Gebetsanliegen ----------
@@ -3090,15 +3493,18 @@ function exportWeekReview() {
     md += `- **${h.title}**: ${doneCount}/${scheduledCount} Tage · Serie: ${streak}\n`;
   });
 
-  md += `\n## Aufgaben (letzte 7 Tage)\n`;
-  const weekTasks = state.tasks.filter(t => t.dueDate && t.dueDate >= fmt(start) && t.dueDate <= fmt(end));
-  const doneWeekTasks = weekTasks.filter(t => t.done);
-  const onTimeCount = doneWeekTasks.filter(isOnTime).length;
-  md += `- Erledigt: ${doneWeekTasks.length}/${weekTasks.length}\n`;
-  md += `- Davon pünktlich: ${onTimeCount}/${doneWeekTasks.length || 0}\n`;
-  weekTasks.forEach(t => {
-    md += `  - [${t.done ? "x" : " "}] ${t.title} (fällig ${t.dueDate})\n`;
-  });
+  md += `\n## ToDos\n`;
+  const todoTasksAll = state.tasks.filter(t => (t.source || "todo") !== "category");
+  const doneTodos = todoTasksAll.filter(t => t.done);
+  const onTimeCount = doneTodos.filter(isOnTime).length;
+  md += `- Erledigt: ${doneTodos.length}/${todoTasksAll.length}\n`;
+  md += `- Davon pünktlich: ${onTimeCount}/${doneTodos.length || 0}\n`;
+  todoTasksAll
+    .slice()
+    .sort((a, b) => (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99"))
+    .forEach(t => {
+      md += `  - [${t.done ? "x" : " "}] ${t.title}${t.dueDate ? " (fällig " + t.dueDate + ")" : ""}\n`;
+    });
 
   md += `\n## Zielbereiche\n`;
   childNodes(null).forEach(node => {
@@ -3133,7 +3539,33 @@ function exportWeekReview() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+
+  // Erledigte ToDos sind jetzt im Wochenrückblick gesichert — sie starten nicht in die neue Woche.
+  // Roadmap-Schritte (source "category") bleiben davon unberührt, die zählen dauerhaft zum Fortschritt.
+  const hadDoneTodos = state.tasks.some(t => t.done && (t.source || "todo") !== "category");
+  if (hadDoneTodos) {
+    state.tasks = state.tasks.filter(t => !(t.done && (t.source || "todo") !== "category"));
+    saveData();
+    renderAll();
+  }
 }
 
 // ---------- Init ----------
 renderAll();
+document.addEventListener("visibilitychange", () => { if (!document.hidden) renderAll(); });
+
+// Swipe vom linken Bildschirmrand nach rechts = eine Roadmap-Ebene zurück (wie iOS Zurück-Geste).
+let edgeSwipeStart = null;
+document.addEventListener("touchstart", e => {
+  if (document.body.dataset.tab !== "zielbereiche") { edgeSwipeStart = null; return; }
+  const t = e.touches[0];
+  edgeSwipeStart = t.clientX <= 24 ? { x: t.clientX, y: t.clientY } : null;
+}, { passive: true });
+document.addEventListener("touchend", e => {
+  if (!edgeSwipeStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - edgeSwipeStart.x;
+  const dy = Math.abs(t.clientY - edgeSwipeStart.y);
+  edgeSwipeStart = null;
+  if (dx > 60 && dy < 60) roadmapGoBack();
+}, { passive: true });
