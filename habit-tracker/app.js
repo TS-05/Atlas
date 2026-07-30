@@ -1005,8 +1005,8 @@ function metallicRingGradient(base) {
 // jeder erledigten Aufgabe einen Schritt weiter durch die Anlassfarben; bei 100% (alles erledigt) geht
 // der Ring in einen "geglühten" Sonderzustand über: weißgelb-flüssiger Kern + orangener Halo, der über
 // den Rand hinaus ausblutet, plus sanftes Pulsieren.
-const MOLTEN_COLOR = "#ff5a1f";
-const MOLTEN_HALO = "#e8280a";
+const MOLTEN_COLOR = "#ff2020";
+const MOLTEN_HALO = "#a80000";
 
 function dayBudgetRing(dueCount, doneCount, size = 200) {
   const t = dueCount > 0 ? doneCount / dueCount : 0;
