@@ -56,20 +56,33 @@
 * , *::before, *::after { box-sizing: border-box; }
 
 html {
-  background: radial-gradient(120% 100% at 30% 0%, #212a35 0%, #0a0d12 70%);
+  background: #0a0d12;
   min-height: 100%;
   min-height: 100dvh;
+  /* Scrollbar-Platz immer reservieren, damit die verfügbare Breite nicht je nach Tab-Höhe
+     (mal mit, mal ohne Scrollbalken) springt und die fixierte Tab-Leiste seitlich verrutscht. */
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
 }
 body {
   margin: 0;
   min-height: 100%;
   min-height: 100dvh;
-  background: radial-gradient(120% 100% at 30% 0%, #212a35 0%, #0a0d12 70%);
   color: var(--color-text);
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+}
+/* Hintergrund-Verlauf fest an den Viewport gebunden (statt an html/body und damit an die
+   Dokumenthöhe) — sieht sonst je nach Tab-Länge (kurzes Heute vs. langes Finanzen/Analyse)
+   unterschiedlich gestreckt aus und springt beim Wechsel sichtbar um. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(120% 100% at 30% 0%, #212a35 0%, #0a0d12 70%);
 }
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
@@ -198,7 +211,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   box-shadow: 0 12px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,214,140,0.12);
   max-width: 480px; margin: 0 auto;
 }
-.tab-indicator { position: absolute; top: 4px; bottom: 4px; width: 56px; z-index: 1; pointer-events: none; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.35)); transition: left .22s cubic-bezier(.3,.7,.4,1); }
+.tab-indicator { position: absolute; top: 4px; bottom: 4px; left: 0; width: 56px; z-index: 1; pointer-events: none; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.35)); transition: transform .22s cubic-bezier(.3,.7,.4,1); will-change: transform; }
 .tab-indicator svg { width: 100%; height: 100%; overflow: visible; }
 .tab-btn {
   flex: 1; position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -323,3 +336,26 @@ textarea.input { min-height: 90px; resize: vertical; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-neutral-400); }
 .checkbox-row input { width: 16px; height: 16px; accent-color: var(--color-accent); }
+
+/* ---------- Analyse-Tab: Ausgaben letzte 6 Monate ---------- */
+.finance-trend { display: flex; align-items: flex-end; gap: 8px; height: 64px; margin-bottom: 6px; }
+.finance-trend-bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+.finance-trend-fill { width: 100%; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--color-accent-300), var(--color-accent-700)); min-height: 2px; }
+.finance-trend-fill.current { background: linear-gradient(180deg, var(--color-accent-200), var(--color-accent-600)); }
+.finance-trend-labels { display: flex; gap: 8px; margin-bottom: 26px; }
+.finance-trend-labels span { flex: 1; text-align: center; font-size: 10px; color: var(--color-neutral-400); }
+
+/* ---------- Analyse-Tab: Sparziele als Ringreihe ---------- */
+.finance-ring-row { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 30px; }
+.finance-ring-row::-webkit-scrollbar { display: none; }
+.finance-ring-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; width: 74px; }
+.finance-ring-item .r-title { font-size: 10.5px; text-align: center; color: var(--color-neutral-300); line-height: 1.25; }
+
+/* ---------- Finanzen-Tab: Einkommen & Sparquote ---------- */
+.finance-income-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.finance-savingsrate { font-size: 12.5px; color: var(--color-neutral-400); margin-top: 6px; }
+.finance-savingsrate b { color: var(--color-accent-300); font-family: var(--font-heading); }
+
+/* ---------- Finanzen-Tab: Letzte Ausgaben ---------- */
+.expense-row .item-meta { display: flex; gap: 6px; }
+.expense-row .item-meta .amount { color: var(--color-neutral-300); font-variant-numeric: tabular-nums; }

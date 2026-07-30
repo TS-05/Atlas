@@ -72,10 +72,7 @@
       <div id="deviationList" class="deviation-list"></div>
       <div id="workShiftBanner" class="work-shift-wrap"></div>
 
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:26px; gap:10px;">
-        <h6 class="metal-gold" style="margin:0;">Tagesroutine</h6>
-        <button class="btn btn-secondary" id="badDayToggleBtn" style="height:30px; padding:0 12px; font-size:11.5px;">Schlechter Tag</button>
-      </div>
+      <h6 class="metal-gold" style="margin-top:26px;">Tagesroutine</h6>
       <div id="routineChain"></div>
       <button class="add-btn btn btn-ghost btn-block hidden" id="addRoutineBtn" style="display:none;">+ Routine-Schritt hinzufügen</button>
 
@@ -102,13 +99,24 @@
     <section id="tab-finanzen" class="tab-panel">
       <h1>Finanzplanung</h1>
 
+      <h6 class="metal-gold">Einkommen &amp; Sparquote</h6>
+      <div class="card elev-sm" style="margin-bottom: 14px;">
+        <div class="finance-income-row">
+          <span class="item-title">Einkommen / Monat gesamt</span>
+          <span class="item-title" id="financeIncomeTotal" style="font-family:var(--font-heading); font-weight:600;"></span>
+        </div>
+        <div class="finance-savingsrate" id="financeSavingsRate"></div>
+      </div>
+      <div id="financeIncomeList" class="list"></div>
+      <button class="btn btn-ghost btn-block" id="addIncomeSourceBtn" style="display:none;">+ Einkommensquelle hinzufügen</button>
+
       <h6 class="metal-gold">Vermögensübersicht</h6>
       <div class="card elev-sm" style="margin-bottom: 14px;">
         <div class="stat-num" id="financeNetWorth" style="font-size: 26px;">0 €</div>
         <div class="stat-label">Gesamtvermögen</div>
       </div>
       <div id="financeAccountsList" class="list"></div>
-      <button class="btn btn-ghost btn-block" id="addAccountBtn">+ Konto/Vermögenswert hinzufügen</button>
+      <button class="btn btn-ghost btn-block" id="addAccountBtn" style="display:none;">+ Konto/Vermögenswert hinzufügen</button>
 
       <h6 class="metal-gold" style="margin-top: 26px;">Budget &amp; Ausgaben</h6>
       <div class="card elev-sm" style="margin-bottom: 14px;">
@@ -116,14 +124,17 @@
         <div class="stat-label">Ausgaben diesen Monat</div>
       </div>
       <div id="financeCategoriesList" style="display:flex; flex-direction:column; gap:12px; margin-bottom:14px;"></div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn btn-secondary" style="flex:1;" id="addExpenseBtn">+ Ausgabe erfassen</button>
+      <div style="display:flex; gap:8px; margin-bottom: 22px;">
+        <button class="btn btn-primary" style="flex:1;" id="addExpenseBtn">+ Ausgabe erfassen</button>
         <button class="btn btn-ghost" style="flex:1;" id="addCategoryBtn">+ Kategorie</button>
       </div>
 
+      <h6 class="metal-gold">Letzte Ausgaben</h6>
+      <div id="financeExpensesList" class="list" style="margin-bottom: 14px;"></div>
+
       <h6 class="metal-gold" style="margin-top: 26px;">Sparziele</h6>
       <div id="savingsGoalsList" class="list"></div>
-      <button class="btn btn-ghost btn-block" id="addSavingsGoalBtn">+ Sparziel hinzufügen</button>
+      <button class="btn btn-ghost btn-block" id="addSavingsGoalBtn" style="display:none;">+ Sparziel hinzufügen</button>
     </section>
 
     <!-- BEREICHE -->
@@ -194,6 +205,28 @@
       <h6 class="metal-gold">Weitere Kennzahlen</h6>
       <div class="stats-grid" id="moreStats"></div>
 
+      <h6 class="metal-gold" style="margin-top: 4px;">Finanzen</h6>
+
+      <div class="stats-grid" id="financeAnalysisStats" style="margin-bottom: 18px;"></div>
+
+      <div style="display:flex; align-items:center; gap:14px; margin-bottom: 26px;">
+        <div id="financeBudgetRing"></div>
+        <div>
+          <div class="text-muted" style="font-size: 11.5px;">Budgetauslastung diesen Monat</div>
+          <div class="item-title" id="financeBudgetBarLabel" style="margin-top:2px;"></div>
+        </div>
+      </div>
+
+      <h6 class="metal-gold">Ausgaben nach Kategorie</h6>
+      <div id="financeCategoryBreakdown" style="display:flex; flex-direction:column; gap:10px; margin-bottom:30px;"></div>
+
+      <h6 class="metal-gold">Ausgaben · letzte 6 Monate</h6>
+      <div class="finance-trend" id="financeTrend"></div>
+      <div class="finance-trend-labels" id="financeTrendLabels"></div>
+
+      <h6 class="metal-gold">Sparziele</h6>
+      <div class="finance-ring-row" id="financeGoalsRings"></div>
+
       <h6 class="metal-gold">Pünktlichkeit erledigter Aufgaben</h6>
       <div class="progress-outer"><div class="progress-inner" id="punctualityFill"></div></div>
       <p class="text-muted" id="punctualityText" style="font-size: 12.5px;"></p>
@@ -238,6 +271,6 @@
   <div class="modal" id="modalBody"></div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

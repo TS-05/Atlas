@@ -783,11 +783,19 @@ state.deviations = state.deviations || [];
 state.weeklyReflection = state.weeklyReflection || {};
 state.prayers = state.prayers || [];
 state.subjectOverride = state.subjectOverride || {};
-state.badDayMode = state.badDayMode || false;
+delete state.badDayMode;
+delete state.minimalDayMode;
+if (state.habits) state.habits.forEach(h => delete h.minVersion);
 state.financeAccounts = state.financeAccounts || [];
 state.financeCategories = state.financeCategories || [];
 state.financeExpenses = state.financeExpenses || [];
 state.savingsGoals = state.savingsGoals || [];
+state.financeIncomeSources = state.financeIncomeSources || [];
+// Migration: einzelnes financeIncome (Vorgänger-Feld) in eine erste Einkommensquelle überführen.
+if (state.financeIncome) {
+  state.financeIncomeSources.push({ id: uid(), title: "Einkommen", amount: state.financeIncome });
+  delete state.financeIncome;
+}
 saveData();
 
 
@@ -795,7 +803,7 @@ saveData();
 function seedData() {
   const data = {
     goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [],
-    financeAccounts: [], financeCategories: [], financeExpenses: [], savingsGoals: [],
+    financeAccounts: [], financeCategories: [], financeExpenses: [], savingsGoals: [], financeIncomeSources: [],
     // Frische Seed-Daten entsprechen bereits der aktuellen Struktur — alle Migrationen sollen hier no-op sein
     bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true,
     seminararbeitRoadmapApplied: true, seminararbeitRoadmapV2Applied: true, taskEffortLevelsApplied: true, learningOrderApplied: true
@@ -997,8 +1005,8 @@ function metallicRingGradient(base) {
 // jeder erledigten Aufgabe einen Schritt weiter durch die Anlassfarben; bei 100% (alles erledigt) geht
 // der Ring in einen "geglühten" Sonderzustand über: weißgelb-flüssiger Kern + orangener Halo, der über
 // den Rand hinaus ausblutet, plus sanftes Pulsieren.
-const MOLTEN_COLOR = "#fff4d6";
-const MOLTEN_HALO = "#ff7a1a";
+const MOLTEN_COLOR = "#ff5a1f";
+const MOLTEN_HALO = "#e8280a";
 
 function dayBudgetRing(dueCount, doneCount, size = 200) {
   const t = dueCount > 0 ? doneCount / dueCount : 0;
@@ -1011,11 +1019,10 @@ function dayBudgetRing(dueCount, doneCount, size = 200) {
   const percentMask = conicPercentMask(pct);
   // Bei 100% (glühend) denselben nahtlosen Metall-Verlauf wie sonst nutzen (erster/letzter Stop
   // identisch, kein harter Rand bei 0°) statt eines eigenen Musters mit Orange-Bändern im Ring
-  // selbst — das Orange gehört nur in den nach außen auslaufenden Halo (drop-shadow unten), der
-  // Ring selbst bleibt gleichmäßig gelblich-weiß glühend.
+  // selbst — der Ring glüht einfach direkt orange-rot, kein weicher Mehrfach-Halo.
   const gradient = metallicRingGradient(baseColor);
   const glowFilter = allDueDone
-    ? `drop-shadow(0 0 5px #fff9e8) drop-shadow(0 0 16px ${MOLTEN_HALO}) drop-shadow(0 0 34px color-mix(in srgb, ${MOLTEN_HALO} 75%, transparent)) drop-shadow(0 0 60px color-mix(in srgb, ${MOLTEN_HALO} 45%, transparent))`
+    ? `drop-shadow(0 0 6px ${MOLTEN_COLOR}) drop-shadow(0 0 14px ${MOLTEN_HALO})`
     : `drop-shadow(0 0 4px color-mix(in srgb, ${baseColor} 70%, transparent)) drop-shadow(0 0 11px color-mix(in srgb, ${baseColor} 32%, transparent))`;
 
   return `
@@ -1042,6 +1049,42 @@ function dayBudgetRing(dueCount, doneCount, size = 200) {
   `;
 }
 
+// Budget-Ring im selben Stahl-/Glüh-Stil wie dayBudgetRing: normal ein Stahlton-Ring nach
+// Ausgaben-Anteil, bei Überschreitung des Limits geht er in den weißgelb-glühenden Zustand mit
+// orangenem Halo über (statt bei "alles erledigt" hier bei "Limit überschritten").
+function budgetRingHtml(spent, limit, size = 40, maskIdx = 0) {
+  const t = limit > 0 ? spent / limit : 0;
+  const pct = Math.round(t * 100);
+  const overLimit = limit > 0 && spent > limit;
+  const baseColor = overLimit ? MOLTEN_COLOR : steelColorForProgress(Math.min(0.999, t));
+  const maskUrl = `assets/${RING_MASKS[maskIdx % RING_MASKS.length]}`;
+  const percentMask = conicPercentMask(Math.min(100, pct));
+  const gradient = metallicRingGradient(baseColor);
+  const glowFilter = overLimit
+    ? `drop-shadow(0 0 6px ${MOLTEN_COLOR}) drop-shadow(0 0 14px ${MOLTEN_HALO})`
+    : `drop-shadow(0 0 4px color-mix(in srgb, ${baseColor} 70%, transparent)) drop-shadow(0 0 11px color-mix(in srgb, ${baseColor} 32%, transparent))`;
+  return `
+    <div class="${overLimit ? "ring-glow-pulse" : ""}" style="position:relative; width:${size}px; height:${size}px; flex-shrink:0;">
+      <div style="position:absolute; inset:0;
+        background:rgba(255,255,255,0.16);
+        -webkit-mask-image:url('${maskUrl}'); -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat; -webkit-mask-position:center;
+        mask-image:url('${maskUrl}'); mask-size:100% 100%; mask-repeat:no-repeat; mask-position:center;"></div>
+      <div style="position:absolute; inset:0;
+        background:${gradient};
+        -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
+        mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;
+        filter:${glowFilter};
+        transition:filter 0.4s, background 0.4s;"></div>
+      <div style="position:absolute; inset:0;
+        background:radial-gradient(circle at 32% 24%, rgba(255,255,255,0.9), transparent 55%);
+        mix-blend-mode:overlay; opacity:${overLimit ? 0.85 : 0.6};
+        -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
+        mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;"></div>
+      <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:${Math.round(size * 0.24)}px; font-family:var(--font-heading); color:var(--color-neutral-100); text-shadow:0 1px 4px rgba(0,0,0,0.6);">${pct}%</span>
+    </div>
+  `;
+}
+
 // ---------- Tabs ----------
 const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "analyse"];
 const TAB_ROT = [-6, 10, 5, -12, 7, -4];
@@ -1051,8 +1094,11 @@ const tabIndicator = document.getElementById("tabIndicator");
 let dropTimer = null;
 
 function renderTabIndicator(idx, dropPhase) {
-  const leftPct = (idx + 0.5) / TAB_ORDER.length * 100;
-  tabIndicator.style.left = `calc(${leftPct}% - 28px)`;
+  // Pixelwert statt CSS-%/calc, damit die Position über transform (Compositor-Thread,
+  // unabhängig vom Haupt-Thread) statt über left (braucht Layout) animiert werden kann.
+  const containerWidth = tabIndicator.parentElement.clientWidth;
+  const leftPx = ((idx + 0.5) / TAB_ORDER.length) * containerWidth - 28;
+  tabIndicator.style.transform = `translateX(${leftPx}px)`;
   if (dropPhase === "flying") {
     tabIndicator.innerHTML = `
       <svg width="52" height="46" viewBox="0 0 20 20" style="overflow:visible; width:100%; height:100%;">
@@ -1088,7 +1134,10 @@ function switchTab(tabName) {
   bereicheSearchVisible = false;
   bereicheSearchQuery = "";
   updateHeaderPlusButton();
-  renderAll();
+  // Auf den nächsten Frame verschoben: der Browser soll erst den Tab-Wechsel (Panel-Umschaltung +
+  // Tintenklecks-Flug-Animation) zeichnen können, bevor die potenziell aufwändige Neu-Rendering-Arbeit
+  // (u.a. Finanzen-Listen, Analyse-Charts) den Haupt-Thread blockiert und die Animation ruckeln lässt.
+  requestAnimationFrame(() => renderAll());
 }
 
 tabBtns.forEach(btn => {
@@ -1098,7 +1147,11 @@ document.body.dataset.tab = "heute";
 renderTabIndicator(0, "settled");
 
 // ---------- Kopfzeile: kontextabhängiger Plus-Button ----------
-const QUICK_ADD_BTN_IDS = { heute: ["addRoutineBtn", "addHabitBtn"], todo: ["addTaskBtn"] };
+const QUICK_ADD_BTN_IDS = {
+  heute: ["addRoutineBtn", "addHabitBtn"],
+  todo: ["addTaskBtn"],
+  finanzen: ["addIncomeSourceBtn", "addAccountBtn", "addSavingsGoalBtn"]
+};
 let quickAddVisible = false;
 let bereicheSearchVisible = false;
 let bereicheSearchQuery = "";
@@ -1173,7 +1226,7 @@ function updateHeaderPlusButton() {
 
 document.getElementById("headerPlusBtn").addEventListener("click", () => {
   const tab = document.body.dataset.tab;
-  if (tab === "heute" || tab === "todo") {
+  if (tab === "heute" || tab === "todo" || tab === "finanzen") {
     quickAddVisible = !quickAddVisible;
     updateHeaderPlusButton();
     renderAll();
@@ -1499,16 +1552,17 @@ function renderWeekCircle() {
   const todayIdx = (today.getDay() + 6) % 7; // Mo=0 ... So=6
 
   // Nur die Tagesroutine zählt für den Wochenkreis, weitere Gewohnheiten nicht.
-  // An einem "schlechten Tag" zählt nur die als Mindestversion markierte Teilmenge (falls vorhanden).
-  let scheduled = state.habits.filter(h => h.routineOrder != null && new Date(h.createdAt) <= today && isScheduledToday(h, today));
-  if (state.badDayMode && scheduled.some(h => h.essential)) scheduled = scheduled.filter(h => h.essential);
-  const done = scheduled.filter(h => {
+  const scheduled = state.habits.filter(h => h.routineOrder != null && new Date(h.createdAt) <= today && isScheduledToday(h, today));
+  const doneHabits = scheduled.filter(h => {
     const v = h.history[todayKey];
     return h.type === "weight" ? (v !== undefined && v !== null) : !!v;
-  }).length;
-  const pct = scheduled.length ? Math.round((done / scheduled.length) * 100) : 0;
+  });
+  const done = doneHabits.length;
+  const totalPoints = scheduled.reduce((sum, h) => sum + (h.points ?? 1), 0);
+  const earnedPoints = doneHabits.reduce((sum, h) => sum + (h.points ?? 1), 0);
+  const pct = totalPoints ? Math.round((earnedPoints / totalPoints) * 100) : 0;
 
-  wrap.title = `${todayKey}: ${scheduled.length ? done + "/" + scheduled.length + " Routine-Schritte" : "keine Routine-Schritte fällig"}`;
+  wrap.title = `${todayKey}: ${scheduled.length ? done + "/" + scheduled.length + " Routine-Schritte (" + earnedPoints + "/" + totalPoints + " Punkte)" : "keine Routine-Schritte fällig"}`;
   wrap.innerHTML = `
     <div style="display:flex; justify-content:center; margin-bottom:30px;">
       <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
@@ -1619,18 +1673,6 @@ function dragHandleHtml(habitId) {
   return `
     <button class="btn btn-icon btn-ghost routine-drag-handle" data-drag-handle="${habitId}" aria-label="Ziehen zum Verschieben" style="touch-action:none; cursor:grab;">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="4" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="3" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="6" r="1" fill="var(--color-neutral-400)"/><circle cx="4" cy="9" r="1" fill="var(--color-neutral-400)"/><circle cx="8" cy="9" r="1" fill="var(--color-neutral-400)"/></svg>
-    </button>
-  `;
-}
-
-// Stern zum Markieren, ob ein Routine-Schritt zur "Mindestversion für schlechte Tage" gehört
-// (nur im Bearbeiten-Modus sichtbar, wie der Zieh-Griff).
-function essentialToggleHtml(habit) {
-  if (!quickAddVisible) return "";
-  const on = !!habit.essential;
-  return `
-    <button class="btn btn-icon btn-ghost" data-toggle-essential="${habit.id}" aria-label="Zur Mindestversion für schlechte Tage" title="Zur Mindestversion für schlechte Tage" style="color:${on ? "var(--color-accent-300)" : "var(--color-neutral-500)"};">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="${on ? "currentColor" : "none"}"><path d="M7 1.5L8.6 5L12.5 5.5L9.7 8.1L10.4 12L7 10.1L3.6 12L4.3 8.1L1.5 5.5L5.4 5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
     </button>
   `;
 }
@@ -1822,16 +1864,12 @@ function renderRoutineChain() {
   const today = todayStr();
   const now = new Date();
 
-  let chainHabits = state.habits
+  const chainHabits = state.habits
     .filter(h => h.routineOrder != null && isScheduledToday(h, now))
     .sort((a, b) => a.routineOrder - b.routineOrder);
-  const badDayFiltered = state.badDayMode && chainHabits.some(h => h.essential);
-  if (badDayFiltered) chainHabits = chainHabits.filter(h => h.essential);
 
   if (chainHabits.length === 0) {
-    wrap.innerHTML = state.badDayMode
-      ? '<div class="empty-hint">Keine Mindest-Punkte markiert — markiere Routine-Schritte mit dem Stern, um sie hier an schlechten Tagen zu behalten.</div>'
-      : '<div class="empty-hint">Keine Routine-Schritte für heute konfiguriert.</div>';
+    wrap.innerHTML = '<div class="empty-hint">Keine Routine-Schritte für heute konfiguriert.</div>';
     return;
   }
 
@@ -1851,9 +1889,6 @@ function renderRoutineChain() {
         noteHtml = `<div class="routine-step-note">Heutiges Hauptfach: <strong>${subj ? escapeHtml(subj.title) : "–"}</strong>${quickAddVisible ? ' <button class="btn btn-ghost" style="font-size:11px; padding:0 4px; height:auto;" data-change-subject="1">ändern</button>' : ""}</div>`;
       }
     }
-    if (state.badDayMode && h.minVersion) {
-      noteHtml += `<div class="routine-step-note">Mindestversion: <strong>${escapeHtml(h.minVersion)}</strong></div>`;
-    }
 
     const checkHtml = h.type === "weight"
       ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1">${doneToday ? splatSvg(h.id) : ""}</button>`
@@ -1864,6 +1899,7 @@ function renderRoutineChain() {
     const titleHtml = quickAddVisible
       ? `<div class="item-title" data-edit-habit="${h.id}" style="cursor:pointer; text-decoration:underline dotted;">${escapeHtml(h.title)}</div>`
       : `<div class="item-title">${escapeHtml(h.title)}</div>`;
+    const pointsHtml = `<div class="item-meta">${h.points ?? 1} Punkt${(h.points ?? 1) === 1 ? "" : "e"}</div>`;
 
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
@@ -1873,10 +1909,10 @@ function renderRoutineChain() {
       ${checkHtml}
       <div style="flex:1; min-width:0;">
         ${titleHtml}
+        ${pointsHtml}
         ${noteHtml}
       </div>
       ${weightInputHtml}
-      ${essentialToggleHtml(h)}
       ${quickAddVisible ? `<button class="btn btn-icon btn-ghost" data-del-habit="${h.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>` : ""}
       ${dragHandleHtml(h.id)}
     `;
@@ -1892,7 +1928,7 @@ function renderWorkShiftBanner() {
   const wrap = document.getElementById("workShiftBanner");
   const shift = shiftForDate(todayStr());
   if (!shift) {
-    wrap.innerHTML = `<button class="btn btn-ghost btn-block" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
+    wrap.innerHTML = `<button class="btn btn-primary btn-block" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
   } else {
     wrap.innerHTML = `
       <div class="gold-frame rule-banner shift-banner" style="justify-content:space-between;">
@@ -1918,9 +1954,6 @@ function renderOtherHabits() {
     const doneToday = !!h.history[today];
     const streak = computeStreak(h);
     const priority = isPriority(h.nodeId);
-    const minVersionHtml = (state.badDayMode && h.minVersion)
-      ? `<div class="routine-step-note">Mindestversion: <strong>${escapeHtml(h.minVersion)}</strong></div>`
-      : "";
     const titleHtml = quickAddVisible
       ? `<div class="item-title" data-edit-habit="${h.id}" style="cursor:pointer; text-decoration:underline dotted;">${escapeHtml(h.title)}</div>`
       : `<div class="item-title">${escapeHtml(h.title)}</div>`;
@@ -1930,8 +1963,7 @@ function renderOtherHabits() {
       <button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}">${doneToday ? splatSvg(h.id) : ""}</button>
       <div style="flex:1; min-width:0;">
         ${titleHtml}
-        <div class="item-meta">${frequencyLabel(h)} · Serie: ${streak}</div>
-        ${minVersionHtml}
+        <div class="item-meta">${frequencyLabel(h)} · Serie: ${streak} · ${h.points ?? 1} Punkt${(h.points ?? 1) === 1 ? "" : "e"}</div>
       </div>
       ${priority ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">Priorität</span>' : ""}
       <button class="btn btn-icon btn-ghost" data-del-habit="${h.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
@@ -2133,6 +2165,7 @@ function renderWeekStats() {
   renderActivityHeatmap();
   renderAreaLoad();
   renderMoreStats();
+  renderFinanceAnalysis();
   renderReflection();
 }
 
@@ -2420,7 +2453,6 @@ function updateNotifPermissionUI() {
 }
 
 function renderAll() {
-  updateBadDayToggleUI();
   renderWeekCircle();
   renderDeviationLog();
   renderRoutineChain();
@@ -2475,13 +2507,6 @@ document.addEventListener("click", e => {
     saveData();
     renderAll();
     if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
-    return;
-  }
-  const essentialBtn = e.target.closest("[data-toggle-essential]");
-  if (essentialBtn) {
-    const habit = state.habits.find(h => h.id === essentialBtn.dataset.toggleEssential);
-    if (habit) habit.essential = !habit.essential;
-    saveData(); renderAll();
     return;
   }
   const editHabitEl = e.target.closest("[data-edit-habit]");
@@ -2547,6 +2572,18 @@ document.addEventListener("click", e => {
     state.exams = state.exams.filter(x => x.id !== e.target.dataset.delExam);
     saveData(); renderAll();
   }
+  const delIncomeBtn = e.target.closest("[data-del-income]");
+  if (delIncomeBtn) {
+    state.financeIncomeSources = state.financeIncomeSources.filter(i => i.id !== delIncomeBtn.dataset.delIncome);
+    saveData(); renderAll();
+    return;
+  }
+  const editIncomeEl = e.target.closest("[data-edit-income]");
+  if (editIncomeEl) {
+    const source = state.financeIncomeSources.find(i => i.id === editIncomeEl.dataset.editIncome);
+    if (source) openIncomeSourceModal(source);
+    return;
+  }
   const delAccountBtn = e.target.closest("[data-del-account]");
   if (delAccountBtn) {
     state.financeAccounts = state.financeAccounts.filter(a => a.id !== delAccountBtn.dataset.delAccount);
@@ -2575,6 +2612,12 @@ document.addEventListener("click", e => {
   const delGoalBtn = e.target.closest("[data-del-goal]");
   if (delGoalBtn) {
     state.savingsGoals = state.savingsGoals.filter(g => g.id !== delGoalBtn.dataset.delGoal);
+    saveData(); renderAll();
+    return;
+  }
+  const delExpenseBtn = e.target.closest("[data-del-expense]");
+  if (delExpenseBtn) {
+    state.financeExpenses = state.financeExpenses.filter(ex => ex.id !== delExpenseBtn.dataset.delExpense);
     saveData(); renderAll();
     return;
   }
@@ -2744,6 +2787,7 @@ document.getElementById("addAccountBtn").addEventListener("click", () => openAcc
 document.getElementById("addExpenseBtn").addEventListener("click", () => openExpenseModal());
 document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal());
 document.getElementById("addSavingsGoalBtn").addEventListener("click", () => openSavingsGoalModal());
+document.getElementById("addIncomeSourceBtn").addEventListener("click", () => openIncomeSourceModal());
 document.getElementById("addDeviationBtn").addEventListener("click", () => {
   const input = document.getElementById("deviationInput");
   addDeviation(input.value);
@@ -2756,19 +2800,6 @@ document.getElementById("enableNotifBtn").addEventListener("click", () => {
     checkMissedRoutineStreaks();
   });
 });
-document.getElementById("badDayToggleBtn").addEventListener("click", () => {
-  state.badDayMode = !state.badDayMode;
-  saveData();
-  renderAll();
-});
-function updateBadDayToggleUI() {
-  const btn = document.getElementById("badDayToggleBtn");
-  if (!btn) return;
-  btn.classList.toggle("btn-primary", state.badDayMode);
-  btn.classList.toggle("btn-secondary", !state.badDayMode);
-  btn.textContent = state.badDayMode ? "Schlechter Tag ✓" : "Schlechter Tag";
-}
-
 function openTaskModal(defaultNodeId, source = "todo") {
   const node = defaultNodeId ? nodeById(defaultNodeId) : null;
   const isLernfeld = source === "category";
@@ -2900,10 +2931,6 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
       <label>Punkte</label>
       <input type="number" id="mHabitPoints" min="1" step="1" value="${isEdit ? (editHabit.points ?? 1) : 1}">
     </div>
-    <div class="field">
-      <label>Mindestversion für schlechte Tage (optional)</label>
-      <input type="text" id="mHabitMinVersion" placeholder="z.B. 5 Liegestütze statt 10" value="${isEdit ? escapeHtml(editHabit.minVersion || "") : ""}">
-    </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
       <button class="btn btn-primary" id="mSave">Speichern</button>
@@ -2937,7 +2964,6 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
       }
       const isRoutine = body.querySelector("#mHabitRoutine").checked;
       const points = parseInt(body.querySelector("#mHabitPoints").value, 10) || 1;
-      const minVersion = body.querySelector("#mHabitMinVersion").value.trim() || null;
       if (isEdit) {
         editHabit.title = title;
         editHabit.nodeId = nodeId;
@@ -2945,7 +2971,6 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
         delete editHabit.intervalDays; delete editHabit.weekday; delete editHabit.everyNWeeks;
         Object.assign(editHabit, extra);
         editHabit.points = points;
-        editHabit.minVersion = minVersion;
         if (isRoutine && editHabit.routineOrder == null) {
           editHabit.routineOrder = state.habits.reduce((max, h) => Math.max(max, h.routineOrder ?? -1), -1) + 1;
         } else if (!isRoutine) {
@@ -2953,7 +2978,7 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
         }
       } else {
         const routineOrder = isRoutine ? state.habits.reduce((max, h) => Math.max(max, h.routineOrder ?? -1), -1) + 1 : null;
-        state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check", points, minVersion });
+        state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check", points });
       }
       saveData();
       closeModal();
@@ -3098,12 +3123,39 @@ function formatEuro(n) {
   return (n || 0).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 function financeMonthKey(d = new Date()) { return localDateKey(d).slice(0, 7); }
+// Monatsanfang N Monate zurück — setDate(1) zuerst, sonst überläuft setMonth() bei Tagen,
+// die es im Zielmonat nicht gibt (z.B. der 30. in Verbindung mit Februar).
+function monthsAgo(n) {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - n);
+  return d;
+}
 
 const DEL_ICON = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg>';
+
+function totalMonthlyIncome() {
+  return state.financeIncomeSources.reduce((s, i) => s + (i.amount || 0), 0);
+}
 
 function renderFinance() {
   const netWorthEl = document.getElementById("financeNetWorth");
   if (!netWorthEl) return;
+
+  const incomeWrap = document.getElementById("financeIncomeList");
+  incomeWrap.innerHTML = state.financeIncomeSources.length
+    ? state.financeIncomeSources.map(i => `
+        <div class="atlas-row">
+          <div style="flex:1; min-width:0; cursor:pointer;" data-edit-income="${i.id}">
+            <div class="item-title">${escapeHtml(i.title)}</div>
+          </div>
+          <div style="font-family:var(--font-heading); font-weight:600;">${formatEuro(i.amount || 0)}</div>
+          <button class="btn btn-icon btn-ghost" data-del-income="${i.id}" aria-label="Löschen">${DEL_ICON}</button>
+        </div>
+      `).join("")
+    : '<div class="empty-hint">Noch keine Einkommensquelle eingetragen.</div>';
+  const totalIncome = totalMonthlyIncome();
+  document.getElementById("financeIncomeTotal").textContent = state.financeIncomeSources.length ? formatEuro(totalIncome) : "";
 
   const totalNetWorth = state.financeAccounts.reduce((s, a) => s + (a.balance || 0), 0);
   netWorthEl.textContent = formatEuro(totalNetWorth);
@@ -3113,7 +3165,7 @@ function renderFinance() {
     ? state.financeAccounts.map(a => `
         <div class="atlas-row">
           <div style="flex:1; min-width:0; cursor:pointer;" data-edit-account="${a.id}">
-            <div class="item-title">${escapeHtml(a.title)}</div>
+            <div class="item-title">${escapeHtml(a.title)}${a.isEmergencyFund ? ' <span class="tag tag-accent" style="margin-left:6px;">Notgroschen</span>' : ""}</div>
           </div>
           <div style="font-family:var(--font-heading); font-weight:600;">${formatEuro(a.balance || 0)}</div>
           <button class="btn btn-icon btn-ghost" data-del-account="${a.id}" aria-label="Löschen">${DEL_ICON}</button>
@@ -3127,26 +3179,47 @@ function renderFinance() {
   const totalLimit = state.financeCategories.reduce((s, c) => s + (c.limit || 0), 0);
   document.getElementById("financeMonthSpent").textContent = `${formatEuro(totalSpent)} / ${formatEuro(totalLimit)}`;
 
+  const rateEl = document.getElementById("financeSavingsRate");
+  if (totalIncome > 0) {
+    const rate = Math.round(((totalIncome - totalSpent) / totalIncome) * 100);
+    rateEl.innerHTML = `Sparquote diesen Monat: <b>${rate}%</b> (${formatEuro(totalIncome - totalSpent)} übrig)`;
+  } else {
+    rateEl.textContent = "Einkommensquelle eintragen, um die Sparquote zu berechnen.";
+  }
+
   const categoriesWrap = document.getElementById("financeCategoriesList");
   categoriesWrap.innerHTML = state.financeCategories.length
-    ? state.financeCategories.map(c => {
+    ? state.financeCategories.map((c, i) => {
         const spent = monthExpenses.filter(e => e.categoryId === c.id).reduce((s, e) => s + e.amount, 0);
-        const pct = c.limit ? Math.min(100, Math.round((spent / c.limit) * 100)) : 0;
-        const over = c.limit > 0 && spent > c.limit;
         return `
-          <div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-              <div class="item-title" style="cursor:pointer;" data-edit-category="${c.id}">${escapeHtml(c.title)}</div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span class="item-meta" style="${over ? "color:var(--color-accent-300);" : ""}">${formatEuro(spent)} / ${formatEuro(c.limit || 0)}</span>
-                <button class="btn btn-icon btn-ghost" data-del-category="${c.id}" aria-label="Löschen">${DEL_ICON}</button>
-              </div>
+          <div class="atlas-row" style="padding:8px 0;">
+            ${budgetRingHtml(spent, c.limit || 0, 40, i)}
+            <div style="flex:1; min-width:0; cursor:pointer;" data-edit-category="${c.id}">
+              <div class="item-title">${escapeHtml(c.title)}</div>
+              <div class="item-meta">${formatEuro(spent)} / ${formatEuro(c.limit || 0)}</div>
             </div>
-            <div class="progress-outer" style="margin-bottom:0;"><div class="progress-inner" style="width:${pct}%; ${over ? "background:var(--color-accent-300);" : ""}"></div></div>
+            <button class="btn btn-icon btn-ghost" data-del-category="${c.id}" aria-label="Löschen">${DEL_ICON}</button>
           </div>
         `;
       }).join("")
     : '<div class="empty-hint">Noch keine Budget-Kategorien angelegt.</div>';
+
+  const expensesWrap = document.getElementById("financeExpensesList");
+  const recentExpenses = [...state.financeExpenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
+  expensesWrap.innerHTML = recentExpenses.length
+    ? recentExpenses.map(ex => {
+        const cat = state.financeCategories.find(c => c.id === ex.categoryId);
+        return `
+          <div class="atlas-row expense-row">
+            <div style="flex:1; min-width:0;">
+              <div class="item-title">${escapeHtml(cat ? cat.title : "Ohne Kategorie")}${ex.note ? " · " + escapeHtml(ex.note) : ""}</div>
+              <div class="item-meta"><span>${ex.date}</span><span class="amount">${formatEuro(ex.amount)}</span></div>
+            </div>
+            <button class="btn btn-icon btn-ghost" data-del-expense="${ex.id}" aria-label="Löschen">${DEL_ICON}</button>
+          </div>
+        `;
+      }).join("")
+    : '<div class="empty-hint">Noch keine Ausgaben erfasst.</div>';
 
   const goalsWrap = document.getElementById("savingsGoalsList");
   goalsWrap.innerHTML = state.savingsGoals.length
@@ -3168,6 +3241,114 @@ function renderFinance() {
     : '<div class="empty-hint">Noch keine Sparziele angelegt.</div>';
 }
 
+function renderFinanceAnalysis() {
+  const statsEl = document.getElementById("financeAnalysisStats");
+  if (!statsEl) return;
+
+  const totalNetWorth = state.financeAccounts.reduce((s, a) => s + (a.balance || 0), 0);
+  const monthKey = financeMonthKey();
+  const monthExpenses = state.financeExpenses.filter(e => e.date.slice(0, 7) === monthKey);
+  const totalSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
+  const totalLimit = state.financeCategories.reduce((s, c) => s + (c.limit || 0), 0);
+
+  const totalIncome = totalMonthlyIncome();
+  const savingsRate = totalIncome > 0
+    ? Math.round(((totalIncome - totalSpent) / totalIncome) * 100) + "%"
+    : "–";
+
+  // Notgroschen-Monate: Saldo aller markierten Konten ÷ Ø-Ausgaben der letzten 3 Monate
+  const emergencyBalance = state.financeAccounts.filter(a => a.isEmergencyFund).reduce((s, a) => s + (a.balance || 0), 0);
+  const last3 = [0, 1, 2].map(i => {
+    const key = financeMonthKey(monthsAgo(i));
+    return state.financeExpenses.filter(e => e.date.slice(0, 7) === key).reduce((s, e) => s + e.amount, 0);
+  });
+  const avgMonthly = last3.reduce((a, b) => a + b, 0) / 3;
+  const emergencyMonths = avgMonthly > 0 ? (emergencyBalance / avgMonthly).toFixed(1) : "–";
+
+  statsEl.innerHTML = `
+    <div class="stat-box"><div class="stat-num">${formatEuro(totalNetWorth)}</div><div class="stat-label">Nettovermögen</div></div>
+    <div class="stat-box"><div class="stat-num">${formatEuro(totalSpent)}</div><div class="stat-label">Ausgaben (Monat)</div></div>
+    <div class="stat-box"><div class="stat-num">${savingsRate}</div><div class="stat-label">Sparquote</div></div>
+    <div class="stat-box"><div class="stat-num">${emergencyMonths}</div><div class="stat-label">Notgroschen-Monate</div></div>
+  `;
+
+  document.getElementById("financeBudgetRing").innerHTML = budgetRingHtml(totalSpent, totalLimit, 72);
+  document.getElementById("financeBudgetBarLabel").textContent = `${formatEuro(totalSpent)} / ${formatEuro(totalLimit)}`;
+
+  const breakdownWrap = document.getElementById("financeCategoryBreakdown");
+  const rows = state.financeCategories.map(c => ({
+    title: c.title,
+    spent: monthExpenses.filter(e => e.categoryId === c.id).reduce((s, e) => s + e.amount, 0)
+  })).sort((a, b) => b.spent - a.spent);
+  const maxSpent = Math.max(1, ...rows.map(r => r.spent));
+  breakdownWrap.innerHTML = rows.length
+    ? rows.map(r => `
+        <div class="areaload-row">
+          <div class="areaload-name">${escapeHtml(r.title)}</div>
+          <div class="areaload-bar-outer"><div class="areaload-bar-inner" style="width:${Math.round((r.spent / maxSpent) * 100)}%"></div></div>
+          <div class="areaload-count">${formatEuro(r.spent)}</div>
+        </div>
+      `).join("")
+    : '<div class="empty-hint">Noch keine Kategorien angelegt.</div>';
+
+  const trendWrap = document.getElementById("financeTrend");
+  const labelsWrap = document.getElementById("financeTrendLabels");
+  const months = [5, 4, 3, 2, 1, 0].map(i => {
+    const d = monthsAgo(i);
+    const key = financeMonthKey(d);
+    const total = state.financeExpenses.filter(e => e.date.slice(0, 7) === key).reduce((s, e) => s + e.amount, 0);
+    return { label: d.toLocaleDateString("de-DE", { month: "short" }), total, isCurrent: i === 0 };
+  });
+  const maxMonth = Math.max(1, ...months.map(m => m.total));
+  trendWrap.innerHTML = months.map(m => `
+    <div class="finance-trend-bar"><div class="finance-trend-fill${m.isCurrent ? " current" : ""}" style="height:${m.total > 0 ? Math.max(4, Math.round((m.total / maxMonth) * 100)) : 2}%"></div></div>
+  `).join("");
+  labelsWrap.innerHTML = months.map(m => `<span>${m.label}</span>`).join("");
+
+  const ringsWrap = document.getElementById("financeGoalsRings");
+  ringsWrap.innerHTML = state.savingsGoals.length
+    ? state.savingsGoals.map(g => {
+        const pct = g.target ? Math.min(100, Math.round(((g.current || 0) / g.target) * 100)) : 0;
+        return `<div class="finance-ring-item">${miniProgressRing(pct, 56)}<div class="r-title">${escapeHtml(g.title)}</div></div>`;
+      }).join("")
+    : '<div class="empty-hint">Noch keine Sparziele.</div>';
+}
+
+function openIncomeSourceModal(editSource = null) {
+  const isEdit = !!editSource;
+  openModal(`
+    <h3>${isEdit ? "Einkommensquelle bearbeiten" : "Einkommensquelle hinzufügen"}</h3>
+    <div class="field">
+      <label>Titel</label>
+      <input type="text" id="mIncomeTitle" placeholder="z.B. Gehalt, Nebenjob" value="${isEdit ? escapeHtml(editSource.title) : ""}">
+    </div>
+    <div class="field">
+      <label>Betrag / Monat (€)</label>
+      <input type="number" step="0.01" min="0" id="mIncomeAmount" value="${isEdit ? (editSource.amount || 0) : ""}">
+    </div>
+    <div class="modal-actions">
+      ${isEdit ? `<button class="btn btn-ghost" id="mDelete" style="color:var(--color-accent-300); margin-right:auto;">Löschen</button>` : ""}
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mIncomeTitle").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    if (isEdit) body.querySelector("#mDelete").addEventListener("click", () => {
+      state.financeIncomeSources = state.financeIncomeSources.filter(i => i.id !== editSource.id);
+      saveData(); closeModal(); renderAll();
+    });
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const title = body.querySelector("#mIncomeTitle").value.trim();
+      if (!title) return;
+      const amount = parseFloat(body.querySelector("#mIncomeAmount").value) || 0;
+      if (isEdit) { editSource.title = title; editSource.amount = amount; }
+      else state.financeIncomeSources.push({ id: uid(), title, amount });
+      saveData(); closeModal(); renderAll();
+    });
+  });
+}
+
 function openAccountModal(editAccount = null) {
   const isEdit = !!editAccount;
   openModal(`
@@ -3179,6 +3360,10 @@ function openAccountModal(editAccount = null) {
     <div class="field">
       <label>Aktueller Kontostand (€)</label>
       <input type="number" step="0.01" id="mAccountBalance" value="${isEdit ? (editAccount.balance || 0) : ""}">
+    </div>
+    <div class="checkbox-row" style="margin-bottom: 12px;">
+      <input type="checkbox" id="mAccountEmergency" ${isEdit && editAccount.isEmergencyFund ? "checked" : ""}>
+      <label for="mAccountEmergency">Das ist mein Notgroschen</label>
     </div>
     <div class="modal-actions">
       ${isEdit ? `<button class="btn btn-ghost" id="mDelete" style="color:var(--color-accent-300); margin-right:auto;">Löschen</button>` : ""}
@@ -3196,8 +3381,9 @@ function openAccountModal(editAccount = null) {
       const title = body.querySelector("#mAccountTitle").value.trim();
       if (!title) return;
       const balance = parseFloat(body.querySelector("#mAccountBalance").value) || 0;
-      if (isEdit) { editAccount.title = title; editAccount.balance = balance; }
-      else state.financeAccounts.push({ id: uid(), title, balance });
+      const isEmergencyFund = body.querySelector("#mAccountEmergency").checked;
+      if (isEdit) { editAccount.title = title; editAccount.balance = balance; editAccount.isEmergencyFund = isEmergencyFund; }
+      else state.financeAccounts.push({ id: uid(), title, balance, isEmergencyFund });
       saveData(); closeModal(); renderAll();
     });
   });
