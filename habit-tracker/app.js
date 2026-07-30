@@ -1928,7 +1928,7 @@ function renderWorkShiftBanner() {
   const wrap = document.getElementById("workShiftBanner");
   const shift = shiftForDate(todayStr());
   if (!shift) {
-    wrap.innerHTML = `<button class="btn btn-primary btn-block" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
+    wrap.innerHTML = `<button class="btn btn-secondary btn-block metal-gold" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
   } else {
     wrap.innerHTML = `
       <div class="gold-frame rule-banner shift-banner" style="justify-content:space-between;">
