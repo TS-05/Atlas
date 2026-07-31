@@ -1485,14 +1485,32 @@ function renderTodo() {
       if (ad !== bd) return ad.localeCompare(bd);
       return (b.priority || 0) - (a.priority || 0);
     });
-  const doneTasks = todoTasks.filter(t => t.done);
+
+  // Woche wechselt Sonntag 23:59 -> Montag 00:00. Erledigte ToDos dieser Woche bleiben direkt in der
+  // Liste sichtbar; alles aus der Vorwoche wandert automatisch ins Archiv darunter (kein manueller
+  // Export mehr nötig, die ToDos gehen dabei nicht mehr verloren).
+  const thisMondayKey = localDateKey(mondayOfWeek(new Date()));
+  const lastMonday = mondayOfWeek(new Date());
+  lastMonday.setDate(lastMonday.getDate() - 7);
+  const lastMondayKey = localDateKey(lastMonday);
+
+  const doneTasks = todoTasks.filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) >= thisMondayKey);
+  const lastWeekDoneTasks = todoTasks
+    .filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) >= lastMondayKey && t.completedAt.slice(0, 10) < thisMondayKey)
+    .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
 
   if (openTasks.length === 0 && doneTasks.length === 0) {
     wrap.innerHTML = '<div class="empty-hint">Noch keine Aufgaben angelegt.</div>';
-    return;
+  } else {
+    openTasks.forEach(t => wrap.appendChild(renderTaskItem(t)));
+    doneTasks.forEach(t => wrap.appendChild(renderTaskItem(t)));
   }
-  openTasks.forEach(t => wrap.appendChild(renderTaskItem(t)));
-  doneTasks.forEach(t => wrap.appendChild(renderTaskItem(t)));
+
+  const lastWeekWrap = document.getElementById("todoLastWeekWrap");
+  const lastWeekList = document.getElementById("todoLastWeekList");
+  lastWeekWrap.style.display = lastWeekDoneTasks.length ? "" : "none";
+  lastWeekList.innerHTML = "";
+  lastWeekDoneTasks.forEach(t => lastWeekList.appendChild(renderTaskItem(t)));
 }
 
 // ---------- Rendering: Heute (Wochenkreis, Abweichung, Routine, weitere Habits) ----------
@@ -3725,15 +3743,6 @@ function exportWeekReview() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-
-  // Erledigte ToDos sind jetzt im Wochenrückblick gesichert — sie starten nicht in die neue Woche.
-  // Roadmap-Schritte (source "category") bleiben davon unberührt, die zählen dauerhaft zum Fortschritt.
-  const hadDoneTodos = state.tasks.some(t => t.done && (t.source || "todo") !== "category");
-  if (hadDoneTodos) {
-    state.tasks = state.tasks.filter(t => !(t.done && (t.source || "todo") !== "category"));
-    saveData();
-    renderAll();
-  }
 }
 
 // ---------- Init ----------
