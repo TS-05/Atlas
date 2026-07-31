@@ -2818,6 +2818,50 @@ document.getElementById("enableNotifBtn").addEventListener("click", () => {
     checkMissedRoutineStreaks();
   });
 });
+document.getElementById("importReviewBtn").addEventListener("click", () => openImportReviewModal());
+
+// Fehlende Aufgaben aus einem zuvor heruntergeladenen Wochenrückblick (.md) wiederherstellen.
+// Fügt nur Aufgaben hinzu, deren id noch nicht existiert — bestehende Daten werden nie überschrieben.
+function openImportReviewModal() {
+  openModal(`
+    <h3>Wochenrückblick importieren</h3>
+    <p class="text-muted" style="font-size:12.5px; margin-bottom:10px;">Kompletten Inhalt einer heruntergeladenen Wochenrückblick-Datei (.md) hier einfügen. Fehlende Aufgaben werden ergänzt — nichts Bestehendes wird verändert oder dupliziert.</p>
+    <div class="field">
+      <textarea id="mImportText" class="input" style="min-height:180px;" placeholder="Inhalt der .md-Datei hier einfügen …"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mImport">Wiederherstellen</button>
+    </div>
+  `, body => {
+    body.querySelector("#mImportText").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    body.querySelector("#mImport").addEventListener("click", () => {
+      const raw = body.querySelector("#mImportText").value;
+      const match = raw.match(/```json\s*([\s\S]*?)```/);
+      if (!match) {
+        alert("Kein Rohdaten-JSON-Block gefunden. Bitte den kompletten Datei-Inhalt einfügen.");
+        return;
+      }
+      let data;
+      try { data = JSON.parse(match[1]); } catch (e) {
+        alert("Die Datei konnte nicht gelesen werden (ungültiges JSON).");
+        return;
+      }
+      if (!Array.isArray(data.tasks)) {
+        alert("Keine Aufgaben in dieser Datei gefunden.");
+        return;
+      }
+      const existingIds = new Set(state.tasks.map(t => t.id));
+      const restored = data.tasks.filter(t => !existingIds.has(t.id));
+      restored.forEach(t => state.tasks.push(t));
+      saveData();
+      closeModal();
+      renderAll();
+      alert(restored.length ? `${restored.length} Aufgabe(n) wiederhergestellt.` : "Keine fehlenden Aufgaben gefunden — alles war schon vorhanden.");
+    });
+  });
+}
 function openTaskModal(defaultNodeId, source = "todo") {
   const node = defaultNodeId ? nodeById(defaultNodeId) : null;
   const isLernfeld = source === "category";
