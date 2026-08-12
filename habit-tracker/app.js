@@ -934,6 +934,29 @@ function splatFor(id) {
     scale: scale.toFixed(2), rot
   };
 }
+// Breiter Farbklecks hinter einem erledigten Titel (ToDo-Zeilen + Roadmap-Ebene-3-Schritte) — dieselbe
+// inkRough-Verzerrung + Anlassfarben-Verlauf wie splatSvg, nur als gestreckter Streifen statt Icon.
+// preserveAspectRatio="none" lässt eine einzige handgezeichnete Form auf jede Titellänge dehnen.
+function paintStrokeSvgHtml(id) {
+  let n = 0;
+  for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0;
+  const flip = n % 2 === 0;
+  const path = flip
+    ? "M4,24 Q12,6 32,12 T74,8 Q104,2 130,14 T172,7 Q198,15 214,24 Q200,38 174,32 T130,36 Q104,41 74,33 T32,37 Q12,39 4,24 Z"
+    : "M4,20 Q14,4 34,11 T76,6 Q102,15 132,9 T174,12 Q198,4 214,20 Q202,36 176,29 T132,34 Q102,26 76,33 T34,30 Q14,37 4,20 Z";
+  const dots = [
+    { cx: 6 + (n % 10), cy: 4 + (n % 6), r: 2 },
+    { cx: 208 - (n % 12), cy: 34 - (n % 8), r: 1.6 },
+    { cx: 198 + (n % 8), cy: 6, r: 1.3 }
+  ];
+  return `<svg viewBox="0 0 220 44" preserveAspectRatio="none">
+    <g filter="url(#inkRough)">
+      <path d="${path}" fill="url(#goldGradRing)"/>
+      ${dots.map(d => `<circle cx="${d.cx}" cy="${d.cy}" r="${d.r}" fill="url(#goldGradRing)"/>`).join("")}
+    </g>
+  </svg>`;
+}
+
 function splatSvg(id) {
   const s = splatFor(id);
   return `<svg width="18" height="18" viewBox="0 0 20 20" style="overflow:visible;">
@@ -1433,13 +1456,19 @@ function renderTaskItem(t) {
   if (t.dueDate) metaParts.push("fällig " + t.dueDate + (t.dueTime ? " " + t.dueTime : ""));
   if (node && !isLernfeld) metaParts.push(node.title);
   const dueToday = t.dueDate === today;
+  const titleHtml = t.done
+    ? `<div class="item-title paint-done-title">
+        <span class="paint-done-stroke">${paintStrokeSvgHtml(t.id)}</span>
+        <span class="paint-done-text">${escapeHtml(t.title)}</span>
+      </div>`
+    : `<div class="item-title">${escapeHtml(t.title)}</div>`;
   const el = document.createElement("div");
   el.className = "atlas-row" + (t.done ? " done" : "") + (dueToday ? " gold-frame" : "");
   el.innerHTML = `
     <button class="atlas-check${t.done ? " checked" : ""}" data-task="${t.id}">${t.done ? splatSvg(t.id) : ""}</button>
     ${isLernfeld ? `<span style="color:var(--color-accent-400); flex-shrink:0;" title="${escapeHtml(lerntyp.label)}">${lerntyp.icon}</span>` : ""}
     <div style="flex:1; min-width:0;">
-      <div class="item-title">${escapeHtml(t.title)}</div>
+      ${titleHtml}
       <div class="item-meta">${escapeHtml((isLernfeld ? [lerntyp.label, ...metaParts] : metaParts).join(" · "))}</div>
     </div>
     ${!isLernfeld && t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
@@ -2139,12 +2168,15 @@ function renderRoadmapPath(nodeId) {
       const el = document.createElement("div");
       el.className = "roadmap-step " + status;
       const dotAttr = s.kind === "node" ? `data-open-roadmap-path="${s.id}"` : `data-task="${s.id}"`;
+      const stepTitleInner = status === "done"
+        ? `<span class="paint-done-stroke">${paintStrokeSvgHtml(s.id)}</span><span class="paint-done-text">${i + 1}. ${escapeHtml(s.title)}</span>`
+        : `${i + 1}. ${escapeHtml(s.title)}`;
       el.innerHTML = `
         <div class="roadmap-step-rail">
           <button class="roadmap-dot" ${dotAttr} aria-label="${escapeHtml(s.title)}">${status === "done" ? "&#10003;" : (i + 1)}</button>
         </div>
         <div class="roadmap-step-body">
-          <div class="roadmap-step-title" ${s.kind === "node" ? `data-open-roadmap-path="${s.id}"` : ""}>${i + 1}. ${escapeHtml(s.title)}</div>
+          <div class="roadmap-step-title${status === "done" ? " paint-done-title" : ""}" ${s.kind === "node" ? `data-open-roadmap-path="${s.id}"` : ""}>${stepTitleInner}</div>
         </div>
       `;
       stepsWrap.appendChild(el);
