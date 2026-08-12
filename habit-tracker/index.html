@@ -63,11 +63,13 @@
       <h6 class="metal-gold">Wochenkreis</h6>
       <div id="weekCircle"></div>
 
-      <h6 class="metal-gold">Abweichung vom Plan</h6>
-      <p class="hint">Wenn du heute etwas anderes gemacht hast als geplant, halte es hier kurz fest.</p>
-      <div class="deviation-input-row">
-        <input class="input" type="text" id="deviationInput" placeholder="z. B. länger gearbeitet, Termin dazwischengekommen …">
-        <button class="btn btn-primary" id="addDeviationBtn">Eintragen</button>
+      <div id="deviationAddWrap">
+        <h6 class="metal-gold">Abweichung vom Plan</h6>
+        <p class="hint">Wenn du heute etwas anderes gemacht hast als geplant, halte es hier kurz fest.</p>
+        <div class="deviation-input-row">
+          <input class="input" type="text" id="deviationInput" placeholder="z. B. länger gearbeitet, Termin dazwischengekommen …">
+          <button class="btn btn-primary" id="addDeviationBtn">Eintragen</button>
+        </div>
       </div>
       <div id="deviationList" class="deviation-list"></div>
       <div id="workShiftBanner" class="work-shift-wrap"></div>
@@ -276,6 +278,6 @@
   <div class="modal" id="modalBody"></div>
 </div>
 
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

@@ -956,21 +956,6 @@ function pieSlicePath(pct) {
   return `M${cx},${cy} L${cx},${cy - R} A${R},${R} 0 ${largeArc} 1 ${ex},${ey} Z`;
 }
 
-// Kleiner, wiederverwendbarer Fortschritts-Ring (z.B. pro Bereiche-Ordner) im selben Gold-Look wie der Wochenkreis
-function miniProgressRing(pct, size = 30) {
-  const inner = Math.round(size * 0.68);
-  const fontSize = Math.max(8, Math.round(size * 0.28));
-  return `
-    <div style="position:relative; width:${size}px; height:${size}px; flex-shrink:0;">
-      <div style="position:absolute; inset:0; border-radius:50%; background:conic-gradient(from -90deg,
-        var(--color-accent-300) 0%, var(--color-accent-600) ${pct}%, var(--color-neutral-800) ${pct}% 100%);"></div>
-      <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
-        <div style="width:${inner}px; height:${inner}px; border-radius:50%; background:var(--color-surface); display:flex; align-items:center; justify-content:center; font-size:${fontSize}px; font-family:var(--font-heading); color:var(--color-accent-200);">${pct}%</div>
-      </div>
-    </div>
-  `;
-}
-
 // Anlassfarben von Stahl (ohne das letzte, für "geglüht" reservierte Stadium, s.u.). Jede erledigte
 // Aufgabe rückt den Ring diesen Verlauf ein Stück weiter, stufenlos ineinander übergehend statt hart
 // springend — bis bei 100% (alle fällig/überfälligen erledigt) der Sonderzustand "glüht" übernimmt.
@@ -1148,7 +1133,7 @@ renderTabIndicator(0, "settled");
 
 // ---------- Kopfzeile: kontextabhängiger Plus-Button ----------
 const QUICK_ADD_BTN_IDS = {
-  heute: ["addRoutineBtn", "addHabitBtn"],
+  heute: ["addRoutineBtn", "addHabitBtn", "deviationAddWrap", "addExamBtn"],
   todo: ["addTaskBtn"],
   finanzen: ["addIncomeSourceBtn", "addAccountBtn", "addSavingsGoalBtn"]
 };
@@ -1946,7 +1931,9 @@ function renderWorkShiftBanner() {
   const wrap = document.getElementById("workShiftBanner");
   const shift = shiftForDate(todayStr());
   if (!shift) {
-    wrap.innerHTML = `<button class="btn btn-secondary btn-block metal-gold" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`;
+    wrap.innerHTML = quickAddVisible
+      ? `<button class="btn btn-secondary btn-block metal-gold" id="addWorkShiftBtn">+ Arbeitsschicht für heute eintragen</button>`
+      : "";
   } else {
     wrap.innerHTML = `
       <div class="gold-frame rule-banner shift-banner" style="justify-content:space-between;">
@@ -2062,6 +2049,14 @@ function renderRoadmapDashboard() {
   return wrap;
 }
 
+// Deterministischer, aber individueller Maskenindex je Knoten (dieselbe Tinten-Maske-Technik wie
+// Ebene 1), damit jeder Roadmap-Kreis auf Ebene 2 sein eigenes Muster hat statt eines schlichten Rings.
+function maskIndexForId(id) {
+  let n = 0;
+  for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0;
+  return n % RING_MASKS.length;
+}
+
 function roadmapCardHtml(p) {
   const pct = Math.round(nodeProgress(p) * 100);
   const children = childNodes(p.id);
@@ -2072,7 +2067,7 @@ function roadmapCardHtml(p) {
     : tasks.filter(t => t.done).length;
   return `
     <button class="roadmap-card" data-open-roadmap-path="${p.id}">
-      ${miniProgressRing(pct, 34)}
+      ${goldRingHtml(pct, 34, maskIndexForId(p.id))}
       <div class="roadmap-card-body">
         <div class="roadmap-card-title">${escapeHtml(p.title)}</div>
         <div class="roadmap-card-meta">${doneCount} / ${stepCount} Etappen</div>
@@ -2637,6 +2632,12 @@ document.addEventListener("click", e => {
   if (delExpenseBtn) {
     state.financeExpenses = state.financeExpenses.filter(ex => ex.id !== delExpenseBtn.dataset.delExpense);
     saveData(); renderAll();
+    return;
+  }
+  const addGoalAmountBtn = e.target.closest("[data-add-goal-amount]");
+  if (addGoalAmountBtn) {
+    const goal = state.savingsGoals.find(g => g.id === addGoalAmountBtn.dataset.addGoalAmount);
+    if (goal) openAddGoalAmountModal(goal);
     return;
   }
   const editGoalEl = e.target.closest("[data-edit-goal]");
@@ -3286,21 +3287,47 @@ function renderFinance() {
   const goalsWrap = document.getElementById("savingsGoalsList");
   goalsWrap.innerHTML = state.savingsGoals.length
     ? state.savingsGoals.map(g => {
-        const pct = g.target ? Math.min(100, Math.round(((g.current || 0) / g.target) * 100)) : 0;
         return `
           <div class="atlas-row">
             <div style="cursor:pointer; display:flex; align-items:center; gap:12px; flex:1; min-width:0;" data-edit-goal="${g.id}">
-              ${miniProgressRing(pct, 34)}
+              ${budgetRingHtml(g.current || 0, g.target || 0, 34)}
               <div style="flex:1; min-width:0;">
                 <div class="item-title">${escapeHtml(g.title)}</div>
                 <div class="item-meta">${formatEuro(g.current || 0)} / ${formatEuro(g.target || 0)}${g.dueDate ? " · bis " + g.dueDate : ""}</div>
               </div>
             </div>
+            <button class="btn btn-icon btn-ghost" data-add-goal-amount="${g.id}" aria-label="Betrag hinzufügen"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
             <button class="btn btn-icon btn-ghost" data-del-goal="${g.id}" aria-label="Löschen">${DEL_ICON}</button>
           </div>
         `;
       }).join("")
     : '<div class="empty-hint">Noch keine Sparziele angelegt.</div>';
+}
+
+function openAddGoalAmountModal(goal) {
+  openModal(`
+    <h3>Betrag zu "${escapeHtml(goal.title)}" hinzufügen</h3>
+    <p class="text-muted" style="font-size:12.5px; margin-bottom:10px;">Aktuell gespart: ${formatEuro(goal.current || 0)} von ${formatEuro(goal.target || 0)}</p>
+    <div class="field">
+      <label>Betrag (€)</label>
+      <input type="number" step="0.01" id="mGoalAddAmount" placeholder="z.B. 50" autofocus>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Hinzufügen</button>
+    </div>
+  `, body => {
+    body.querySelector("#mGoalAddAmount").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const amount = parseFloat(body.querySelector("#mGoalAddAmount").value);
+      if (!amount) return;
+      goal.current = (goal.current || 0) + amount;
+      saveData();
+      closeModal();
+      renderAll();
+    });
+  });
 }
 
 function renderFinanceAnalysis() {
@@ -3369,10 +3396,7 @@ function renderFinanceAnalysis() {
 
   const ringsWrap = document.getElementById("financeGoalsRings");
   ringsWrap.innerHTML = state.savingsGoals.length
-    ? state.savingsGoals.map(g => {
-        const pct = g.target ? Math.min(100, Math.round(((g.current || 0) / g.target) * 100)) : 0;
-        return `<div class="finance-ring-item">${miniProgressRing(pct, 56)}<div class="r-title">${escapeHtml(g.title)}</div></div>`;
-      }).join("")
+    ? state.savingsGoals.map(g => `<div class="finance-ring-item">${budgetRingHtml(g.current || 0, g.target || 0, 56)}<div class="r-title">${escapeHtml(g.title)}</div></div>`).join("")
     : '<div class="empty-hint">Noch keine Sparziele.</div>';
 }
 
@@ -3808,3 +3832,7 @@ document.addEventListener("touchend", e => {
   edgeSwipeStart = null;
   if (dx > 60 && dy < 60) roadmapGoBack();
 }, { passive: true });
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
