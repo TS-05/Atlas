@@ -310,6 +310,17 @@ textarea.input { min-height: 90px; resize: vertical; }
 .roadmap-step.current .roadmap-step-title { color: var(--color-accent-200); font-weight: 700; }
 .roadmap-step.future .roadmap-step-title { color: var(--color-neutral-400); }
 .roadmap-step-title[data-open-roadmap-path] { cursor: pointer; }
+
+/* Current step: lifted out of the plain list into its own gold-bordered panel */
+.roadmap-step.current .roadmap-step-body {
+  padding: 14px 16px;
+  border: 1.5px solid var(--color-accent-500);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-accent) 7%, var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 22%, transparent), 0 0 18px color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+.roadmap-step.current .roadmap-dot { margin-top: 12px; }
+.roadmap-start-btn { display: flex; margin-top: 10px; border-radius: 999px; padding: 8px 22px; font-size: 13px; }
 .roadmap-footer-tools { display: flex; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--color-divider); }
 .goal-node-children { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 14px; }
 

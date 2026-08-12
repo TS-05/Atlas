@@ -2174,12 +2174,16 @@ function renderRoadmapPath(nodeId) {
       const stepTitleInner = status === "done"
         ? `<span class="paint-done-stroke">${paintStrokeSvgHtml(s.id)}</span><span class="paint-done-text">${i + 1}. ${escapeHtml(s.title)}</span>`
         : `${i + 1}. ${escapeHtml(s.title)}`;
+      const startBtnHtml = status === "current"
+        ? `<button class="btn btn-primary roadmap-start-btn" ${dotAttr}>Start</button>`
+        : "";
       el.innerHTML = `
         <div class="roadmap-step-rail">
           <button class="roadmap-dot" ${dotAttr} aria-label="${escapeHtml(s.title)}">${status === "done" ? "&#10003;" : (i + 1)}</button>
         </div>
         <div class="roadmap-step-body">
           <div class="roadmap-step-title${status === "done" ? " paint-done-title" : ""}" ${s.kind === "node" ? `data-open-roadmap-path="${s.id}"` : ""}>${stepTitleInner}</div>
+          ${startBtnHtml}
         </div>
       `;
       stepsWrap.appendChild(el);
