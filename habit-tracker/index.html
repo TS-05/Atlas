@@ -11,9 +11,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/favicon-32.png?v=2" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png?v=2">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Kein externes Google-Fonts-Laden mehr (war die einzige Netzwerk-Abhängigkeit der App und
+     verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
+     style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
+     native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -31,6 +32,23 @@
     <filter id="inkRough" x="-70%" y="-70%" width="240%" height="240%">
       <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="4" seed="4" result="noise"/>
       <feDisplacementMap in="SourceGraphic" in2="noise" scale="4.4"/>
+    </filter>
+    <!-- Für den breiten Farbrollen-Klecks hinter erledigten Titeln: eigener Gradient mit an die
+         220x40-Streifenbreite angepassten userSpaceOnUse-Koordinaten (goldGradRing ist auf 0-40 fest,
+         darüber hinaus lief alles nur noch im letzten, dunklen Farbstopp — daher die matschige Optik).
+         Eigener Filter mit niedrigerer, richtungsbetonter Turbulenzfrequenz für einen flacheren,
+         "gewischten" statt kreisrunden Rand. -->
+    <linearGradient id="goldGradWide" x1="0" y1="0" x2="220" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="var(--color-accent-100)"/>
+      <stop offset="0.22" stop-color="var(--color-accent-600)"/>
+      <stop offset="0.4" stop-color="var(--color-accent-200)"/>
+      <stop offset="0.55" stop-color="var(--color-accent-700)"/>
+      <stop offset="0.75" stop-color="var(--color-accent-300)"/>
+      <stop offset="1" stop-color="var(--color-accent-800)"/>
+    </linearGradient>
+    <filter id="inkRoughWide" x="-30%" y="-60%" width="160%" height="220%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.06 0.35" numOctaves="3" seed="7" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="6"/>
     </filter>
     <radialGradient id="liquidBallGrad" cx="35%" cy="28%" r="75%">
       <stop offset="0" stop-color="#fffdf2"/>
@@ -278,6 +296,6 @@
   <div class="modal" id="modalBody"></div>
 </div>
 
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

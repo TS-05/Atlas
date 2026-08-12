@@ -934,26 +934,29 @@ function splatFor(id) {
     scale: scale.toFixed(2), rot
   };
 }
-// Breiter Farbklecks hinter einem erledigten Titel (ToDo-Zeilen + Roadmap-Ebene-3-Schritte) — dieselbe
-// inkRough-Verzerrung + Anlassfarben-Verlauf wie splatSvg, nur als gestreckter Streifen statt Icon.
-// preserveAspectRatio="none" lässt eine einzige handgezeichnete Form auf jede Titellänge dehnen.
+// Breiter Farbklecks hinter einem erledigten Titel (ToDo-Zeilen + Roadmap-Ebene-3-Schritte) — ein
+// flacher, gewischter Streifen statt eines runden Splats, mit eigenem Gradient/Filter (goldGradWide /
+// inkRoughWide, siehe index.html-Defs): goldGradRing ist mit userSpaceOnUse auf 0–40 fest verankert,
+// bei einem 220 Einheiten breiten Pfad lief der Großteil davon nur noch im letzten, dunklen Farbstopp
+// (matschig statt golden). preserveAspectRatio="none" lässt eine einzige handgezeichnete Form auf
+// jede Titellänge dehnen.
 function paintStrokeSvgHtml(id) {
   let n = 0;
   for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0;
   const flip = n % 2 === 0;
   const path = flip
-    ? "M4,24 Q12,6 32,12 T74,8 Q104,2 130,14 T172,7 Q198,15 214,24 Q200,38 174,32 T130,36 Q104,41 74,33 T32,37 Q12,39 4,24 Z"
-    : "M4,20 Q14,4 34,11 T76,6 Q102,15 132,9 T174,12 Q198,4 214,20 Q202,36 176,29 T132,34 Q102,26 76,33 T34,30 Q14,37 4,20 Z";
+    ? "M2,20 C6,10 14,7 26,8 C40,9 55,13 72,11 C95,8 110,15 128,12 C148,9 165,14 182,11 C196,9 208,13 218,19 C210,29 198,32 182,30 C165,33 148,28 128,31 C110,33 95,29 72,32 C55,34 40,30 26,32 C14,33 6,30 2,20 Z"
+    : "M2,18 C8,8 17,12 31,9 C47,6 59,14 77,10 C98,15 113,8 132,13 C150,17 168,10 184,14 C198,17 210,10 218,18 C212,30 200,34 184,30 C168,34 150,27 132,31 C113,26 98,33 77,28 C59,32 47,24 31,27 C17,31 8,26 2,18 Z";
   const dots = [
-    { cx: 6 + (n % 10), cy: 4 + (n % 6), r: 2 },
-    { cx: 208 - (n % 12), cy: 34 - (n % 8), r: 1.6 },
-    { cx: 198 + (n % 8), cy: 6, r: 1.3 }
+    { cx: 4 + (n % 8), cy: 3 + (n % 5), r: 2.2 },
+    { cx: 212 - (n % 10), cy: 34 - (n % 6), r: 1.7 },
+    { cx: 202 + (n % 6), cy: 4, r: 1.3 }
   ];
-  return `<svg viewBox="0 0 220 44" preserveAspectRatio="none">
-    <g filter="url(#inkRough)">
-      <path d="${path}" fill="url(#goldGradRing)"/>
-      ${dots.map(d => `<circle cx="${d.cx}" cy="${d.cy}" r="${d.r}" fill="url(#goldGradRing)"/>`).join("")}
+  return `<svg viewBox="0 0 220 40" preserveAspectRatio="none">
+    <g filter="url(#inkRoughWide)">
+      <path d="${path}" fill="url(#goldGradWide)"/>
     </g>
+    ${dots.map(d => `<circle cx="${d.cx}" cy="${d.cy}" r="${d.r}" fill="url(#goldGradWide)"/>`).join("")}
   </svg>`;
 }
 
