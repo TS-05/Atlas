@@ -2173,9 +2173,7 @@ function renderRoadmapPath(nodeId) {
       <div class="roadmap-progress-label">${doneCount} / ${steps.length} Schritte</div>
     </div>
     <div class="roadmap-path" id="roadmapPathSteps"></div>
-    <div class="roadmap-footer-tools">${resourceLinksRow(node)}</div>
   `;
-  hydrateResourceLinks(node, wrap);
   const stepsWrap = wrap.querySelector("#roadmapPathSteps");
   if (steps.length === 0) {
     stepsWrap.innerHTML = '<div class="empty-hint">Noch keine Schritte.</div>';
@@ -2589,12 +2587,6 @@ document.addEventListener("click", e => {
     state.habits = state.habits.filter(h => h.id !== e.target.dataset.delHabit);
     saveData(); renderAll();
   }
-  const geminiBtn = e.target.closest("[data-copy-gemini]");
-  if (geminiBtn) copyGeminiPrompt(geminiBtn.dataset.copyGemini, geminiBtn);
-  const monthBtn = e.target.closest("[data-copy-month-prompt]");
-  if (monthBtn) copyMonthTestPrompt(monthBtn.dataset.copyMonthPrompt, monthBtn);
-  const cardBtn = e.target.closest("[data-copy-card-prompt]");
-  if (cardBtn) copyKnowledgeCardPrompt(cardBtn.dataset.copyCardPrompt, cardBtn);
   const openRootBtn = e.target.closest("[data-open-roadmap-root]");
   if (openRootBtn) {
     roadmapRootId = openRootBtn.dataset.openRoadmapRoot;
@@ -2723,133 +2715,6 @@ document.addEventListener("click", e => {
 });
 initRoutineDragReorder();
 initPrayerDragReorder();
-
-function flashButton(btn, tempContent) {
-  const original = btn.textContent;
-  btn.textContent = tempContent;
-  setTimeout(() => { btn.textContent = original; }, 1200);
-}
-
-function downloadText(text, filename) {
-  const blob = new Blob([text], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-// ---------- Wissens-Ressourcen pro Bereich: echter Wikipedia-Artikel, echtes YouTube-Video, KI-Prompts ----------
-const RESOURCE_ICONS = {
-  wikipedia: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 1.5V13.5M1.5 7.5H13.5M2.7 4.2C4.8 5.6 10.2 5.6 12.3 4.2M2.7 10.8C4.8 9.4 10.2 9.4 12.3 10.8" stroke="currentColor" stroke-width="1"/></svg>',
-  youtube: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="3.5" width="12" height="8" rx="2.2" stroke="currentColor" stroke-width="1.2"/><path d="M6.3 5.8L9.5 7.5L6.3 9.2V5.8Z" fill="currentColor"/></svg>',
-  gemini: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1.5C7.5 4.5 9.5 6.5 12.5 6.5C9.5 6.5 7.5 8.5 7.5 11.5C7.5 8.5 5.5 6.5 2.5 6.5C5.5 6.5 7.5 4.5 7.5 1.5Z" fill="currentColor"/></svg>',
-  monat: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="3" width="11" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M2 6H13M5 1.5V4M10 1.5V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
-  karte: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="4" y="3.5" width="9" height="6.5" rx="0.9" stroke="currentColor" stroke-width="1.1"/><rect x="2" y="5.5" width="9" height="6.5" rx="0.9" fill="var(--color-surface)" stroke="currentColor" stroke-width="1.1"/></svg>'
-};
-
-// Wikipedia: direkter Artikel statt Suchseite. Erst ein sofort funktionierender Fallback-Link
-// (Direktaufruf des Titels), danach im Hintergrund per Opensearch-API auf den echten Trefferartikel
-// aktualisiert (kein API-Key nötig, CORS-offen).
-const wikiArticleCache = new Map();
-function wikipediaFallbackUrl(title) {
-  return `https://de.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
-}
-async function resolveWikipediaUrl(title) {
-  if (wikiArticleCache.has(title)) return wikiArticleCache.get(title);
-  try {
-    const res = await fetch(`https://de.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(title)}&limit=1&namespace=0&format=json&origin=*`);
-    const data = await res.json();
-    const url = (data && data[3] && data[3][0]) ? data[3][0] : wikipediaFallbackUrl(title);
-    wikiArticleCache.set(title, url);
-    return url;
-  } catch (e) {
-    return wikipediaFallbackUrl(title);
-  }
-}
-
-// YouTube: ohne eigenen Data-API-Key kann kein einzelnes Video zuverlässig aufgelöst werden (keine
-// key-lose offizielle Such-API). Ist ein Key hinterlegt (lokal, optional), wird direkt das Top-Video
-// verlinkt; sonst ein zielgerichteter Such-Link als Fallback.
-const youtubeVideoCache = new Map();
-function youtubeFallbackUrl(title) {
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " einfach erklärt")}`;
-}
-function getYoutubeApiKey() { return localStorage.getItem("atlas-youtube-api-key") || ""; }
-async function resolveYoutubeUrl(title) {
-  const key = getYoutubeApiKey();
-  if (!key) return youtubeFallbackUrl(title);
-  if (youtubeVideoCache.has(title)) return youtubeVideoCache.get(title);
-  try {
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&type=video&q=${encodeURIComponent(title + " erklärt")}&key=${key}`);
-    const data = await res.json();
-    const id = data && data.items && data.items[0] && data.items[0].id && data.items[0].id.videoId;
-    const url = id ? `https://www.youtube.com/watch?v=${id}` : youtubeFallbackUrl(title);
-    youtubeVideoCache.set(title, url);
-    return url;
-  } catch (e) {
-    return youtubeFallbackUrl(title);
-  }
-}
-
-function hydrateResourceLinks(node, container) {
-  resolveWikipediaUrl(node.title).then(url => {
-    const a = container.querySelector(`[data-wiki-link="${node.id}"]`);
-    if (a) a.href = url;
-  });
-  resolveYoutubeUrl(node.title).then(url => {
-    const a = container.querySelector(`[data-yt-link="${node.id}"]`);
-    if (a) a.href = url;
-  });
-}
-
-function buildGeminiQuizPrompt(node) {
-  const path = nodePath(node.id).map(n => n.title).join(" / ");
-  return `Stelle mir ein kurzes Quiz (5-8 Fragen) zum Thema "${node.title}" (Einordnung: ${path}). Werte danach meine Antworten aus, zeig mir konkret, wo meine Wissenslücken liegen, und erkläre mir diese Lücken verständlich.`;
-}
-async function copyGeminiPrompt(nodeId, btn) {
-  const node = nodeById(nodeId);
-  if (!node) return;
-  try { await navigator.clipboard.writeText(buildGeminiQuizPrompt(node)); flashButton(btn, "✓"); }
-  catch (e) { downloadText(buildGeminiQuizPrompt(node), `Quiz_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`); }
-}
-
-function buildMonthTestPrompt(node) {
-  const path = nodePath(node.id).map(n => n.title).join(" / ");
-  return `Schlage mir eine konkrete, klar abgegrenzte Aufgabe vor, mit der ich das Thema "${node.title}" (Einordnung: ${path}) einen Monat lang praktisch teste bzw. anwende. Nenne mir ein messbares Ziel für den Monat und 2-3 Zwischenschritte.`;
-}
-async function copyMonthTestPrompt(nodeId, btn) {
-  const node = nodeById(nodeId);
-  if (!node) return;
-  try { await navigator.clipboard.writeText(buildMonthTestPrompt(node)); flashButton(btn, "✓"); }
-  catch (e) { downloadText(buildMonthTestPrompt(node), `Monatstest_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`); }
-}
-
-function buildKnowledgeCardPrompt(node) {
-  const path = nodePath(node.id).map(n => n.title).join(" / ");
-  return `Erstelle mir eine kurze, gebündelte Wissens-Zusammenfassung (wie eine Karteikarte, max. 1 Seite) zum Thema "${node.title}" (Einordnung: ${path}) mit den wichtigsten Fakten, Begriffen und Zusammenhängen, die ich mir merken sollte.`;
-}
-async function copyKnowledgeCardPrompt(nodeId, btn) {
-  const node = nodeById(nodeId);
-  if (!node) return;
-  try { await navigator.clipboard.writeText(buildKnowledgeCardPrompt(node)); flashButton(btn, "✓"); }
-  catch (e) { downloadText(buildKnowledgeCardPrompt(node), `Karteikarte_${node.title.replace(/[^a-z0-9]+/gi, "_")}.txt`); }
-}
-
-function resourceLinksRow(node) {
-  return `
-    <div class="goal-node-resources" style="display:flex; gap:6px; flex-wrap:wrap; padding:0 14px 10px;">
-      <a class="btn btn-icon btn-ghost" href="${wikipediaFallbackUrl(node.title)}" target="_blank" rel="noopener" title="Wikipedia-Artikel" data-wiki-link="${node.id}">${RESOURCE_ICONS.wikipedia}</a>
-      <a class="btn btn-icon btn-ghost" href="${youtubeFallbackUrl(node.title)}" target="_blank" rel="noopener" title="YouTube-Erklärvideo" data-yt-link="${node.id}">${RESOURCE_ICONS.youtube}</a>
-      <button class="btn btn-icon btn-ghost" data-copy-gemini="${node.id}" title="KI-Quiz-Prompt kopieren">${RESOURCE_ICONS.gemini}</button>
-      <button class="btn btn-icon btn-ghost" data-copy-month-prompt="${node.id}" title="KI-Prompt für 1-Monats-Testaufgabe kopieren">${RESOURCE_ICONS.monat}</button>
-      <button class="btn btn-icon btn-ghost" data-copy-card-prompt="${node.id}" title="KI-Prompt für Wissens-Zusammenfassung kopieren">${RESOURCE_ICONS.karte}</button>
-    </div>
-  `;
-}
 
 // ---------- Add buttons ----------
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
