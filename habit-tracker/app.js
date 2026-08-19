@@ -3891,12 +3891,44 @@ if (splashEl) {
     });
   });
 
-  // orientation als statisches HTML-Attribut wird von model-viewer nur reaktiv angewendet, wenn es
-  // sich NACH dem Laden ändert (interner Guard "wenn noch nicht geladen, überspringen"). Direkt beim
-  // Parsen gesetzt, kommt die erste Anwendung dadurch u.U. nie an -- deshalb hier nach dem "load"-
-  // Event nochmal explizit (per Property, nicht Attribut) neu zugewiesen, garantiert nach dem Laden.
+  // Zweite, unabhängige Erkennung als Absicherung: falls die Hotspot-Buttons aus irgendeinem Grund
+  // (Occlusion-Logik, Layout-Timing, Browser-Eigenheit) keinen Touch abbekommen, wertet ein simpler
+  // "click" auf dem Globus selbst den echten 3D-Trefferpunkt aus (kein pointerdown-Tracking -- das
+  // könnte an derselben Stelle scheitern wie bei den Hotspots) und prüft grob gegen dieselben
+  // Kontinent-Regionen, an denen auch die Pins/Hotspots positioniert sind.
+  const CONTINENT_REGIONS = [
+    { tab: "todo", latMin: 15, latMax: 75, lonMin: -170, lonMax: -50 },
+    { tab: "zielbereiche", latMin: -55, latMax: 12, lonMin: -85, lonMax: -35 },
+    { tab: "heute", latMin: 35, latMax: 70, lonMin: -10, lonMax: 40 },
+    { tab: "gebete", latMin: -35, latMax: 35, lonMin: -20, lonMax: 50 }
+  ];
+  if (globeModel && globeModel.positionAndNormalFromPoint) {
+    globeModel.addEventListener("click", e => {
+      if (e.target !== globeModel) return; // Hotspot-Buttons haben ihren eigenen Handler oben
+      const rect = globeModel.getBoundingClientRect();
+      const hit = globeModel.positionAndNormalFromPoint(e.clientX - rect.left, e.clientY - rect.top);
+      if (!hit) return;
+      const { position } = hit;
+      const radius = Math.sqrt(position.x ** 2 + position.y ** 2 + position.z ** 2);
+      const lat = Math.asin(position.y / radius) * 180 / Math.PI;
+      const lon = Math.atan2(position.x, position.z) * 180 / Math.PI;
+      const region = CONTINENT_REGIONS.find(r => lat >= r.latMin && lat <= r.latMax && lon >= r.lonMin && lon <= r.lonMax);
+      if (region) goToTab(region.tab);
+    });
+  }
+
+  // orientation als statisches HTML-Attribut wird von model-viewer nur reaktiv angewendet, wenn sich
+  // der Property-Wert NACH dem Laden echt ändert (interner Guard "wenn noch nicht geladen,
+  // überspringen" + Lits eigene Änderungserkennung reagiert nicht, wenn der neue Wert exakt dem
+  // schon gesetzten String entspricht). Deshalb hier nach dem "load"-Event erst auf einen anderen
+  // Wert und im nächsten Frame erst auf den Zielwert gesetzt -- garantiert eine echte, erkannte
+  // Änderung nach dem Laden statt eines wirkungslosen "gleicher Wert nochmal"-Assignments.
+  const TARGET_ORIENTATION = "23.5deg 0deg 0deg";
   if (globeModel) {
-    const applyOrientation = () => { globeModel.orientation = "23.5deg 0deg 0deg"; };
+    const applyOrientation = () => {
+      globeModel.orientation = "0deg 0deg 0deg";
+      requestAnimationFrame(() => { globeModel.orientation = TARGET_ORIENTATION; });
+    };
     if (globeModel.loaded) applyOrientation();
     else globeModel.addEventListener("load", applyOrientation, { once: true });
   }
