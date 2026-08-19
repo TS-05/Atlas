@@ -541,16 +541,16 @@ textarea.input { min-height: 90px; resize: vertical; }
   touch-action: none;
 }
 .globe-model {
-  height: clamp(240px, 42vh, 400px);
-  width: clamp(240px, 42vh, 400px);
+  height: clamp(300px, 54vh, 480px);
+  width: clamp(300px, 54vh, 480px);
   --poster-color: transparent;
 }
 /* Unsichtbarer, aber großzügiger Tap-Ziel-Kreis über dem jeweiligen 3D-Pin (der Pin selbst ist echte
    GLB-Geometrie und liefert das sichtbare Marker-Design). model-viewer positioniert/verdeckt diese
    Hotspots automatisch passend zur aktuellen Rotation über die data-position/data-normal-Attribute. */
 .globe-hotspot {
-  width: 44px;
-  height: 44px;
+  width: 68px;
+  height: 68px;
   transform: translate(-50%, -50%);
   border: none;
   border-radius: 50%;
