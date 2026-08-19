@@ -429,6 +429,18 @@ textarea.input { min-height: 90px; resize: vertical; }
   width: auto;
   object-fit: contain;
 }
+.splash-tagline {
+  position: relative;
+  z-index: 1;
+  margin-top: -20px;
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 11.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-neutral-100);
+  text-align: center;
+}
 .splash-bar-plate {
   position: relative;
   z-index: 1;
