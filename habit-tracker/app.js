@@ -3861,16 +3861,23 @@ if (splashEl) {
 
 // ---------- Homemenü: 3D-Globus-Navigation ----------
 // Drehung (Auto-Rotation + Wisch-Ziehen) übernimmt <model-viewer> selbst (siehe camera-controls/
-// auto-rotate-Attribute in index.html). Hier wird nur noch der Home-Screen ausgeblendet und zum
-// jeweiligen Tab gewechselt, sobald einer der Nav-Buttons unter dem Globus angetippt wird.
+// auto-rotate-Attribute in index.html). Kontinent-Antippen läuft über model-viewers eigenes
+// Hotspot-Slot-System (<button slot="hotspot-..." data-position="..." data-normal="...">, siehe
+// index.html) statt über eigenes Raycasting -- model-viewer übernimmt Positionierung/Verdeckung
+// passend zur aktuellen Rotation von sich aus, ein Klick auf den Button ist ein ganz normales
+// DOM-Event und damit unabhängig davon zuverlässig, ob der zugehörige 3D-Pin optisch schon exakt
+// auf dem richtigen Kontinent sitzt (das ist rein eine Positionsfrage der data-position-Werte).
 (() => {
   const homeMenu = document.getElementById("homeMenu");
   if (!homeMenu) return;
-  homeMenu.querySelectorAll(".home-satellite").forEach(btn => {
-    btn.addEventListener("click", () => {
-      homeMenu.classList.add("home-hidden");
-      switchTab(btn.dataset.tab);
-    });
+
+  function goToTab(tabName) {
+    homeMenu.classList.add("home-hidden");
+    switchTab(tabName);
+  }
+
+  homeMenu.querySelectorAll(".home-satellite, .globe-hotspot").forEach(btn => {
+    btn.addEventListener("click", () => goToTab(btn.dataset.tab));
   });
 })();
 

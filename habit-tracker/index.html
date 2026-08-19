@@ -383,11 +383,23 @@
     <div class="globe-stage">
       <!-- Echtes 3D-Modell (assets/atlas_globe_v6.glb) über das lokal gehostete model-viewer
            (habit-tracker/vendor/model-viewer.min.js, kein CDN -- bleibt offline-fähig, der Service
-           Worker cacht beide Dateien wie jede andere same-origin Ressource). Kontinente sind im
-           Modell EIN gemeinsames Material (kein Objekt pro Kontinent), Antippen einzelner Kontinente
-           ist damit nicht zuverlässig möglich -- Navigation läuft stattdessen über das Button-Raster
-           unten. min-camera-orbit/max-camera-orbit fixieren den Polarwinkel auf 90°, damit sich der
-           Globus wie zuvor nur horizontal dreht (Auto-Rotation + Wisch-Drehen via camera-controls).
+           Worker cacht beide Dateien wie jede andere same-origin Ressource). min-camera-orbit/
+           max-camera-orbit fixieren den Polarwinkel auf 90°, damit sich der Globus nur horizontal
+           dreht (Auto-Rotation + Wisch-Drehen via camera-controls). orientation kippt die Drehachse
+           um 23,5° (wie die echte Erdachsenneigung) -- auto-rotate spinnt weiterhin um die lokale
+           Y-Achse des Modells, orientation kippt das Ganze danach als feste Grundausrichtung, wodurch
+           die Spin-Achse selbst schräg steht statt nur die Kamera.
+
+           Kontinent-Navigation: das GLB hat inzwischen echte 3D-Pin-Marker (kleine Silber-Oktaeder,
+           siehe assets/atlas_globe_v6.glb-Node "Pin*") an den vier Kontinent-Positionen sowie einen
+           kleinen Satelliten als Deko. Für zuverlässiges Antippen (nicht auf eigenes Raycasting
+           gegen die Kugeloberfläche verlassen -- Längengrad-Konvention des Modells war nicht sicher
+           kalibrierbar) liegen zusätzlich unsichtbare model-viewer-Hotspots exakt an denselben
+           Koordinaten wie die Pins: model-viewer positioniert/verdeckt sie automatisch passend zur
+           aktuellen Rotation, der Klick-Handler in app.js braucht dafür kein eigenes Hit-Testing.
+           Falls ein Pin (visuell) auf dem falschen Kontinent sitzt, sind nur die x/y/z-Werte unten
+           anzupassen -- das Klicken selbst bleibt davon unberührt, da Hotspot-Position und Pin-Position
+           hier bewusst gemeinsam gepflegt werden.
       -->
       <model-viewer
         id="globeModel"
@@ -402,13 +414,19 @@
         auto-rotate
         rotation-per-second="6deg"
         interaction-prompt="none"
+        orientation="23.5deg 0deg 0deg"
         camera-orbit="0deg 90deg 105%"
         min-camera-orbit="auto 90deg auto"
         max-camera-orbit="auto 90deg auto"
         environment-image="neutral"
         exposure="0.9"
         shadow-intensity="0"
-      ></model-viewer>
+      >
+        <button slot="hotspot-todo" class="globe-hotspot" data-tab="todo" aria-label="Nordamerika – ToDo" data-position="-0.7173 0.7283 -0.1265" data-normal="-0.6964 0.7071 -0.1228"></button>
+        <button slot="hotspot-zielbereiche" class="globe-hotspot" data-tab="zielbereiche" aria-label="Südamerika – Roadmap" data-position="-0.8616 -0.2666 0.4975" data-normal="-0.8365 -0.2588 0.4830"></button>
+        <button slot="hotspot-heute" class="globe-hotspot" data-tab="heute" aria-label="Europa – Heute" data-position="0.1714 0.7890 0.6395" data-normal="0.1664 0.7660 0.6209"></button>
+        <button slot="hotspot-gebete" class="globe-hotspot" data-tab="gebete" aria-label="Afrika – Gebete" data-position="0.3523 0.0000 0.9679" data-normal="0.3420 0.0000 0.9397"></button>
+      </model-viewer>
     </div>
     <div class="home-nav-grid">
       <button class="home-satellite" data-tab="heute">
