@@ -3869,6 +3869,7 @@ if (splashEl) {
 // auf dem richtigen Kontinent sitzt (das ist rein eine Positionsfrage der data-position-Werte).
 (() => {
   const homeMenu = document.getElementById("homeMenu");
+  const globeModel = document.getElementById("globeModel");
   if (!homeMenu) return;
 
   function goToTab(tabName) {
@@ -3876,9 +3877,29 @@ if (splashEl) {
     switchTab(tabName);
   }
 
-  homeMenu.querySelectorAll(".home-satellite, .globe-hotspot").forEach(btn => {
+  homeMenu.querySelectorAll(".home-satellite").forEach(btn => {
     btn.addEventListener("click", () => goToTab(btn.dataset.tab));
   });
+
+  homeMenu.querySelectorAll(".globe-hotspot").forEach(btn => {
+    // pointerdown zuerst abfangen (stopPropagation), bevor model-viewers eigene Dreh-Geste
+    // (camera-controls) den Touch als Drag-Start interpretiert -- sonst kommt nie ein "click" durch.
+    btn.addEventListener("pointerdown", e => e.stopPropagation());
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      goToTab(btn.dataset.tab);
+    });
+  });
+
+  // orientation als statisches HTML-Attribut wird von model-viewer nur reaktiv angewendet, wenn es
+  // sich NACH dem Laden ändert (interner Guard "wenn noch nicht geladen, überspringen"). Direkt beim
+  // Parsen gesetzt, kommt die erste Anwendung dadurch u.U. nie an -- deshalb hier nach dem "load"-
+  // Event nochmal explizit (per Property, nicht Attribut) neu zugewiesen, garantiert nach dem Laden.
+  if (globeModel) {
+    const applyOrientation = () => { globeModel.orientation = "23.5deg 0deg 0deg"; };
+    if (globeModel.loaded) applyOrientation();
+    else globeModel.addEventListener("load", applyOrientation, { once: true });
+  }
 })();
 
 // Swipe vom linken Bildschirmrand nach rechts = eine Roadmap-Ebene zurück (wie iOS Zurück-Geste).
