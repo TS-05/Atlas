@@ -670,6 +670,18 @@ function migrateTaskEffortLevels(data) {
   data.taskEffortLevelsApplied = true;
 }
 
+// ---------- Migration: 5-stufige -> 6-stufige Aufwandsskala (neue Stufe "2-6 Std." eingefügt) ----------
+// Verschiebt alte Stufe 4 ("Größere Aufgabe", halber-1 Tag) auf neu 5, alte Stufe 5 ("Große Aufgabe") auf neu 6,
+// damit bereits vergebene Aufwandsstufen ihre Bedeutung behalten.
+function migrateTaskEffortLevelsV2(data) {
+  if (data.taskEffortLevelsV2Applied || !data.tasks) return;
+  data.tasks.forEach(t => {
+    if (t.size === 5) t.size = 6;
+    else if (t.size === 4) t.size = 5;
+  });
+  data.taskEffortLevelsV2Applied = true;
+}
+
 // ---------- Migration: von der enzyklopädischen 18er-Struktur zur zielorientierten Struktur (Phase 7.11) ----------
 // "Glaube" bleibt (ID/Inhalt erhalten, nur neue Unterpunkte ergänzt). Alle anderen alten Wurzeln: wenn
 // irgendwo im Teilbaum Aufgaben/Gewohnheiten hängen, werden sie unter "Archiv (alte Bereiche)" verschoben
@@ -774,6 +786,7 @@ migrateToGoalDrivenStructure(state);
 migrateSeminararbeitRoadmap(state);
 migrateSeminararbeitRoadmapV2(state);
 migrateTaskEffortLevels(state);
+migrateTaskEffortLevelsV2(state);
 migrateLearningOrder(state);
 repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
@@ -1184,13 +1197,14 @@ const HEADER_ICON_SEARCH = '<svg width="14" height="14" viewBox="0 0 14 14" fill
 const HEADER_ICON_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V9.5M4 6.5L7 9.5L10 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 11.5V12.5H12V11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
 // ---------- Lernfeldaufgaben: Aufgabentypen mit Icon (statt Klein/Groß, für source="category") ----------
-// Aufwandsstufen für Aufgaben (task.size): fünf Stufen mit grobem Zeitrahmen statt nur klein/groß.
+// Aufwandsstufen für Aufgaben (task.size): sechs Stufen mit grobem Zeitrahmen statt nur klein/groß.
 const EFFORT_LEVELS = [
   { level: 1, label: "Erster Gedanke", time: "1–5 Min." },
   { level: 2, label: "Kurzaufgabe", time: "5–30 Min." },
   { level: 3, label: "Mittlere Aufgabe", time: "30 Min. – 2 Std." },
-  { level: 4, label: "Größere Aufgabe", time: "halber – 1 Tag" },
-  { level: 5, label: "Große Aufgabe", time: "1 – 1,5 Wochen" }
+  { level: 4, label: "Halbtagsaufgabe", time: "2–6 Std." },
+  { level: 5, label: "Größere Aufgabe", time: "halber – 1 Tag" },
+  { level: 6, label: "Große Aufgabe", time: "1 – 1,5 Wochen" }
 ];
 function effortLevelInfo(size) {
   const n = typeof size === "number" ? size : (size === "gross" ? 4 : 1);
@@ -3855,6 +3869,16 @@ function exportWeekReview() {
 // ---------- Init ----------
 renderAll();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) renderAll(); });
+
+// Ladebildschirm: läuft bei jedem App-Start als feste 3-Sekunden-Sequenz durch (unabhängig davon,
+// wie schnell der eigentliche Render aus localStorage steht) und blendet danach aus.
+const splashEl = document.getElementById("splashScreen");
+if (splashEl) {
+  setTimeout(() => {
+    splashEl.classList.add("splash-hidden");
+    splashEl.addEventListener("transitionend", () => splashEl.remove(), { once: true });
+  }, 3000);
+}
 
 // Swipe vom linken Bildschirmrand nach rechts = eine Roadmap-Ebene zurück (wie iOS Zurück-Geste).
 let edgeSwipeStart = null;

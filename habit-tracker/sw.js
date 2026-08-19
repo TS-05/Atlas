@@ -3,7 +3,7 @@
 // liefert sie danach auch offline aus. Bei Netzverbindung wird der Cache im Hintergrund aktualisiert.
 // Nichts fest verdrahtet — neue/versionierte Dateinamen (z.B. app.js?v=15) landen automatisch im Cache,
 // sobald sie einmal geladen wurden.
-const CACHE_NAME = "atlas-cache-v1";
+const CACHE_NAME = "atlas-cache-v2";
 const APP_SHELL = ["./", "./index.html"];
 
 self.addEventListener("install", e => {
@@ -24,6 +24,22 @@ self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return; // z.B. Google Fonts: Netzwerk-only, Offline-Fallback ist die System-Schrift
+
+  // Navigation (App wird geöffnet/neu geladen, z.B. übers Homescreen-Icon): wenn die exakte URL nicht
+  // 1:1 im Cache liegt (z.B. abweichende Groß-/Kleinschreibung, Query-Parameter, Redirect-Ziel) und das
+  // Netz offline ist, sonst auf die gecachte index.html zurückfallen statt mit leerem Bildschirm zu enden.
+  if (e.request.mode === "navigate") {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, copy));
+          return res;
+        })
+        .catch(() => caches.match(e.request).then(cached => cached || caches.match("./index.html")))
+    );
+    return;
+  }
 
   e.respondWith(
     caches.match(e.request).then(cached => {

@@ -393,3 +393,72 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* ---------- Finanzen-Tab: Letzte Ausgaben ---------- */
 .expense-row .item-meta { display: flex; gap: 6px; }
 .expense-row .item-meta .amount { color: var(--color-neutral-300); font-variant-numeric: tabular-nums; }
+
+/* ---------- Ladebildschirm ----------
+   Eigener, prozedural generierter Low-Poly-Dreieckshintergrund (gleiche Dunkeltöne wie das
+   App-Theme, vereinzelt bronze/goldstichige Facetten als Echo der Globus-Kontinente) füllt den
+   ganzen Screen randlos. Die Atlas-Figur (atlas-figure-cutout.png, echt freigestellt mit Alpha,
+   Hochformat 921x1656) liegt darüber, ohne Maske — direkt sauber, kein Icon-Quadrat mehr.
+   Balkenbreite bleibt an die Figurenhöhe gekoppelt (0.465 = gemessener Globus-Durchmesser
+   relativ zur Bildbreite, umgerechnet über das Seitenverhältnis), damit "Balken = Erdball-Durchmesser" stimmt. */
+.splash-screen {
+  --splash-figure-h: clamp(340px, 62vh, 640px);
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  background: var(--color-bg);
+  overflow: hidden;
+  transition: opacity 0.5s ease;
+}
+.splash-screen.splash-hidden { opacity: 0; pointer-events: none; }
+.splash-mesh {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.splash-figure {
+  position: relative;
+  height: var(--splash-figure-h);
+  width: auto;
+  object-fit: contain;
+}
+.splash-bar-plate {
+  position: relative;
+  z-index: 1;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(10, 12, 16, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.splash-bar {
+  position: relative;
+  width: calc(var(--splash-figure-h) * 0.465);
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.splash-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: #ffffff;
+  animation: splashFillSteps 3s ease-in-out forwards;
+}
+@keyframes splashFillSteps {
+  0% { width: 0%; }
+  6% { width: 18%; }
+  24% { width: 18%; }
+  34% { width: 47%; }
+  64% { width: 47%; }
+  72% { width: 100%; }
+  100% { width: 100%; }
+}
