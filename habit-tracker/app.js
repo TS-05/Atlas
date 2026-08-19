@@ -3859,142 +3859,18 @@ if (splashEl) {
   }, 3000);
 }
 
-// ---------- Homemenü: drehbarer Globus mit Kontinent-Navigation ----------
-// Echte 3D-Kugel aus N schmalen Streifen (siehe ausführlicher Kommentar bei .globe-viewport in
-// style.css). Nur assets/globe-single.png (eine fotografierte Hemisphäre) existiert als Textur;
-// foldFrontAngle() faltet die volle 360°-Rotation an den Rändern (±90°) auf diese eine Hemisphäre
-// zurück, statt eine gespiegelte Kachel seitlich anzuhängen -- so liegt die Naht dort, wo die
-// Streifen durch die Rotation ohnehin auf Kante stehen (kaum sichtbar), nie mitten im Bild.
+// ---------- Homemenü: 3D-Globus-Navigation ----------
+// Drehung (Auto-Rotation + Wisch-Ziehen) übernimmt <model-viewer> selbst (siehe camera-controls/
+// auto-rotate-Attribute in index.html). Hier wird nur noch der Home-Screen ausgeblendet und zum
+// jeweiligen Tab gewechselt, sobald einer der Nav-Buttons unter dem Globus angetippt wird.
 (() => {
   const homeMenu = document.getElementById("homeMenu");
-  const viewport = document.getElementById("globeViewport");
-  const globe3d = document.getElementById("globe3d");
-  const hotspotData = document.getElementById("globeHotspotData");
-  if (!homeMenu || !viewport || !globe3d || !hotspotData) return;
-
-  const TEX_SIZE = 788; // Breite/Höhe von assets/globe-single.png
-  const STRIP_COUNT = 32;
-  const FULL_ROTATION_SECONDS = 60;
-  const DRAG_DEG_PER_PX = 0.35;
-
-  const hotspots = Array.from(hotspotData.querySelectorAll("path")).map(p => ({
-    tab: p.dataset.tab,
-    points: p.getAttribute("d").match(/-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?/g)
-      .map(pair => pair.split(",").map(Number))
-  }));
-
-  // Faltet einen beliebigen Winkel (0-360°, "wo auf der vollen Kugel") auf den sichtbaren
-  // Front-Bereich der einen vorhandenen Fotohemisphäre zurück (-90°..+90°, Dreieckswelle,
-  // Faltpunkte bei ±90° -- geometrisch die Ränder/Silhouette, wo Streifen ohnehin kaum sichtbar sind).
-  function foldFrontAngle(baseDeg) {
-    const n = ((baseDeg + 90) % 360 + 360) % 360;
-    return 90 - Math.abs(n - 180);
-  }
-  function frontAngleToTexX(frontDeg) {
-    return (Math.sin(frontDeg * Math.PI / 180) + 1) / 2 * TEX_SIZE;
-  }
-
-  let radiusPx = 0;
-  function buildStrips() {
-    radiusPx = viewport.getBoundingClientRect().width / 2;
-    globe3d.innerHTML = "";
-    const stepDeg = 360 / STRIP_COUNT;
-    const stripWidthPx = 2 * radiusPx * Math.sin((stepDeg * Math.PI / 180) / 2) * 1.02; // leichte Überlappung gegen Spalten
-    for (let i = 0; i < STRIP_COUNT; i++) {
-      const baseDeg = i * stepDeg;
-      const texX = frontAngleToTexX(foldFrontAngle(baseDeg));
-      const strip = document.createElement("div");
-      strip.className = "globe-strip";
-      strip.style.width = `${stripWidthPx}px`;
-      strip.style.left = "50%";
-      strip.style.marginLeft = `${-stripWidthPx / 2}px`;
-      strip.style.backgroundImage = 'url("assets/globe-single.png?v=1")';
-      strip.style.backgroundSize = `${radiusPx * 2}px ${radiusPx * 2}px`;
-      strip.style.backgroundPosition = `${-(texX - stripWidthPx / 2)}px 0px`;
-      strip.style.transform = `rotateY(${baseDeg}deg) translateZ(${radiusPx}px)`;
-      globe3d.appendChild(strip);
-    }
-  }
-  buildStrips();
-  window.addEventListener("resize", buildStrips);
-
-  let rotationDeg = 0;
-  let dragging = false;
-  let dragMoved = false;
-  let dragStartX = 0;
-  let dragStartRotation = 0;
-  let lastFrameTime = null;
-
-  function applyRotation() {
-    globe3d.style.transform = `rotateY(${rotationDeg}deg)`;
-  }
-
-  function frame(t) {
-    if (lastFrameTime === null) lastFrameTime = t;
-    const dt = (t - lastFrameTime) / 1000;
-    lastFrameTime = t;
-    if (!dragging && !homeMenu.classList.contains("home-hidden")) {
-      rotationDeg += (360 / FULL_ROTATION_SECONDS) * dt;
-      applyRotation();
-    }
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-
-  viewport.addEventListener("pointerdown", e => {
-    dragging = true;
-    dragMoved = false;
-    dragStartX = e.clientX;
-    dragStartRotation = rotationDeg;
-    viewport.setPointerCapture(e.pointerId);
-  });
-  viewport.addEventListener("pointermove", e => {
-    if (!dragging) return;
-    const delta = e.clientX - dragStartX;
-    if (Math.abs(delta) > 3) dragMoved = true;
-    rotationDeg = dragStartRotation + delta * DRAG_DEG_PER_PX;
-    applyRotation();
-  });
-  function endDrag(e) {
-    if (!dragging) return;
-    dragging = false;
-    lastFrameTime = null; // Ambient-Tempo nicht mit der Zeit "aufholen", die die Wischgeste gedauert hat
-    try { viewport.releasePointerCapture(e.pointerId); } catch (err) {}
-  }
-  viewport.addEventListener("pointerup", endDrag);
-  viewport.addEventListener("pointercancel", endDrag);
-
-  function pointInPolygon(x, y, points) {
-    let inside = false;
-    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-      const [xi, yi] = points[i], [xj, yj] = points[j];
-      const intersects = (yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi;
-      if (intersects) inside = !inside;
-    }
-    return inside;
-  }
-
-  function goToTab(tabName) {
-    homeMenu.classList.add("home-hidden");
-    switchTab(tabName);
-  }
-
-  viewport.addEventListener("click", e => {
-    if (dragMoved) return;
-    const r = viewport.getBoundingClientRect();
-    const clickXRel = e.clientX - (r.left + r.width / 2);
-    const clickYRel = e.clientY - r.top;
-    if (radiusPx <= 0 || Math.abs(clickXRel) > radiusPx) return;
-    const visualFrontDeg = Math.asin(clickXRel / radiusPx) * 180 / Math.PI;
-    const baseDeg = visualFrontDeg - rotationDeg;
-    const texX = frontAngleToTexX(foldFrontAngle(baseDeg));
-    const texY = (clickYRel / r.height) * TEX_SIZE;
-    const hit = hotspots.find(h => pointInPolygon(texX, texY, h.points));
-    if (hit) goToTab(hit.tab);
-  });
-
+  if (!homeMenu) return;
   homeMenu.querySelectorAll(".home-satellite").forEach(btn => {
-    btn.addEventListener("click", () => goToTab(btn.dataset.tab));
+    btn.addEventListener("click", () => {
+      homeMenu.classList.add("home-hidden");
+      switchTab(btn.dataset.tab);
+    });
   });
 })();
 

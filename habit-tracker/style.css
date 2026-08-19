@@ -489,13 +489,12 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* ---------- Homemenü ----------
    Liegt im DOM direkt unter dem Ladebildschirm (niedrigerer z-index) und wird dadurch automatisch
    sichtbar, sobald der Ladebildschirm sich ausblendet und entfernt wird — kein eigener Show-Trigger
-   nötig. Die Figur dreht sich im flachen 2D (Z-Achse, wie ein Zifferblatt) langsam von selbst und
-   lässt sich per Wischgeste zusätzlich drehen; die Kontinent-Hotspots (SVG-Pfade, exakt aus den
-   Gold-Flächen des Bilds extrahiert) rotieren mit der Figur mit, damit ein Klick immer den sichtbar
-   getroffenen Kontinent meint. Amerika/Europa/Afrika sind als eigenständige Landmassen groß genug
-   für zuverlässige Tap-Ziele; die zwei übrigen Tabs (Roadmap, Analyse) hängen als feststehende
-   Satelliten-Buttons neben der Figur, statt einen unrealistisch kleinen Flecken (z.B. Madagaskar)
-   als Hotspot zu erzwingen. */
+   nötig. Der Globus ist ein echtes 3D-Modell (assets/atlas_globe_v6.glb) über das lokal gehostete
+   <model-viewer> (vendor/model-viewer.min.js, kein CDN). Er dreht sich von selbst und lässt sich
+   per Wisch-/Ziehgeste zusätzlich drehen (camera-controls, min/max-camera-orbit fixieren den
+   Polarwinkel, damit nur horizontal gedreht wird). Da die Kontinente im Modell EIN gemeinsames
+   Material sind statt einzelner Objekte, ist präzises Antippen einzelner Kontinente nicht zuverlässig
+   möglich — alle sieben Tabs hängen stattdessen als Button-Raster unter dem Globus. */
 .home-menu {
   position: fixed;
   inset: 0;
@@ -528,24 +527,12 @@ textarea.input { min-height: 90px; resize: vertical; }
   width: 100%;
   padding: 0 10px;
 }
-.home-satellites-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(8px, 4vw, 20px);
+.home-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: min(92vw, 420px);
 }
-/* ---------- Homemenü: drehbarer Globus ----------
-   Echte 3D-Kugel aus schmalen, gebogenen Streifen (klassische "CSS-Globus"-Technik) statt einer
-   flach scrollenden Textur: .globe-3d (transform-style:preserve-3d, in .globe-viewport mit
-   perspective) enthält N per JS erzeugte .globe-strip-Elemente, jeder auf seinem eigenen
-   rotateY(baseAngle) translateZ(radius) fest positioniert und mit einem Ausschnitt derselben
-   Globus-Textur (assets/globe-single.png) belegt. Rotiert wird NUR .globe-3d als Ganzes
-   (rotateY) -- die Streifen drehen sich starr mit, exakt wie ein echter Globus auf einer Achse.
-   Da nur eine fotografierte Hemisphäre existiert, wird die Rückseite nicht per Spiegel-Kachel
-   angehängt (das erzeugte zuvor eine Naht mitten im sichtbaren Bild), sondern die Textur-Zuordnung
-   jedes Streifens faltet sich an den Rändern (±90°) zurück auf dieselbe Fotohemisphäre. Die Naht
-   landet dadurch dort, wo die Streifen durch die Rotation ohnehin fast auf Kante stehen (kaum
-   sichtbar), nie mitten im Blickfeld. */
 .globe-stage {
   position: relative;
   display: flex;
@@ -553,39 +540,10 @@ textarea.input { min-height: 90px; resize: vertical; }
   justify-content: center;
   touch-action: none;
 }
-.globe-viewport {
-  position: relative;
+.globe-model {
   height: clamp(240px, 42vh, 400px);
   width: clamp(240px, 42vh, 400px);
-  border-radius: 50%;
-  overflow: hidden;
-  cursor: grab;
-  perspective: 1400px;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 18px 50px rgba(0,0,0,0.55);
-}
-.globe-viewport:active { cursor: grabbing; }
-.globe-viewport::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: radial-gradient(circle at 34% 30%, rgba(255,255,255,0.14), transparent 45%),
-    radial-gradient(circle at 68% 78%, rgba(0,0,0,0.35), transparent 55%),
-    radial-gradient(circle at 50% 50%, transparent 55%, rgba(0,0,0,0.45) 100%);
-}
-.globe-3d {
-  position: absolute;
-  inset: 0;
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-.globe-strip {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  background-repeat: no-repeat;
-  backface-visibility: hidden;
+  --poster-color: transparent;
 }
 .home-satellite {
   display: flex;
