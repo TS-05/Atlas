@@ -151,7 +151,8 @@ textarea.input { min-height: 90px; resize: vertical; }
 .metal-gold { background: linear-gradient(120deg, var(--color-accent-700) 0%, var(--color-accent-100) 22%, var(--color-accent-600) 40%, var(--color-accent-200) 58%, var(--color-accent-700) 78%, var(--color-accent-300) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .atlas-scroll::-webkit-scrollbar { display: none; }
 .atlas-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; position: relative; }
-.atlas-row + .atlas-row::before { content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--color-divider); }
+.atlas-row + .atlas-row::before,
+.task-item + .task-item > .atlas-row::before { content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--color-divider); }
 .atlas-row.dragging { background: var(--color-surface); box-shadow: 0 8px 20px rgba(0,0,0,0.35); border-radius: 10px; opacity: 0.95; }
 .atlas-row.drag-over-top::before { background: var(--color-accent-400); height: 2px; }
 .routine-drag-handle { cursor: grab; }
@@ -196,6 +197,16 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* ---------- ToDo / generische Zeilen ---------- */
 .item-title { font-size: 14px; }
 .item-meta { font-size: 11.5px; color: var(--color-neutral-400); margin-top: 2px; }
+
+/* ---------- ToDo: aufklappbare Detailansicht (Einzelklick Zeile = auf/zu, Doppelklick = abhaken) ---------- */
+.task-item .atlas-row { cursor: pointer; }
+.task-expand { padding: 2px 16px 14px 48px; display: flex; flex-direction: column; gap: 8px; }
+.task-expand textarea {
+  width: 100%; resize: vertical; font: inherit; font-size: 13px; color: var(--color-text);
+  background: var(--color-bg); border: 1px solid var(--color-divider); border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.task-expand-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--color-neutral-400); }
 /* Erledigt = wie mit einer Farbrolle übermalt statt nur durchgestrichen: ein unregelmäßiger
    Gold-Farbklecks (dieselbe inkRough-Verzerrung + Anlassfarben-Verlauf wie die Splat-Häkchen) liegt
    hinter dem Titel, Text bleibt oben drüber voll lesbar. Für Roadmap-Ebene-3-Schritte dasselbe Design.
@@ -474,3 +485,138 @@ textarea.input { min-height: 90px; resize: vertical; }
   72% { width: 100%; }
   100% { width: 100%; }
 }
+
+/* ---------- Homemenü ----------
+   Liegt im DOM direkt unter dem Ladebildschirm (niedrigerer z-index) und wird dadurch automatisch
+   sichtbar, sobald der Ladebildschirm sich ausblendet und entfernt wird — kein eigener Show-Trigger
+   nötig. Die Figur dreht sich im flachen 2D (Z-Achse, wie ein Zifferblatt) langsam von selbst und
+   lässt sich per Wischgeste zusätzlich drehen; die Kontinent-Hotspots (SVG-Pfade, exakt aus den
+   Gold-Flächen des Bilds extrahiert) rotieren mit der Figur mit, damit ein Klick immer den sichtbar
+   getroffenen Kontinent meint. Amerika/Europa/Afrika sind als eigenständige Landmassen groß genug
+   für zuverlässige Tap-Ziele; die zwei übrigen Tabs (Roadmap, Analyse) hängen als feststehende
+   Satelliten-Buttons neben der Figur, statt einen unrealistisch kleinen Flecken (z.B. Madagaskar)
+   als Hotspot zu erzwingen. */
+.home-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background: var(--color-bg);
+  overflow: hidden;
+  transition: opacity 0.4s ease;
+}
+.home-menu.home-hidden { opacity: 0; pointer-events: none; }
+.home-mesh {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.home-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  width: 100%;
+  padding: 0 10px;
+}
+.home-satellites-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 4vw, 20px);
+}
+/* ---------- Homemenü: drehbarer Globus ----------
+   Echte 3D-Kugel aus schmalen, gebogenen Streifen (klassische "CSS-Globus"-Technik) statt einer
+   flach scrollenden Textur: .globe-3d (transform-style:preserve-3d, in .globe-viewport mit
+   perspective) enthält N per JS erzeugte .globe-strip-Elemente, jeder auf seinem eigenen
+   rotateY(baseAngle) translateZ(radius) fest positioniert und mit einem Ausschnitt derselben
+   Globus-Textur (assets/globe-single.png) belegt. Rotiert wird NUR .globe-3d als Ganzes
+   (rotateY) -- die Streifen drehen sich starr mit, exakt wie ein echter Globus auf einer Achse.
+   Da nur eine fotografierte Hemisphäre existiert, wird die Rückseite nicht per Spiegel-Kachel
+   angehängt (das erzeugte zuvor eine Naht mitten im sichtbaren Bild), sondern die Textur-Zuordnung
+   jedes Streifens faltet sich an den Rändern (±90°) zurück auf dieselbe Fotohemisphäre. Die Naht
+   landet dadurch dort, wo die Streifen durch die Rotation ohnehin fast auf Kante stehen (kaum
+   sichtbar), nie mitten im Blickfeld. */
+.globe-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+.globe-viewport {
+  position: relative;
+  height: clamp(240px, 42vh, 400px);
+  width: clamp(240px, 42vh, 400px);
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: grab;
+  perspective: 1400px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 18px 50px rgba(0,0,0,0.55);
+}
+.globe-viewport:active { cursor: grabbing; }
+.globe-viewport::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(circle at 34% 30%, rgba(255,255,255,0.14), transparent 45%),
+    radial-gradient(circle at 68% 78%, rgba(0,0,0,0.35), transparent 55%),
+    radial-gradient(circle at 50% 50%, transparent 55%, rgba(0,0,0,0.45) 100%);
+}
+.globe-3d {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.globe-strip {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background-repeat: no-repeat;
+  backface-visibility: hidden;
+}
+.home-satellite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(10, 12, 16, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--color-accent-300);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.home-satellite:active { transform: scale(0.94); background: rgba(10, 12, 16, 0.7); }
+.home-satellite span { color: var(--color-neutral-300); }
+.home-hint {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  color: var(--color-neutral-500);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- Projekte-Tab ---------- */
+.project-card { padding: 14px 16px; }
+.project-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.project-card-head .item-title { flex: 1; min-width: 0; }
+.project-notes { min-height: 90px; font-size: 13.5px; }

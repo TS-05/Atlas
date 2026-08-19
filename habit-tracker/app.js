@@ -804,6 +804,7 @@ state.financeCategories = state.financeCategories || [];
 state.financeExpenses = state.financeExpenses || [];
 state.savingsGoals = state.savingsGoals || [];
 state.financeIncomeSources = state.financeIncomeSources || [];
+state.projects = state.projects || [];
 // Migration: einzelnes financeIncome (Vorgänger-Feld) in eine erste Einkommensquelle überführen.
 if (state.financeIncome) {
   state.financeIncomeSources.push({ id: uid(), title: "Einkommen", amount: state.financeIncome });
@@ -816,7 +817,7 @@ saveData();
 function seedData() {
   const data = {
     goalNodes: [], tasks: [], habits: [], subjects: [], exams: [], workShifts: [], deviations: [], weeklyReflection: {}, prayers: [],
-    financeAccounts: [], financeCategories: [], financeExpenses: [], savingsGoals: [], financeIncomeSources: [],
+    financeAccounts: [], financeCategories: [], financeExpenses: [], savingsGoals: [], financeIncomeSources: [], projects: [],
     // Frische Seed-Daten entsprechen bereits der aktuellen Struktur — alle Migrationen sollen hier no-op sein
     bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true,
     seminararbeitRoadmapApplied: true, seminararbeitRoadmapV2Applied: true, taskEffortLevelsApplied: true, learningOrderApplied: true
@@ -1110,9 +1111,9 @@ function budgetRingHtml(spent, limit, size = 40, maskIdx = 0) {
 }
 
 // ---------- Tabs ----------
-const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "analyse"];
-const TAB_ROT = [-6, 10, 5, -12, 7, -4];
-const TAB_SCALE = [1.05, 0.92, 1, 1.1, 0.95, 1.02];
+const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "projekte", "analyse"];
+const TAB_ROT = [-6, 10, 5, -12, 7, 9, -4];
+const TAB_SCALE = [1.05, 0.92, 1, 1.1, 0.95, 1.03, 1.02];
 const tabBtns = Array.from(document.querySelectorAll(".tab-btn"));
 const tabIndicator = document.getElementById("tabIndicator");
 let dropTimer = null;
@@ -1270,6 +1271,8 @@ document.getElementById("headerPlusBtn").addEventListener("click", () => {
     if (quickAddVisible) document.getElementById("prayerInput").focus();
   } else if (tab === "analyse") {
     exportWeekReview();
+  } else if (tab === "projekte") {
+    openProjectModal();
   }
 });
 document.getElementById("bereicheSearchInput").addEventListener("input", e => {
@@ -1463,16 +1466,23 @@ function escapeHtml(str) {
 }
 
 // ---------- Rendering: ToDo / Bereiche-Aufgaben (gemeinsame Zeile) ----------
+// Klick auf die Zeile klappt die Detailansicht (Beschreibung + Metadaten) für genau dieses ToDo
+// auf/zu; Doppelklick auf die Zeile hakt ab (wie der Check-Button). Rein per UI-State, nicht
+// persistiert -- expandedTaskIds lebt nur im Tab-Modul, kein saveData() nötig.
+const expandedTaskIds = new Set();
+
 function renderTaskItem(t) {
   const today = todayStr();
   const overdue = !t.done && t.dueDate && t.dueDate < today;
   const node = nodeById(t.nodeId);
   const isLernfeld = t.source === "category" && t.learnType;
   const lerntyp = isLernfeld ? lerntypById(t.learnType) : null;
-  const metaParts = isLernfeld ? [] : [`${effortLevelInfo(t.size).level} · ${effortLevelInfo(t.size).label}`];
+  const effort = effortLevelInfo(t.size);
+  const metaParts = isLernfeld ? [] : [`${effort.level} · ${effort.label}`];
   if (t.dueDate) metaParts.push("fällig " + t.dueDate + (t.dueTime ? " " + t.dueTime : ""));
   if (node && !isLernfeld) metaParts.push(node.title);
   const dueToday = t.dueDate === today;
+  const expanded = expandedTaskIds.has(t.id);
   const titleHtml = t.done
     ? `<div class="item-title paint-done-title">
         <span class="paint-done-stroke">${paintStrokeSvgHtml(t.id)}</span>
@@ -1480,17 +1490,30 @@ function renderTaskItem(t) {
       </div>`
     : `<div class="item-title">${escapeHtml(t.title)}</div>`;
   const el = document.createElement("div");
-  el.className = "atlas-row" + (t.done ? " done" : "") + (dueToday ? " gold-frame" : "");
+  el.className = "task-item" + (expanded ? " expanded" : "");
   el.innerHTML = `
-    <button class="atlas-check${t.done ? " checked" : ""}" data-task="${t.id}">${t.done ? splatSvg(t.id) : ""}</button>
-    ${isLernfeld ? `<span style="color:var(--color-accent-400); flex-shrink:0;" title="${escapeHtml(lerntyp.label)}">${lerntyp.icon}</span>` : ""}
-    <div style="flex:1; min-width:0;">
-      ${titleHtml}
-      <div class="item-meta">${escapeHtml((isLernfeld ? [lerntyp.label, ...metaParts] : metaParts).join(" · "))}</div>
+    <div class="atlas-row${t.done ? " done" : ""}${dueToday ? " gold-frame" : ""}" data-task-row="${t.id}">
+      <button class="atlas-check${t.done ? " checked" : ""}" data-task="${t.id}">${t.done ? splatSvg(t.id) : ""}</button>
+      ${isLernfeld ? `<span style="color:var(--color-accent-400); flex-shrink:0;" title="${escapeHtml(lerntyp.label)}">${lerntyp.icon}</span>` : ""}
+      <div style="flex:1; min-width:0;">
+        ${titleHtml}
+        <div class="item-meta">${escapeHtml((isLernfeld ? [lerntyp.label, ...metaParts] : metaParts).join(" · "))}</div>
+      </div>
+      ${!isLernfeld && t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
+      ${overdue ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">ÜBERFÄLLIG</span>' : ""}
+      <button class="btn btn-icon btn-ghost" data-del-task="${t.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
     </div>
-    ${!isLernfeld && t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
-    ${overdue ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">ÜBERFÄLLIG</span>' : ""}
-    <button class="btn btn-icon btn-ghost" data-del-task="${t.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+    ${!isLernfeld && expanded ? `
+    <div class="task-expand">
+      <label>Beschreibung</label>
+      <textarea data-task-notes="${t.id}" rows="3" placeholder="Details, Kontext, nächste Schritte…">${escapeHtml(t.notes || "")}</textarea>
+      <div class="task-expand-meta">
+        <span>Aufwand: ${effort.level} · ${escapeHtml(effort.label)} (${escapeHtml(effort.time)})</span>
+        ${t.dueDate ? `<span>Fällig: ${t.dueDate}${t.dueTime ? " · " + t.dueTime : ""}</span>` : ""}
+        ${t.priority > 0 ? `<span>Priorität: ${t.priority}</span>` : ""}
+        ${node ? `<span>Zielbereich: ${escapeHtml(node.title)}</span>` : ""}
+      </div>
+    </div>` : ""}
   `;
   return el;
 }
@@ -2526,6 +2549,7 @@ function renderAll() {
   renderGoalBrowser();
   renderPlanning();
   renderFinance();
+  renderProjekte();
   renderPrayers();
   renderWeekStats();
   updateNotifPermissionUI();
@@ -2550,16 +2574,55 @@ document.addEventListener("change", e => {
     state.weeklyReflection[key] = e.target.value;
     saveData();
   }
+  if (e.target.matches("[data-task-notes]")) {
+    const task = state.tasks.find(t => t.id === e.target.dataset.taskNotes);
+    if (task) { task.notes = e.target.value.trim(); saveData(); }
+  }
+  if (e.target.matches("[data-project-notes]")) {
+    const project = state.projects.find(p => p.id === e.target.dataset.projectNotes);
+    if (project) { project.notes = e.target.value; saveData(); }
+  }
+});
+
+function toggleTaskDone(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task) return;
+  task.done = !task.done;
+  task.completedAt = task.done ? new Date().toISOString() : null;
+  saveData();
+  renderAll();
+}
+
+// Einzelklick auf die ToDo-Zeile klappt die Details auf; Doppelklick hakt ab. Da jeder Doppelklick
+// mit zwei einzelnen "click"-Events beginnt, wird der Einzelklick kurz verzögert ausgeführt und
+// verworfen, falls in der Zwischenzeit ein "dblclick" auf derselben Zeile eintrifft.
+let pendingTaskRowClicks = {};
+const TASK_ROW_CLICK_DELAY = 280;
+
+document.addEventListener("dblclick", e => {
+  const taskRow = e.target.closest("[data-task-row]");
+  if (!taskRow || e.target.closest("[data-del-task]") || e.target.closest("[data-task]")) return;
+  const id = taskRow.dataset.taskRow;
+  if (pendingTaskRowClicks[id]) { clearTimeout(pendingTaskRowClicks[id]); delete pendingTaskRowClicks[id]; }
+  toggleTaskDone(id);
 });
 
 document.addEventListener("click", e => {
   const taskCheck = e.target.closest("[data-task]");
   if (taskCheck) {
-    const task = state.tasks.find(t => t.id === taskCheck.dataset.task);
-    task.done = !task.done;
-    task.completedAt = task.done ? new Date().toISOString() : null;
-    saveData();
-    renderAll();
+    toggleTaskDone(taskCheck.dataset.task);
+    return;
+  }
+  const taskRow = e.target.closest("[data-task-row]");
+  if (taskRow && !e.target.closest("[data-del-task]")) {
+    const id = taskRow.dataset.taskRow;
+    if (pendingTaskRowClicks[id]) clearTimeout(pendingTaskRowClicks[id]);
+    pendingTaskRowClicks[id] = setTimeout(() => {
+      delete pendingTaskRowClicks[id];
+      if (expandedTaskIds.has(id)) expandedTaskIds.delete(id);
+      else expandedTaskIds.add(id);
+      renderAll();
+    }, TASK_ROW_CLICK_DELAY);
     return;
   }
   const habitCheck = e.target.closest("[data-habit]");
@@ -2648,6 +2711,12 @@ document.addEventListener("click", e => {
     saveData(); renderAll();
     return;
   }
+  const delProjectBtn = e.target.closest("[data-del-project]");
+  if (delProjectBtn) {
+    state.projects = state.projects.filter(p => p.id !== delProjectBtn.dataset.delProject);
+    saveData(); renderAll();
+    return;
+  }
   const editAccountEl = e.target.closest("[data-edit-account]");
   if (editAccountEl) {
     const account = state.financeAccounts.find(a => a.id === editAccountEl.dataset.editAccount);
@@ -2721,6 +2790,29 @@ document.getElementById("addTaskBtn").addEventListener("click", () => openTaskMo
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
 document.getElementById("addExamBtn").addEventListener("click", () => openExamModal());
 document.getElementById("addAccountBtn").addEventListener("click", () => openAccountModal());
+function openProjectModal() {
+  openModal(`
+    <h3>Projekt hinzufügen</h3>
+    <div class="field">
+      <label>Titel</label>
+      <input type="text" id="mProjectTitle" placeholder="z.B. Seminararbeit, Buch schreiben">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mProjectTitle").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const title = body.querySelector("#mProjectTitle").value.trim();
+      if (!title) return;
+      state.projects.push({ id: uid(), title, notes: "" });
+      saveData(); closeModal(); renderAll();
+    });
+  });
+}
+document.getElementById("addProjectBtn").addEventListener("click", openProjectModal);
 document.getElementById("addExpenseBtn").addEventListener("click", () => openExpenseModal());
 document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal());
 document.getElementById("addSavingsGoalBtn").addEventListener("click", () => openSavingsGoalModal());
@@ -2797,6 +2889,11 @@ function openTaskModal(defaultNodeId, source = "todo") {
       <label>${isLernfeld ? "Konkret: was genau?" : "Titel"}</label>
       <input type="text" id="mTaskTitle" placeholder="${isLernfeld ? "z.B. 3Blue1Brown Neuronen-Video" : "z.B. Bericht abschicken"}">
     </div>
+    ${isLernfeld ? "" : `
+    <div class="field">
+      <label>Beschreibung (optional)</label>
+      <textarea id="mTaskNotes" rows="3" placeholder="Details, Kontext, nächste Schritte…"></textarea>
+    </div>`}
     <div class="field">
       <label>Fälligkeitsdatum (optional)</label>
       <input type="date" id="mTaskDate" value="${isLernfeld ? "" : todayStr()}">
@@ -2850,11 +2947,12 @@ function openTaskModal(defaultNodeId, source = "todo") {
         renderAll();
         return;
       }
+      const notes = body.querySelector("#mTaskNotes").value.trim();
       const size = parseInt(body.querySelector("#mTaskSize").value, 10) || 1;
       const priority = parseInt(body.querySelector("#mTaskPriority").value, 10) || 0;
       const categorySelect = body.querySelector("#mTaskCategory");
       const nodeId = categorySelect ? categorySelect.value || null : null;
-      state.tasks.push({ id: uid(), title, nodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source });
+      state.tasks.push({ id: uid(), title, notes, nodeId, dueDate, dueTime, done: false, completedAt: null, createdAt: new Date().toISOString(), size, priority, source });
       saveData();
       closeModal();
       renderAll();
@@ -3353,6 +3451,22 @@ function openIncomeSourceModal(editSource = null) {
   });
 }
 
+function renderProjekte() {
+  const wrap = document.getElementById("projectsList");
+  if (!wrap) return;
+  wrap.innerHTML = state.projects.length
+    ? state.projects.map(p => `
+        <div class="card elev-sm project-card">
+          <div class="project-card-head">
+            <div class="item-title">${escapeHtml(p.title)}</div>
+            <button class="btn btn-icon btn-ghost" data-del-project="${p.id}" aria-label="Löschen">${DEL_ICON}</button>
+          </div>
+          <textarea class="input project-notes" data-project-notes="${p.id}" placeholder="Notizen, Gedanken, Zwischenstand …">${escapeHtml(p.notes || "")}</textarea>
+        </div>
+      `).join("")
+    : '<div class="empty-hint">Noch keine Projekte angelegt.</div>';
+}
+
 function openAccountModal(editAccount = null) {
   const isEdit = !!editAccount;
   openModal(`
@@ -3744,6 +3858,145 @@ if (splashEl) {
     splashEl.addEventListener("transitionend", () => splashEl.remove(), { once: true });
   }, 3000);
 }
+
+// ---------- Homemenü: drehbarer Globus mit Kontinent-Navigation ----------
+// Echte 3D-Kugel aus N schmalen Streifen (siehe ausführlicher Kommentar bei .globe-viewport in
+// style.css). Nur assets/globe-single.png (eine fotografierte Hemisphäre) existiert als Textur;
+// foldFrontAngle() faltet die volle 360°-Rotation an den Rändern (±90°) auf diese eine Hemisphäre
+// zurück, statt eine gespiegelte Kachel seitlich anzuhängen -- so liegt die Naht dort, wo die
+// Streifen durch die Rotation ohnehin auf Kante stehen (kaum sichtbar), nie mitten im Bild.
+(() => {
+  const homeMenu = document.getElementById("homeMenu");
+  const viewport = document.getElementById("globeViewport");
+  const globe3d = document.getElementById("globe3d");
+  const hotspotData = document.getElementById("globeHotspotData");
+  if (!homeMenu || !viewport || !globe3d || !hotspotData) return;
+
+  const TEX_SIZE = 788; // Breite/Höhe von assets/globe-single.png
+  const STRIP_COUNT = 32;
+  const FULL_ROTATION_SECONDS = 60;
+  const DRAG_DEG_PER_PX = 0.35;
+
+  const hotspots = Array.from(hotspotData.querySelectorAll("path")).map(p => ({
+    tab: p.dataset.tab,
+    points: p.getAttribute("d").match(/-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?/g)
+      .map(pair => pair.split(",").map(Number))
+  }));
+
+  // Faltet einen beliebigen Winkel (0-360°, "wo auf der vollen Kugel") auf den sichtbaren
+  // Front-Bereich der einen vorhandenen Fotohemisphäre zurück (-90°..+90°, Dreieckswelle,
+  // Faltpunkte bei ±90° -- geometrisch die Ränder/Silhouette, wo Streifen ohnehin kaum sichtbar sind).
+  function foldFrontAngle(baseDeg) {
+    const n = ((baseDeg + 90) % 360 + 360) % 360;
+    return 90 - Math.abs(n - 180);
+  }
+  function frontAngleToTexX(frontDeg) {
+    return (Math.sin(frontDeg * Math.PI / 180) + 1) / 2 * TEX_SIZE;
+  }
+
+  let radiusPx = 0;
+  function buildStrips() {
+    radiusPx = viewport.getBoundingClientRect().width / 2;
+    globe3d.innerHTML = "";
+    const stepDeg = 360 / STRIP_COUNT;
+    const stripWidthPx = 2 * radiusPx * Math.sin((stepDeg * Math.PI / 180) / 2) * 1.02; // leichte Überlappung gegen Spalten
+    for (let i = 0; i < STRIP_COUNT; i++) {
+      const baseDeg = i * stepDeg;
+      const texX = frontAngleToTexX(foldFrontAngle(baseDeg));
+      const strip = document.createElement("div");
+      strip.className = "globe-strip";
+      strip.style.width = `${stripWidthPx}px`;
+      strip.style.left = "50%";
+      strip.style.marginLeft = `${-stripWidthPx / 2}px`;
+      strip.style.backgroundImage = 'url("assets/globe-single.png?v=1")';
+      strip.style.backgroundSize = `${radiusPx * 2}px ${radiusPx * 2}px`;
+      strip.style.backgroundPosition = `${-(texX - stripWidthPx / 2)}px 0px`;
+      strip.style.transform = `rotateY(${baseDeg}deg) translateZ(${radiusPx}px)`;
+      globe3d.appendChild(strip);
+    }
+  }
+  buildStrips();
+  window.addEventListener("resize", buildStrips);
+
+  let rotationDeg = 0;
+  let dragging = false;
+  let dragMoved = false;
+  let dragStartX = 0;
+  let dragStartRotation = 0;
+  let lastFrameTime = null;
+
+  function applyRotation() {
+    globe3d.style.transform = `rotateY(${rotationDeg}deg)`;
+  }
+
+  function frame(t) {
+    if (lastFrameTime === null) lastFrameTime = t;
+    const dt = (t - lastFrameTime) / 1000;
+    lastFrameTime = t;
+    if (!dragging && !homeMenu.classList.contains("home-hidden")) {
+      rotationDeg += (360 / FULL_ROTATION_SECONDS) * dt;
+      applyRotation();
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  viewport.addEventListener("pointerdown", e => {
+    dragging = true;
+    dragMoved = false;
+    dragStartX = e.clientX;
+    dragStartRotation = rotationDeg;
+    viewport.setPointerCapture(e.pointerId);
+  });
+  viewport.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const delta = e.clientX - dragStartX;
+    if (Math.abs(delta) > 3) dragMoved = true;
+    rotationDeg = dragStartRotation + delta * DRAG_DEG_PER_PX;
+    applyRotation();
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    lastFrameTime = null; // Ambient-Tempo nicht mit der Zeit "aufholen", die die Wischgeste gedauert hat
+    try { viewport.releasePointerCapture(e.pointerId); } catch (err) {}
+  }
+  viewport.addEventListener("pointerup", endDrag);
+  viewport.addEventListener("pointercancel", endDrag);
+
+  function pointInPolygon(x, y, points) {
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const [xi, yi] = points[i], [xj, yj] = points[j];
+      const intersects = (yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi;
+      if (intersects) inside = !inside;
+    }
+    return inside;
+  }
+
+  function goToTab(tabName) {
+    homeMenu.classList.add("home-hidden");
+    switchTab(tabName);
+  }
+
+  viewport.addEventListener("click", e => {
+    if (dragMoved) return;
+    const r = viewport.getBoundingClientRect();
+    const clickXRel = e.clientX - (r.left + r.width / 2);
+    const clickYRel = e.clientY - r.top;
+    if (radiusPx <= 0 || Math.abs(clickXRel) > radiusPx) return;
+    const visualFrontDeg = Math.asin(clickXRel / radiusPx) * 180 / Math.PI;
+    const baseDeg = visualFrontDeg - rotationDeg;
+    const texX = frontAngleToTexX(foldFrontAngle(baseDeg));
+    const texY = (clickYRel / r.height) * TEX_SIZE;
+    const hit = hotspots.find(h => pointInPolygon(texX, texY, h.points));
+    if (hit) goToTab(hit.tab);
+  });
+
+  homeMenu.querySelectorAll(".home-satellite").forEach(btn => {
+    btn.addEventListener("click", () => goToTab(btn.dataset.tab));
+  });
+})();
 
 // Swipe vom linken Bildschirmrand nach rechts = eine Roadmap-Ebene zurück (wie iOS Zurück-Geste).
 let edgeSwipeStart = null;
