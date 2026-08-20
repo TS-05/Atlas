@@ -383,9 +383,9 @@
     <div class="globe-stage">
       <!-- Echtes 3D-Modell (assets/atlas_globe_v6.glb) über das lokal gehostete model-viewer
            (habit-tracker/vendor/model-viewer.min.js, kein CDN -- bleibt offline-fähig, der Service
-           Worker cacht beide Dateien wie jede andere same-origin Ressource). min-camera-orbit/
-           max-camera-orbit fixieren den Polarwinkel auf 90°, damit sich der Globus nur horizontal
-           dreht (Auto-Rotation + Wisch-Drehen via camera-controls). orientation kippt die Drehachse
+           Worker cacht beide Dateien wie jede andere same-origin Ressource). camera-controls ohne
+           min/max-camera-orbit-Einschränkung erlaubt freies Drehen in alle Richtungen (auch nach
+           oben/unten, nicht nur horizontal). orientation kippt die Drehachse
            um 23,5° (wie die echte Erdachsenneigung) -- auto-rotate spinnt weiterhin um die lokale
            Y-Achse des Modells, orientation kippt das Ganze danach als feste Grundausrichtung, wodurch
            die Spin-Achse selbst schräg steht statt nur die Kamera.
@@ -416,8 +416,6 @@
         interaction-prompt="none"
         orientation="23.5deg 0deg 0deg"
         camera-orbit="0deg 90deg 105%"
-        min-camera-orbit="auto 90deg auto"
-        max-camera-orbit="auto 90deg auto"
         environment-image="neutral"
         exposure="0.9"
         shadow-intensity="0"
