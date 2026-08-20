@@ -3939,24 +3939,32 @@ const GLOBE_MAX_PITCH_DEG = 80; // näher an ±90° kippt sie durch den Pol, wir
     return ((now - startTime) / 1000 * GLOBE_SPIN_DEG_PER_SEC) % 360;
   }
 
+  // try/catch + requestAnimationFrame(frame) in einem finally: ein einzelner Fehler in einem Frame
+  // darf die Dauerschleife nie endgültig abwürgen (ohne das würde ein einziger Ausnahmefall die
+  // Rotation für immer stoppen, weil der nächste requestAnimationFrame-Aufruf sonst nie erreicht wird).
   function frame(now) {
-    if (!homeMenu.classList.contains("home-hidden")) {
-      if (releasing) {
-        const progress = Math.min(1, (now - releaseStart) / GLOBE_RELEASE_EASE_MS);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        yawOffset = releaseYaw * (1 - eased);
-        pitchOffset = releasePitch * (1 - eased);
-        if (progress >= 1) { releasing = false; yawOffset = 0; pitchOffset = 0; }
+    try {
+      if (!homeMenu.classList.contains("home-hidden")) {
+        if (releasing) {
+          const progress = Math.min(1, (now - releaseStart) / GLOBE_RELEASE_EASE_MS);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          yawOffset = releaseYaw * (1 - eased);
+          pitchOffset = releasePitch * (1 - eased);
+          if (progress >= 1) { releasing = false; yawOffset = 0; pitchOffset = 0; }
+        }
+        const yaw = currentBaseYaw(now) + yawOffset;
+        globeModel.orientation = `${GLOBE_TILT_DEG}deg ${pitchOffset.toFixed(2)}deg ${yaw.toFixed(2)}deg`;
       }
-      const yaw = currentBaseYaw(now) + yawOffset;
-      globeModel.orientation = `${GLOBE_TILT_DEG}deg ${pitchOffset.toFixed(2)}deg ${yaw.toFixed(2)}deg`;
+    } catch (err) {
+      console.error("Globus-Rotation:", err);
+    } finally {
+      requestAnimationFrame(frame);
     }
-    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
   globeModel.addEventListener("pointerdown", e => {
-    if (e.target !== globeModel) return; // Hotspot-Buttons regeln pointerdown selbst
+    if (e.target.closest(".globe-hotspot")) return; // Hotspot-Buttons regeln pointerdown selbst
     dragging = true;
     dragMoved = false;
     releasing = false;
