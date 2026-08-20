@@ -3897,6 +3897,7 @@ if (splashEl) {
   // öffnet der Tab -- Auto-Rotation wird dabei abgeschaltet, sonst dreht sie sofort wieder weg.
   const ringButtons = Array.from(homeMenu.querySelectorAll(".ring-btn"));
   const ringHandle = document.getElementById("ringHandle");
+  let liquidTimer = null;
   const ringSlots = ringButtons.map(btn => ({
     btn,
     tab: btn.dataset.tab,
@@ -3907,12 +3908,17 @@ if (splashEl) {
 
   function moveHandleTo(slot) {
     if (!ringHandle) return;
-    ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
-    // Kurzes Nachwabern, damit sich das Einrasten wie Wasser anfuehlt.
+    // Glaslinse nur waehrend der Bewegung einblenden (wie im Referenz-Video), danach bleibt die
+    // schlichte hellere Kapsel stehen.
+    ringHandle.classList.add("is-liquid");
     ringHandle.classList.remove("is-splash");
-    void ringHandle.offsetWidth; // Reflow erzwingen, sonst startet die Animation beim zweiten Mal nicht
+    void ringHandle.offsetWidth; // Reflow, sonst startet die Wobble-Animation beim zweiten Mal nicht
     ringHandle.classList.add("is-splash");
-    setTimeout(() => ringHandle.classList.remove("is-splash"), 780);
+    ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
+    clearTimeout(liquidTimer);
+    liquidTimer = setTimeout(() => {
+      ringHandle.classList.remove("is-splash", "is-liquid");
+    }, 430);
   }
 
   function activateSlot(slot) {
@@ -3946,7 +3952,8 @@ if (splashEl) {
 
     ringHandle.addEventListener("pointerdown", e => {
       handleDragging = true;
-      ringHandle.classList.add("is-dragging");
+      clearTimeout(liquidTimer);
+      ringHandle.classList.add("is-dragging", "is-liquid");
       try { ringHandle.setPointerCapture(e.pointerId); } catch (err) {}
       e.preventDefault();
     });

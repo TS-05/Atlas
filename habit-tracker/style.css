@@ -602,76 +602,80 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* Liquid-Glass-Linse nach Vorbild der Referenz-Leiste: fast unsichtbare Fuellung (man schaut durch),
    helle Glanzkanten oben/unten, und Farbsaum (chromatische Aberration) NUR an zwei gegenueberliegenden
    Stellen statt als kompletter Regenbogenring -- genau das unterscheidet echtes Glas von Deko. */
+/* Nach Vorbild des Referenz-Videos: im RUHEZUSTAND ist der Marker nur eine schlichte, etwas hellere
+   Kapsel -- kein Glas, kein Regenbogen. Die Glasblase mit Farbsaum erscheint ausschliesslich WAEHREND
+   der Bewegung (Ziehen bzw. Gleiten zum naechsten Symbol) und verschwindet danach wieder. */
 .ring-handle {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 80px;
-  height: 74px;
-  margin: -37px 0 0 -40px;
+  width: 78px;
+  height: 66px;
+  margin: -33px 0 0 -39px;
   z-index: 2;
   pointer-events: auto;
-  border-radius: 50% / 47%;
+  border-radius: 26px;
   cursor: grab;
   touch-action: none;
-  background: rgba(255, 255, 255, 0.045);
-  backdrop-filter: blur(0.4px) saturate(1.28) brightness(1.07) contrast(1.03);
-  -webkit-backdrop-filter: blur(0.4px) saturate(1.28) brightness(1.07) contrast(1.03);
-  box-shadow:
-    inset 0 1.2px 1.5px rgba(255, 255, 255, 0.62),
-    inset 0 -1.2px 1.5px rgba(255, 255, 255, 0.34),
-    inset 2px 0 4px -3px rgba(255, 255, 255, 0.3),
-    inset -2px 0 4px -3px rgba(255, 255, 255, 0.3),
-    0 8px 20px rgba(0, 0, 0, 0.45);
+  background: rgba(255, 255, 255, 0.1);
   transform: rotate(var(--angle)) translate(var(--ring-r)) rotate(calc(-1 * var(--angle)));
-  transition: transform 0.32s cubic-bezier(0.34, 1.4, 0.5, 1);
+  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+              background 0.2s ease, box-shadow 0.2s ease, border-radius 0.2s ease;
 }
-/* Farbsaum: zwei weiche Fransen gegenueber, leicht unscharf -- kein durchgehender Regenbogen. */
-.ring-handle::before {
+.ring-handle::before,
+.ring-handle::after {
   content: "";
   position: absolute;
-  inset: -1.5px;
   border-radius: inherit;
-  padding: 1.7px;
-  background: conic-gradient(from 125deg,
-    transparent 0deg,
-    rgba(255, 130, 190, 0.6) 16deg,
-    rgba(255, 214, 130, 0.5) 38deg,
-    rgba(140, 245, 205, 0.35) 58deg,
-    transparent 84deg,
-    transparent 196deg,
-    rgba(120, 215, 255, 0.55) 224deg,
-    rgba(178, 145, 255, 0.5) 250deg,
-    rgba(255, 150, 200, 0.3) 272deg,
-    transparent 300deg);
-  filter: blur(1.1px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+/* Farbsaum: kraeftig an Ober- und Fuehrungskante, wie die Aberration im Video. */
+.ring-handle::before {
+  inset: -1.5px;
+  padding: 1.8px;
+  background: conic-gradient(from 130deg,
+    rgba(120, 255, 190, 0.85) 0deg,
+    rgba(255, 240, 140, 0.75) 26deg,
+    rgba(255, 120, 190, 0.8) 52deg,
+    transparent 92deg,
+    transparent 190deg,
+    rgba(130, 220, 255, 0.8) 222deg,
+    rgba(190, 150, 255, 0.75) 250deg,
+    rgba(120, 255, 200, 0.6) 276deg,
+    transparent 312deg);
+  filter: blur(0.9px);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
-  pointer-events: none;
 }
-/* Spiegelnder Lichtstreifen oben -- gibt der Blase Woelbung. */
+/* Dunkle Baender oben/unten = Glasdicke bzw. Totalreflexion, im Video deutlich sichtbar. */
 .ring-handle::after {
-  content: "";
-  position: absolute;
-  left: 14%;
-  right: 14%;
-  top: 6%;
-  height: 34%;
-  border-radius: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
-  pointer-events: none;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 22%,
+                                      rgba(0, 0, 0, 0) 78%, rgba(0, 0, 0, 0.55) 100%);
 }
+/* Bewegungszustand: klare Linse mit Brechung. */
+.ring-handle.is-liquid {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 31px;
+  backdrop-filter: blur(0.6px) saturate(1.55) contrast(1.18) brightness(1.08);
+  -webkit-backdrop-filter: blur(0.6px) saturate(1.55) contrast(1.18) brightness(1.08);
+  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.5), inset 0 -1.5px 1px rgba(255, 255, 255, 0.3),
+              0 8px 20px rgba(0, 0, 0, 0.45);
+}
+.ring-handle.is-liquid::before,
+.ring-handle.is-liquid::after { opacity: 1; }
 @keyframes waterWobble {
-  0%   { border-radius: 50% / 47%; }
-  30%  { border-radius: 60% 40% 47% 53% / 44% 56% 44% 56%; }
-  55%  { border-radius: 42% 58% 56% 44% / 57% 43% 57% 43%; }
-  80%  { border-radius: 53% 47% 49% 51% / 49% 51% 49% 51%; }
-  100% { border-radius: 50% / 47%; }
+  0%   { border-radius: 31px; }
+  35%  { border-radius: 38px 26px 33px 29px; }
+  65%  { border-radius: 26px 36px 28px 34px; }
+  100% { border-radius: 31px; }
 }
-.ring-handle.is-splash { animation: waterWobble 0.75s ease-out; }
-.ring-handle.is-dragging { cursor: grabbing; transition: none; animation: waterWobble 1.1s ease-in-out infinite; }
+.ring-handle.is-liquid.is-splash { animation: waterWobble 0.42s ease-out; }
+.ring-handle.is-dragging { cursor: grabbing; transition: none; }
 /* Vignette ueber dem GESAMTEN Homemenue (nicht nur um die Globus-Buehne): als Rechteck um den Globus
    endete die Abdunklung vorher an dessen Kanten und erzeugte zwei sichtbare gerade Linien oben/unten. */
 .home-menu::after {
