@@ -504,18 +504,14 @@ textarea.input { min-height: 90px; resize: vertical; }
   align-items: center;
   justify-content: center;
   gap: 22px;
-  background: var(--color-bg);
+  background: radial-gradient(circle at 50% 45%, #141922 0%, #0d1117 55%, #080b0f 100%);
   overflow: hidden;
   transition: opacity 0.4s ease;
 }
 .home-menu.home-hidden { opacity: 0; pointer-events: none; }
-.home-mesh {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+/* Dreiecks-Mesh im Homemenue ausgeblendet: es endete oben/unten in einer harten Kante. Stattdessen
+   ein durchgehend dunkler Verlauf ohne jede Kante. */
+.home-mesh { display: none; }
 .home-stage {
   position: relative;
   z-index: 1;
@@ -533,8 +529,8 @@ textarea.input { min-height: 90px; resize: vertical; }
   /* Radius, auf dem die Ring-Knöpfe sitzen: knapp innerhalb des Bühnenrands (Bühne ist doppelt so
      breit). Muss eine echte Länge sein -- Prozentwerte in translate() beziehen sich sonst auf die
      Knopfgröße statt auf den Ring. */
-  --ring-r: min(37vw, 224px);
-  --ring-w: 56px;
+  --ring-r: min(35vw, 214px);
+  --ring-w: 74px;
   position: relative;
   width: min(94vw, 560px);
   aspect-ratio: 1;
@@ -555,9 +551,10 @@ textarea.input { min-height: 90px; resize: vertical; }
   transform: translate(-50%, -50%);
   border-radius: 50%;
   pointer-events: none;
-  border: var(--ring-w) solid color-mix(in srgb, var(--color-accent-600) 30%, transparent);
-  box-shadow: inset 0 0 18px color-mix(in srgb, var(--color-accent-800) 40%, transparent),
-              0 0 26px color-mix(in srgb, var(--color-accent-900) 45%, transparent);
+  border: var(--ring-w) solid color-mix(in srgb, var(--color-accent-700) 42%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-400) 45%, transparent),
+              0 0 0 1px color-mix(in srgb, var(--color-accent-400) 32%, transparent),
+              0 0 30px color-mix(in srgb, var(--color-accent-900) 55%, transparent);
 }
 .globe-ring {
   position: absolute;
@@ -595,16 +592,17 @@ textarea.input { min-height: 90px; resize: vertical; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 52px;
-  height: 52px;
-  margin: -26px 0 0 -26px;
+  width: 62px;
+  height: 62px;
+  margin: -31px 0 0 -31px;
+  z-index: 2;
   pointer-events: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: grab;
   touch-action: none;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 0 10px rgba(130, 200, 245, 0.55)) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.6));
   transform: rotate(var(--angle)) translate(var(--ring-r)) rotate(calc(-1 * var(--angle)));
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -621,8 +619,8 @@ textarea.input { min-height: 90px; resize: vertical; }
   background: radial-gradient(circle at center, transparent 42%, rgba(15, 18, 24, 0.55) 68%, rgba(15, 18, 24, 0.92) 100%);
 }
 .globe-model {
-  height: 58%;
-  width: 58%;
+  height: 50%;
+  width: 50%;
   --poster-color: transparent;
 }
 /* Unsichtbarer, aber großzügiger Tap-Ziel-Kreis über dem jeweiligen 3D-Pin (der Pin selbst ist echte
