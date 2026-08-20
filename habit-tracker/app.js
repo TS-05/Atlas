@@ -3860,26 +3860,13 @@ if (splashEl) {
 }
 
 // ---------- Homemenü: 3D-Globus-Navigation ----------
-// Eigene Rotation statt model-viewers eingebautem camera-controls/auto-rotate (das dreht nur die
-// Kamera um ein stillstehendes Modell -- gewollt ist das Gegenteil: die Erde selbst dreht sich um
-// eine im Raum feste, 23,5°-geneigte Achse, die Kamera steht fest). Jeder Frame setzt
-// element.orientation direkt als "<Kippwinkel>deg <Pitch-Offset>deg <Gier-Offset + Dauerdrehung>deg"
-// -- das ist genau die Reihenfolge/Achsenzuordnung, die model-viewer selbst für den "orientation"-
-// String erwartet (Term 0 = Z/Roll = fester Kippwinkel, Term 1 = X/Pitch, Term 2 = Y/Yaw), die
-// Dauerdrehung passiert also exakt um die gekippte Achse, nicht um die Welt-Y-Achse.
-//
-// Ziehen: pointerdown auf dem Globus (nicht auf einem Hotspot-Button) startet einen Drag; Bewegung
-// verschiebt Pitch-/Yaw-Offset direkt (horizontal = Yaw, vertikal = Pitch) -- freies Drehen in alle
-// Richtungen. Loslassen federt die Offsets über ~700ms weich auf 0 zurück (ease-out), die
-// Dauerdrehung läuft während des ganzen Drags in Echtzeit unbeeinflusst weiter (kein Nachholen/
-// Zurückspringen der Uhr), sodass die Erde beim Loslassen nahtlos in die "richtige" Rotation
-// zurückfindet und normal weiterdreht -- wie eine echte, kurz angestoßene Kugel auf ihrer Achse.
-const GLOBE_TILT_DEG = 23.5;
-const GLOBE_SPIN_DEG_PER_SEC = 6; // 360°/60s = eine Umdrehung pro Minute
-const GLOBE_DRAG_DEG_PER_PX = 0.35;
-const GLOBE_RELEASE_EASE_MS = 700;
-const GLOBE_MAX_PITCH_DEG = 80; // näher an ±90° kippt sie durch den Pol, wirkt dann verwirrend
-
+// Drehung (Auto-Rotation + Wisch-Ziehen) übernimmt <model-viewer> selbst (siehe camera-controls/
+// auto-rotate-Attribute in index.html). Kontinent-Antippen läuft über model-viewers eigenes
+// Hotspot-Slot-System (<button slot="hotspot-..." data-position="..." data-normal="...">, siehe
+// index.html) statt über eigenes Raycasting -- model-viewer übernimmt Positionierung/Verdeckung
+// passend zur aktuellen Rotation von sich aus, ein Klick auf den Button ist ein ganz normales
+// DOM-Event und damit unabhängig davon zuverlässig, ob der zugehörige 3D-Pin optisch schon exakt
+// auf dem richtigen Kontinent sitzt (das ist rein eine Positionsfrage der data-position-Werte).
 (() => {
   const homeMenu = document.getElementById("homeMenu");
   const globeModel = document.getElementById("globeModel");
@@ -3895,6 +3882,8 @@ const GLOBE_MAX_PITCH_DEG = 80; // näher an ±90° kippt sie durch den Pol, wir
   });
 
   homeMenu.querySelectorAll(".globe-hotspot").forEach(btn => {
+    // pointerdown zuerst abfangen (stopPropagation), bevor model-viewers eigene Dreh-Geste
+    // (camera-controls) den Touch als Drag-Start interpretiert -- sonst kommt nie ein "click" durch.
     btn.addEventListener("pointerdown", e => e.stopPropagation());
     btn.addEventListener("click", e => {
       e.stopPropagation();
@@ -3902,9 +3891,10 @@ const GLOBE_MAX_PITCH_DEG = 80; // näher an ±90° kippt sie durch den Pol, wir
     });
   });
 
-  // Zweite, unabhängige Erkennung als Absicherung: falls ein Hotspot-Button aus irgendeinem Grund
-  // (Occlusion-Logik, Layout-Timing, Browser-Eigenheit) keinen Touch abbekommt, wertet ein simpler
-  // "click" auf dem Globus selbst den echten 3D-Trefferpunkt aus und prüft grob gegen dieselben
+  // Zweite, unabhängige Erkennung als Absicherung: falls die Hotspot-Buttons aus irgendeinem Grund
+  // (Occlusion-Logik, Layout-Timing, Browser-Eigenheit) keinen Touch abbekommen, wertet ein simpler
+  // "click" auf dem Globus selbst den echten 3D-Trefferpunkt aus (kein pointerdown-Tracking -- das
+  // könnte an derselben Stelle scheitern wie bei den Hotspots) und prüft grob gegen dieselben
   // Kontinent-Regionen, an denen auch die Pins/Hotspots positioniert sind.
   const CONTINENT_REGIONS = [
     { tab: "todo", latMin: 15, latMax: 75, lonMin: -170, lonMax: -50 },
@@ -3927,73 +3917,21 @@ const GLOBE_MAX_PITCH_DEG = 80; // näher an ±90° kippt sie durch den Pol, wir
     });
   }
 
-  if (!globeModel) return;
-
-  const startTime = performance.now();
-  let yawOffset = 0, pitchOffset = 0;
-  let dragging = false, dragMoved = false;
-  let dragStartX = 0, dragStartY = 0, dragStartYaw = 0, dragStartPitch = 0;
-  let releasing = false, releaseYaw = 0, releasePitch = 0, releaseStart = 0;
-
-  function currentBaseYaw(now) {
-    return ((now - startTime) / 1000 * GLOBE_SPIN_DEG_PER_SEC) % 360;
+  // orientation als statisches HTML-Attribut wird von model-viewer nur reaktiv angewendet, wenn sich
+  // der Property-Wert NACH dem Laden echt ändert (interner Guard "wenn noch nicht geladen,
+  // überspringen" + Lits eigene Änderungserkennung reagiert nicht, wenn der neue Wert exakt dem
+  // schon gesetzten String entspricht). Deshalb hier nach dem "load"-Event erst auf einen anderen
+  // Wert und im nächsten Frame erst auf den Zielwert gesetzt -- garantiert eine echte, erkannte
+  // Änderung nach dem Laden statt eines wirkungslosen "gleicher Wert nochmal"-Assignments.
+  const TARGET_ORIENTATION = "23.5deg 0deg 0deg";
+  if (globeModel) {
+    const applyOrientation = () => {
+      globeModel.orientation = "0deg 0deg 0deg";
+      requestAnimationFrame(() => { globeModel.orientation = TARGET_ORIENTATION; });
+    };
+    if (globeModel.loaded) applyOrientation();
+    else globeModel.addEventListener("load", applyOrientation, { once: true });
   }
-
-  // try/catch + requestAnimationFrame(frame) in einem finally: ein einzelner Fehler in einem Frame
-  // darf die Dauerschleife nie endgültig abwürgen (ohne das würde ein einziger Ausnahmefall die
-  // Rotation für immer stoppen, weil der nächste requestAnimationFrame-Aufruf sonst nie erreicht wird).
-  function frame(now) {
-    try {
-      if (!homeMenu.classList.contains("home-hidden")) {
-        if (releasing) {
-          const progress = Math.min(1, (now - releaseStart) / GLOBE_RELEASE_EASE_MS);
-          const eased = 1 - Math.pow(1 - progress, 3);
-          yawOffset = releaseYaw * (1 - eased);
-          pitchOffset = releasePitch * (1 - eased);
-          if (progress >= 1) { releasing = false; yawOffset = 0; pitchOffset = 0; }
-        }
-        const yaw = currentBaseYaw(now) + yawOffset;
-        globeModel.orientation = `${GLOBE_TILT_DEG}deg ${pitchOffset.toFixed(2)}deg ${yaw.toFixed(2)}deg`;
-      }
-    } catch (err) {
-      console.error("Globus-Rotation:", err);
-    } finally {
-      requestAnimationFrame(frame);
-    }
-  }
-  requestAnimationFrame(frame);
-
-  globeModel.addEventListener("pointerdown", e => {
-    if (e.target.closest(".globe-hotspot")) return; // Hotspot-Buttons regeln pointerdown selbst
-    dragging = true;
-    dragMoved = false;
-    releasing = false;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    dragStartYaw = yawOffset;
-    dragStartPitch = pitchOffset;
-    try { globeModel.setPointerCapture(e.pointerId); } catch (err) {}
-  });
-  globeModel.addEventListener("pointermove", e => {
-    if (!dragging) return;
-    const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
-    if (Math.sqrt(dx * dx + dy * dy) > 3) dragMoved = true;
-    yawOffset = dragStartYaw + dx * GLOBE_DRAG_DEG_PER_PX;
-    pitchOffset = Math.max(-GLOBE_MAX_PITCH_DEG, Math.min(GLOBE_MAX_PITCH_DEG, dragStartPitch + dy * GLOBE_DRAG_DEG_PER_PX));
-  });
-  function endGlobeDrag(e) {
-    if (!dragging) return;
-    dragging = false;
-    if (dragMoved) {
-      releasing = true;
-      releaseYaw = yawOffset;
-      releasePitch = pitchOffset;
-      releaseStart = performance.now();
-    }
-    try { globeModel.releasePointerCapture(e.pointerId); } catch (err) {}
-  }
-  globeModel.addEventListener("pointerup", endGlobeDrag);
-  globeModel.addEventListener("pointercancel", endGlobeDrag);
 })();
 
 // Swipe vom linken Bildschirmrand nach rechts = eine Roadmap-Ebene zurück (wie iOS Zurück-Geste).

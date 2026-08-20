@@ -544,10 +544,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   height: clamp(300px, 54vh, 480px);
   width: clamp(300px, 54vh, 480px);
   --poster-color: transparent;
-  touch-action: none;
-  cursor: grab;
 }
-.globe-model:active { cursor: grabbing; }
 /* Unsichtbarer, aber großzügiger Tap-Ziel-Kreis über dem jeweiligen 3D-Pin (der Pin selbst ist echte
    GLB-Geometrie und liefert das sichtbare Marker-Design). model-viewer positioniert/verdeckt diese
    Hotspots automatisch passend zur aktuellen Rotation über die data-position/data-normal-Attribute. */
