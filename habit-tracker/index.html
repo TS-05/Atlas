@@ -383,12 +383,15 @@
     <div class="globe-stage">
       <!-- Echtes 3D-Modell (assets/atlas_globe_v6.glb) über das lokal gehostete model-viewer
            (habit-tracker/vendor/model-viewer.min.js, kein CDN -- bleibt offline-fähig, der Service
-           Worker cacht beide Dateien wie jede andere same-origin Ressource). camera-controls ohne
-           min/max-camera-orbit-Einschränkung erlaubt freies Drehen in alle Richtungen (auch nach
-           oben/unten, nicht nur horizontal). orientation kippt die Drehachse
-           um 23,5° (wie die echte Erdachsenneigung) -- auto-rotate spinnt weiterhin um die lokale
-           Y-Achse des Modells, orientation kippt das Ganze danach als feste Grundausrichtung, wodurch
-           die Spin-Achse selbst schräg steht statt nur die Kamera.
+           Worker cacht beide Dateien wie jede andere same-origin Ressource).
+
+           Rotation ist bewusst NICHT model-viewers eingebautes camera-controls/auto-rotate -- das
+           dreht nur die Kamera um ein stillstehendes Modell. Gewünscht ist das Gegenteil: die Erde
+           selbst dreht sich um eine im Raum feste, 23,5° geneigte Achse (wie die echte Erdachse),
+           die Kamera steht fest (camera-orbit unten, keine camera-controls). Die komplette Steuerung
+           (Dauerdrehung, freies Wisch-Drehen in alle Richtungen, Zurückfedern in die Skript-Rotation
+           nach dem Loslassen) übernimmt der Homemenü-Block in app.js per eigenem rAF-Loop, der
+           element.orientation jeden Frame direkt setzt -- siehe dort für die genaue Mechanik.
 
            Kontinent-Navigation: das GLB hat inzwischen echte 3D-Pin-Marker (kleine Silber-Oktaeder,
            siehe assets/atlas_globe_v6.glb-Node "Pin*") an den vier Kontinent-Positionen sowie einen
@@ -408,12 +411,6 @@
         alt="Atlas-Globus"
         loading="eager"
         reveal="auto"
-        camera-controls
-        disable-zoom
-        disable-pan
-        auto-rotate
-        rotation-per-second="6deg"
-        interaction-prompt="none"
         orientation="23.5deg 0deg 0deg"
         camera-orbit="0deg 90deg 105%"
         environment-image="neutral"
