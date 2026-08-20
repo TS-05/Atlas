@@ -3877,22 +3877,79 @@ if (splashEl) {
     switchTab(tabName);
   }
 
-  // Ring-Knöpfe: erst den Globus sichtbar auf den Kontinent drehen (camera-orbit -- model-viewer
-  // interpoliert das weich), dann nach kurzer Wartezeit den Tab öffnen. Auto-Rotation wird dabei
-  // abgeschaltet, sonst dreht sie sofort wieder weg.
-  homeMenu.querySelectorAll(".ring-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const lat = parseFloat(btn.dataset.lat);
-      const lon = parseFloat(btn.dataset.lon);
-      if (globeModel && !isNaN(lat) && !isNaN(lon)) {
-        globeModel.autoRotate = false;
-        globeModel.cameraOrbit = `${lon}deg ${90 - lat}deg 105%`;
-        setTimeout(() => goToTab(btn.dataset.tab), 850);
-      } else {
-        goToTab(btn.dataset.tab);
-      }
+  // Ring-Knöpfe + Wassertropfen-Griff. Der Tropfen markiert immer den gewählten Tab und lässt sich
+  // am Ring entlangziehen; beim Loslassen rastet er auf das nächstgelegene Symbol. Antippen eines
+  // Symbols bewegt den Tropfen ebenfalls dorthin. In beiden Fällen dreht sich der Globus zuerst
+  // sichtbar auf den zugehörigen Kontinent (camera-orbit, model-viewer interpoliert weich), danach
+  // öffnet der Tab -- Auto-Rotation wird dabei abgeschaltet, sonst dreht sie sofort wieder weg.
+  const ringButtons = Array.from(homeMenu.querySelectorAll(".ring-btn"));
+  const ringHandle = document.getElementById("ringHandle");
+  const ringSlots = ringButtons.map(btn => ({
+    btn,
+    tab: btn.dataset.tab,
+    angle: parseFloat(btn.style.getPropertyValue("--angle")),
+    lat: parseFloat(btn.dataset.lat),
+    lon: parseFloat(btn.dataset.lon)
+  }));
+
+  function moveHandleTo(slot) {
+    if (ringHandle) ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
+  }
+
+  function activateSlot(slot) {
+    moveHandleTo(slot);
+    if (globeModel && !isNaN(slot.lat) && !isNaN(slot.lon)) {
+      globeModel.autoRotate = false;
+      globeModel.cameraOrbit = `${slot.lon}deg ${90 - slot.lat}deg 105%`;
+      setTimeout(() => goToTab(slot.tab), 850);
+    } else {
+      goToTab(slot.tab);
+    }
+  }
+
+  ringSlots.forEach(slot => slot.btn.addEventListener("click", () => activateSlot(slot)));
+
+  if (ringHandle) {
+    const stage = homeMenu.querySelector(".globe-stage");
+    let handleDragging = false;
+
+    // Kürzester Winkelabstand auf dem Kreis (berücksichtigt den Sprung bei 360°/0°).
+    function angleDistance(a, b) {
+      const d = Math.abs(((a - b) % 360 + 540) % 360 - 180);
+      return d;
+    }
+    function pointerAngle(e) {
+      const r = stage.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2);
+      const dy = e.clientY - (r.top + r.height / 2);
+      return Math.atan2(dy, dx) * 180 / Math.PI;
+    }
+
+    ringHandle.addEventListener("pointerdown", e => {
+      handleDragging = true;
+      ringHandle.classList.add("is-dragging");
+      try { ringHandle.setPointerCapture(e.pointerId); } catch (err) {}
+      e.preventDefault();
     });
-  });
+    ringHandle.addEventListener("pointermove", e => {
+      if (!handleDragging) return;
+      ringHandle.style.setProperty("--angle", `${pointerAngle(e)}deg`);
+    });
+    function endHandleDrag(e) {
+      if (!handleDragging) return;
+      handleDragging = false;
+      ringHandle.classList.remove("is-dragging");
+      try { ringHandle.releasePointerCapture(e.pointerId); } catch (err) {}
+      const current = pointerAngle(e);
+      let nearest = ringSlots[0];
+      ringSlots.forEach(slot => {
+        if (angleDistance(slot.angle, current) < angleDistance(nearest.angle, current)) nearest = slot;
+      });
+      activateSlot(nearest);
+    }
+    ringHandle.addEventListener("pointerup", endHandleDrag);
+    ringHandle.addEventListener("pointercancel", endHandleDrag);
+  }
 
   homeMenu.querySelectorAll(".globe-hotspot").forEach(btn => {
     // pointerdown zuerst abfangen (stopPropagation), bevor model-viewers eigene Dreh-Geste
