@@ -1119,6 +1119,7 @@ const tabIndicator = document.getElementById("tabIndicator");
 let dropTimer = null;
 
 function renderTabIndicator(idx, dropPhase) {
+  if (!tabIndicator) return; // Tab-Leiste ersetzt durch einen einzelnen Home-Knopf
   // Pixelwert statt CSS-%/calc, damit die Position über transform (Compositor-Thread,
   // unabhängig vom Haupt-Thread) statt über left (braucht Layout) animiert werden kann.
   const containerWidth = tabIndicator.parentElement.clientWidth;
@@ -1170,6 +1171,18 @@ tabBtns.forEach(btn => {
 });
 document.body.dataset.tab = "heute";
 renderTabIndicator(0, "settled");
+
+// Einziger Knopf unten: blendet das Erdball-Homemenue wieder ein.
+const homeReturnBtn = document.getElementById("homeReturnBtn");
+if (homeReturnBtn) {
+  homeReturnBtn.addEventListener("click", () => {
+    const menu = document.getElementById("homeMenu");
+    if (!menu) return;
+    menu.classList.remove("home-hidden");
+    const gm = document.getElementById("globeModel");
+    if (gm) gm.autoRotate = true; // Dauerdrehung wieder an, sie wird beim Auswaehlen abgeschaltet
+  });
+}
 
 // ---------- Kopfzeile: kontextabhängiger Plus-Button ----------
 const QUICK_ADD_BTN_IDS = {
