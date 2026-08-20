@@ -3908,17 +3908,11 @@ if (splashEl) {
 
   function moveHandleTo(slot) {
     if (!ringHandle) return;
-    // Glaslinse nur waehrend der Bewegung einblenden (wie im Referenz-Video), danach bleibt die
-    // schlichte hellere Kapsel stehen.
+    // Glaslinse + Streckung nur waehrend der Bewegung; danach bleibt der schlichte runde Marker.
     ringHandle.classList.add("is-liquid");
-    ringHandle.classList.remove("is-splash");
-    void ringHandle.offsetWidth; // Reflow, sonst startet die Wobble-Animation beim zweiten Mal nicht
-    ringHandle.classList.add("is-splash");
     ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
     clearTimeout(liquidTimer);
-    liquidTimer = setTimeout(() => {
-      ringHandle.classList.remove("is-splash", "is-liquid");
-    }, 430);
+    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 400);
   }
 
   function activateSlot(slot) {
