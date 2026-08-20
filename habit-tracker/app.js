@@ -3896,12 +3896,17 @@ if (splashEl) {
   // "click" auf dem Globus selbst den echten 3D-Trefferpunkt aus (kein pointerdown-Tracking -- das
   // könnte an derselben Stelle scheitern wie bei den Hotspots) und prüft grob gegen dieselben
   // Kontinent-Regionen, an denen auch die Pins/Hotspots positioniert sind.
+  // Alle sieben Tabs sind jetzt geografisch zugeordnet -- sechs Kontinente plus der Ozean als
+  // Auffangfall (jeder Treffer auf der Kugel, der zu keinem Kontinent passt, zählt als Wasser).
   const CONTINENT_REGIONS = [
-    { tab: "todo", latMin: 15, latMax: 75, lonMin: -170, lonMax: -50 },
-    { tab: "zielbereiche", latMin: -55, latMax: 12, lonMin: -85, lonMax: -35 },
-    { tab: "heute", latMin: 35, latMax: 70, lonMin: -10, lonMax: 40 },
-    { tab: "gebete", latMin: -35, latMax: 35, lonMin: -20, lonMax: 50 }
+    { tab: "todo", label: "Nordamerika", latMin: 15, latMax: 75, lonMin: -170, lonMax: -50 },
+    { tab: "zielbereiche", label: "Südamerika", latMin: -55, latMax: 12, lonMin: -85, lonMax: -35 },
+    { tab: "heute", label: "Europa", latMin: 35, latMax: 70, lonMin: -10, lonMax: 40 },
+    { tab: "gebete", label: "Afrika", latMin: -35, latMax: 35, lonMin: -20, lonMax: 50 },
+    { tab: "finanzen", label: "Asien", latMin: 5, latMax: 75, lonMin: 40, lonMax: 180 },
+    { tab: "analyse", label: "Australien", latMin: -45, latMax: -10, lonMin: 110, lonMax: 155 }
   ];
+  const OCEAN_TAB = "projekte";
   if (globeModel && globeModel.positionAndNormalFromPoint) {
     globeModel.addEventListener("click", e => {
       if (e.target !== globeModel) return; // Hotspot-Buttons haben ihren eigenen Handler oben
@@ -3913,7 +3918,7 @@ if (splashEl) {
       const lat = Math.asin(position.y / radius) * 180 / Math.PI;
       const lon = Math.atan2(position.x, position.z) * 180 / Math.PI;
       const region = CONTINENT_REGIONS.find(r => lat >= r.latMin && lat <= r.latMax && lon >= r.lonMin && lon <= r.lonMax);
-      if (region) goToTab(region.tab);
+      goToTab(region ? region.tab : OCEAN_TAB);
     });
   }
 
