@@ -599,48 +599,76 @@ textarea.input { min-height: 90px; resize: vertical; }
 .ring-btn svg { display: block; }
 .ring-btn span { white-space: nowrap; opacity: 0.92; }
 /* Wassertropfen-Griff: markiert den aktuellen Tab und laesst sich am Ring entlangziehen. */
+/* Liquid-Glass-Linse nach Vorbild der Referenz-Leiste: fast unsichtbare Fuellung (man schaut durch),
+   helle Glanzkanten oben/unten, und Farbsaum (chromatische Aberration) NUR an zwei gegenueberliegenden
+   Stellen statt als kompletter Regenbogenring -- genau das unterscheidet echtes Glas von Deko. */
 .ring-handle {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 78px;
-  height: 72px;
-  margin: -36px 0 0 -39px;
+  width: 80px;
+  height: 74px;
+  margin: -37px 0 0 -40px;
   z-index: 2;
   pointer-events: auto;
-  border-radius: 50%;
+  border-radius: 50% / 47%;
   cursor: grab;
   touch-action: none;
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.03) 45%, rgba(255, 255, 255, 0.10));
-  backdrop-filter: blur(0.5px) saturate(1.35) brightness(1.12);
-  -webkit-backdrop-filter: blur(0.5px) saturate(1.35) brightness(1.12);
-  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.4), inset 0 -2px 3px rgba(255, 255, 255, 0.18),
-              0 6px 18px rgba(0, 0, 0, 0.4);
+  background: rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(0.4px) saturate(1.28) brightness(1.07) contrast(1.03);
+  -webkit-backdrop-filter: blur(0.4px) saturate(1.28) brightness(1.07) contrast(1.03);
+  box-shadow:
+    inset 0 1.2px 1.5px rgba(255, 255, 255, 0.62),
+    inset 0 -1.2px 1.5px rgba(255, 255, 255, 0.34),
+    inset 2px 0 4px -3px rgba(255, 255, 255, 0.3),
+    inset -2px 0 4px -3px rgba(255, 255, 255, 0.3),
+    0 8px 20px rgba(0, 0, 0, 0.45);
   transform: rotate(var(--angle)) translate(var(--ring-r)) rotate(calc(-1 * var(--angle)));
   transition: transform 0.32s cubic-bezier(0.34, 1.4, 0.5, 1);
 }
-/* Schillernder Seifenblasen-Rand (Farbverlauf-Rahmen per Masken-Trick). */
+/* Farbsaum: zwei weiche Fransen gegenueber, leicht unscharf -- kein durchgehender Regenbogen. */
 .ring-handle::before {
   content: "";
   position: absolute;
-  inset: -1px;
-  border-radius: 50%;
-  padding: 1.6px;
-  background: conic-gradient(from 200deg, #ff9ec4, #ffe6a1, #a5f2d2, #9ad4ff, #cbb0ff, #ff9ec4);
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.7px;
+  background: conic-gradient(from 125deg,
+    transparent 0deg,
+    rgba(255, 130, 190, 0.6) 16deg,
+    rgba(255, 214, 130, 0.5) 38deg,
+    rgba(140, 245, 205, 0.35) 58deg,
+    transparent 84deg,
+    transparent 196deg,
+    rgba(120, 215, 255, 0.55) 224deg,
+    rgba(178, 145, 255, 0.5) 250deg,
+    rgba(255, 150, 200, 0.3) 272deg,
+    transparent 300deg);
+  filter: blur(1.1px);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
-  opacity: 0.8;
   pointer-events: none;
 }
-/* Wasser-Feedback: die Blase wabert beim Antippen/Einrasten kurz nach. */
+/* Spiegelnder Lichtstreifen oben -- gibt der Blase Woelbung. */
+.ring-handle::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 6%;
+  height: 34%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
 @keyframes waterWobble {
-  0%   { border-radius: 50%; }
-  30%  { border-radius: 62% 38% 45% 55% / 42% 58% 42% 58%; }
-  55%  { border-radius: 40% 60% 58% 42% / 60% 40% 60% 40%; }
-  80%  { border-radius: 54% 46% 48% 52% / 47% 53% 47% 53%; }
-  100% { border-radius: 50%; }
+  0%   { border-radius: 50% / 47%; }
+  30%  { border-radius: 60% 40% 47% 53% / 44% 56% 44% 56%; }
+  55%  { border-radius: 42% 58% 56% 44% / 57% 43% 57% 43%; }
+  80%  { border-radius: 53% 47% 49% 51% / 49% 51% 49% 51%; }
+  100% { border-radius: 50% / 47%; }
 }
 .ring-handle.is-splash { animation: waterWobble 0.75s ease-out; }
 .ring-handle.is-dragging { cursor: grabbing; transition: none; animation: waterWobble 1.1s ease-in-out infinite; }
