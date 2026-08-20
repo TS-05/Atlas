@@ -3893,7 +3893,13 @@ if (splashEl) {
   }));
 
   function moveHandleTo(slot) {
-    if (ringHandle) ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
+    if (!ringHandle) return;
+    ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
+    // Kurzes Nachwabern, damit sich das Einrasten wie Wasser anfuehlt.
+    ringHandle.classList.remove("is-splash");
+    void ringHandle.offsetWidth; // Reflow erzwingen, sonst startet die Animation beim zweiten Mal nicht
+    ringHandle.classList.add("is-splash");
+    setTimeout(() => ringHandle.classList.remove("is-splash"), 780);
   }
 
   function activateSlot(slot) {
