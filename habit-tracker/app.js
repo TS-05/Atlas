@@ -3900,7 +3900,7 @@ if (splashEl) {
     moveHandleTo(slot);
     if (globeModel && !isNaN(slot.lat) && !isNaN(slot.lon)) {
       globeModel.autoRotate = false;
-      globeModel.cameraOrbit = `${slot.lon}deg ${90 - slot.lat}deg 105%`;
+      globeModel.cameraOrbit = `${slot.lon}deg ${90 - slot.lat}deg 95%`;
       setTimeout(() => goToTab(slot.tab), 850);
     } else {
       goToTab(slot.tab);
