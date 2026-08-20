@@ -3877,8 +3877,21 @@ if (splashEl) {
     switchTab(tabName);
   }
 
-  homeMenu.querySelectorAll(".home-satellite").forEach(btn => {
-    btn.addEventListener("click", () => goToTab(btn.dataset.tab));
+  // Ring-Knöpfe: erst den Globus sichtbar auf den Kontinent drehen (camera-orbit -- model-viewer
+  // interpoliert das weich), dann nach kurzer Wartezeit den Tab öffnen. Auto-Rotation wird dabei
+  // abgeschaltet, sonst dreht sie sofort wieder weg.
+  homeMenu.querySelectorAll(".ring-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const lat = parseFloat(btn.dataset.lat);
+      const lon = parseFloat(btn.dataset.lon);
+      if (globeModel && !isNaN(lat) && !isNaN(lon)) {
+        globeModel.autoRotate = false;
+        globeModel.cameraOrbit = `${lon}deg ${90 - lat}deg 105%`;
+        setTimeout(() => goToTab(btn.dataset.tab), 850);
+      } else {
+        goToTab(btn.dataset.tab);
+      }
+    });
   });
 
   homeMenu.querySelectorAll(".globe-hotspot").forEach(btn => {

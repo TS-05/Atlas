@@ -527,19 +527,65 @@ textarea.input { min-height: 90px; resize: vertical; }
   width: 100%;
   padding: 0 10px;
 }
-.home-nav-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  width: min(92vw, 420px);
-}
+/* Bühne = Quadrat, das Globus UND Navigations-Ring umfasst. Der Globus füllt nur die inneren ~64 %,
+   der Rest ist Platz für den Goldring mit den Kontinent-Symbolen. */
 .globe-stage {
+  /* Radius, auf dem die Ring-Knöpfe sitzen: knapp innerhalb des Bühnenrands (Bühne ist doppelt so
+     breit). Muss eine echte Länge sein -- Prozentwerte in translate() beziehen sich sonst auf die
+     Knopfgröße statt auf den Ring. */
+  --ring-r: min(42vw, 244px);
   position: relative;
+  width: min(94vw, 560px);
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   touch-action: none;
 }
+/* Goldenes Band, auf dem die Symbole sitzen (wie in der Skizze). */
+.globe-stage::before {
+  content: "";
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  pointer-events: none;
+  border: 2px solid color-mix(in srgb, var(--color-accent-500) 45%, transparent);
+  box-shadow: inset 0 0 26px color-mix(in srgb, var(--color-accent-700) 30%, transparent),
+              0 0 22px color-mix(in srgb, var(--color-accent-800) 26%, transparent);
+}
+.globe-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ring-btn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--color-accent-500) 34%, transparent);
+  border-radius: 50%;
+  background: rgba(10, 12, 16, 0.72);
+  color: var(--color-accent-300);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  /* rotate -> nach außen schieben -> zurückdrehen: Knopf sitzt auf dem Ring, Symbol bleibt aufrecht */
+  transform: rotate(var(--angle)) translate(var(--ring-r)) rotate(calc(-1 * var(--angle)));
+}
+.ring-btn:active {
+  background: rgba(10, 12, 16, 0.9);
+  border-color: var(--color-accent-400);
+  transform: rotate(var(--angle)) translate(var(--ring-r)) rotate(calc(-1 * var(--angle))) scale(0.92);
+}
+/* Wassertropfen (Ozean -> Projekte): leicht trüb/milchig statt goldklar. */
+.ring-btn-drop { color: #b9c6d4; }
 /* Vignette wie im Referenzbild: dunkelt die Ecken um den Globus bis fast Schwarz ab, erzeugt eine
    Spotlight-Wirkung auf die Bildmitte. Reines CSS statt echtem Kamera-Post-Processing (model-viewer
    bietet keine Vignette/DoF-Pipeline), liegt als eigene Ebene über dem Modell, blockiert aber keine
@@ -552,8 +598,8 @@ textarea.input { min-height: 90px; resize: vertical; }
   background: radial-gradient(circle at center, transparent 42%, rgba(15, 18, 24, 0.55) 68%, rgba(15, 18, 24, 0.92) 100%);
 }
 .globe-model {
-  height: clamp(300px, 54vh, 480px);
-  width: clamp(300px, 54vh, 480px);
+  height: 64%;
+  width: 64%;
   --poster-color: transparent;
 }
 /* Unsichtbarer, aber großzügiger Tap-Ziel-Kreis über dem jeweiligen 3D-Pin (der Pin selbst ist echte
@@ -571,26 +617,6 @@ textarea.input { min-height: 90px; resize: vertical; }
   cursor: pointer;
   touch-action: manipulation;
 }
-.home-satellite {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 14px 10px;
-  border: none;
-  border-radius: 999px;
-  background: rgba(10, 12, 16, 0.5);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  color: var(--color-accent-300);
-  font-family: var(--font-body);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  flex-shrink: 0;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-.home-satellite:active { transform: scale(0.94); background: rgba(10, 12, 16, 0.7); }
-.home-satellite span { color: var(--color-neutral-300); }
 .home-hint {
   position: relative;
   z-index: 1;
