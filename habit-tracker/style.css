@@ -540,6 +540,17 @@ textarea.input { min-height: 90px; resize: vertical; }
   justify-content: center;
   touch-action: none;
 }
+/* Vignette wie im Referenzbild: dunkelt die Ecken um den Globus bis fast Schwarz ab, erzeugt eine
+   Spotlight-Wirkung auf die Bildmitte. Reines CSS statt echtem Kamera-Post-Processing (model-viewer
+   bietet keine Vignette/DoF-Pipeline), liegt als eigene Ebene über dem Modell, blockiert aber keine
+   Klicks (pointer-events: none). */
+.globe-stage::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 42%, rgba(15, 18, 24, 0.55) 68%, rgba(15, 18, 24, 0.92) 100%);
+}
 .globe-model {
   height: clamp(300px, 54vh, 480px);
   width: clamp(300px, 54vh, 480px);
