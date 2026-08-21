@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=35">
+<link rel="stylesheet" href="style.css?v=36">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -390,16 +390,7 @@
            Y-Achse des Modells, orientation kippt das Ganze danach als feste Grundausrichtung, wodurch
            die Spin-Achse selbst schräg steht statt nur die Kamera.
 
-           Kontinent-Navigation: das GLB hat inzwischen echte 3D-Pin-Marker (kleine Silber-Oktaeder,
-           siehe assets/atlas_globe_v17.glb-Node "Pin*") an den vier Kontinent-Positionen sowie einen
-           kleinen Satelliten als Deko. Für zuverlässiges Antippen (nicht auf eigenes Raycasting
-           gegen die Kugeloberfläche verlassen -- Längengrad-Konvention des Modells war nicht sicher
-           kalibrierbar) liegen zusätzlich unsichtbare model-viewer-Hotspots exakt an denselben
-           Koordinaten wie die Pins: model-viewer positioniert/verdeckt sie automatisch passend zur
-           aktuellen Rotation, der Klick-Handler in app.js braucht dafür kein eigenes Hit-Testing.
-           Falls ein Pin (visuell) auf dem falschen Kontinent sitzt, sind nur die x/y/z-Werte unten
-           anzupassen -- das Klicken selbst bleibt davon unberührt, da Hotspot-Position und Pin-Position
-           hier bewusst gemeinsam gepflegt werden.
+           Der Globus ist reine Anzeige/Drehung -- die Tab-Auswahl passiert über den Ring darum.
       -->
       <model-viewer
         id="globeModel"
@@ -424,12 +415,6 @@
         exposure="1.1"
         shadow-intensity="0"
       >
-        <button slot="hotspot-todo" class="globe-hotspot" data-tab="todo" aria-label="Nordamerika – ToDo" data-position="-0.7173 0.7283 -0.1265" data-normal="-0.6964 0.7071 -0.1228"></button>
-        <button slot="hotspot-zielbereiche" class="globe-hotspot" data-tab="zielbereiche" aria-label="Südamerika – Roadmap" data-position="-0.8616 -0.2666 0.4975" data-normal="-0.8365 -0.2588 0.4830"></button>
-        <button slot="hotspot-heute" class="globe-hotspot" data-tab="heute" aria-label="Europa – Heute" data-position="0.1714 0.7890 0.6395" data-normal="0.1664 0.7660 0.6209"></button>
-        <button slot="hotspot-gebete" class="globe-hotspot" data-tab="gebete" aria-label="Afrika – Gebete" data-position="0.3523 0.0000 0.9679" data-normal="0.3420 0.0000 0.9397"></button>
-        <button slot="hotspot-finanzen" class="globe-hotspot" data-tab="finanzen" aria-label="Asien – Finanzen" data-position="0.7283 0.7283 0.0000" data-normal="0.7071 0.7071 0.0000"></button>
-        <button slot="hotspot-analyse" class="globe-hotspot" data-tab="analyse" aria-label="Australien – Analyse" data-position="0.6601 -0.4353 -0.6601" data-normal="0.6409 -0.4226 -0.6409"></button>
       </model-viewer>
       <!-- Navigations-Ring um den Globus. Bewusst normale HTML-Buttons AUSSERHALB des 3D-Canvas:
            damit ist das Antippen zuverlässig (model-viewers eigene Dreh-Geste kann Touches auf der
@@ -721,6 +706,6 @@
   <div class="modal" id="modalBody"></div>
 </div>
 
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

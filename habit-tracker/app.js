@@ -4062,12 +4062,10 @@ if (splashEl) {
 
 // ---------- Homemenü: 3D-Globus-Navigation ----------
 // Drehung (Auto-Rotation + Wisch-Ziehen) übernimmt <model-viewer> selbst (siehe camera-controls/
-// auto-rotate-Attribute in index.html). Kontinent-Antippen läuft über model-viewers eigenes
-// Hotspot-Slot-System (<button slot="hotspot-..." data-position="..." data-normal="...">, siehe
-// index.html) statt über eigenes Raycasting -- model-viewer übernimmt Positionierung/Verdeckung
-// passend zur aktuellen Rotation von sich aus, ein Klick auf den Button ist ein ganz normales
-// DOM-Event und damit unabhängig davon zuverlässig, ob der zugehörige 3D-Pin optisch schon exakt
-// auf dem richtigen Kontinent sitzt (das ist rein eine Positionsfrage der data-position-Werte).
+// auto-rotate-Attribute in index.html). Der Globus dient nur noch zum Drehen -- die Tab-Auswahl
+// läuft ausschließlich über den Ring. Die früheren unsichtbaren Kontinent-Tippflächen lagen mit
+// pointer-events:auto über der Kugel und haben die Wischgeste je nach Ansatzpunkt abgefangen,
+// wodurch das Drehen sporadisch hängen blieb.
 (() => {
   const homeMenu = document.getElementById("homeMenu");
   const globeModel = document.getElementById("globeModel");
@@ -4181,47 +4179,6 @@ if (splashEl) {
     }
     ringHandle.addEventListener("pointerup", endHandleDrag);
     ringHandle.addEventListener("pointercancel", endHandleDrag);
-  }
-
-  homeMenu.querySelectorAll(".globe-hotspot").forEach(btn => {
-    // pointerdown zuerst abfangen (stopPropagation), bevor model-viewers eigene Dreh-Geste
-    // (camera-controls) den Touch als Drag-Start interpretiert -- sonst kommt nie ein "click" durch.
-    btn.addEventListener("pointerdown", e => e.stopPropagation());
-    btn.addEventListener("click", e => {
-      e.stopPropagation();
-      goToTab(btn.dataset.tab);
-    });
-  });
-
-  // Zweite, unabhängige Erkennung als Absicherung: falls die Hotspot-Buttons aus irgendeinem Grund
-  // (Occlusion-Logik, Layout-Timing, Browser-Eigenheit) keinen Touch abbekommen, wertet ein simpler
-  // "click" auf dem Globus selbst den echten 3D-Trefferpunkt aus (kein pointerdown-Tracking -- das
-  // könnte an derselben Stelle scheitern wie bei den Hotspots) und prüft grob gegen dieselben
-  // Kontinent-Regionen, an denen auch die Pins/Hotspots positioniert sind.
-  // Alle sieben Tabs sind jetzt geografisch zugeordnet -- sechs Kontinente plus der Ozean als
-  // Auffangfall (jeder Treffer auf der Kugel, der zu keinem Kontinent passt, zählt als Wasser).
-  const CONTINENT_REGIONS = [
-    { tab: "todo", label: "Nordamerika", latMin: 15, latMax: 75, lonMin: -170, lonMax: -50 },
-    { tab: "zielbereiche", label: "Südamerika", latMin: -55, latMax: 12, lonMin: -85, lonMax: -35 },
-    { tab: "heute", label: "Europa", latMin: 35, latMax: 70, lonMin: -10, lonMax: 40 },
-    { tab: "gebete", label: "Afrika", latMin: -35, latMax: 35, lonMin: -20, lonMax: 50 },
-    { tab: "finanzen", label: "Asien", latMin: 5, latMax: 75, lonMin: 40, lonMax: 180 },
-    { tab: "analyse", label: "Australien", latMin: -45, latMax: -10, lonMin: 110, lonMax: 155 }
-  ];
-  const OCEAN_TAB = "projekte";
-  if (globeModel && globeModel.positionAndNormalFromPoint) {
-    globeModel.addEventListener("click", e => {
-      if (e.target !== globeModel) return; // Hotspot-Buttons haben ihren eigenen Handler oben
-      const rect = globeModel.getBoundingClientRect();
-      const hit = globeModel.positionAndNormalFromPoint(e.clientX - rect.left, e.clientY - rect.top);
-      if (!hit) return;
-      const { position } = hit;
-      const radius = Math.sqrt(position.x ** 2 + position.y ** 2 + position.z ** 2);
-      const lat = Math.asin(position.y / radius) * 180 / Math.PI;
-      const lon = Math.atan2(position.x, position.z) * 180 / Math.PI;
-      const region = CONTINENT_REGIONS.find(r => lat >= r.latMin && lat <= r.latMax && lon >= r.lonMin && lon <= r.lonMax);
-      goToTab(region ? region.tab : OCEAN_TAB);
-    });
   }
 
   // orientation als statisches HTML-Attribut wird von model-viewer nur reaktiv angewendet, wenn sich
