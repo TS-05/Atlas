@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=38">
+<link rel="stylesheet" href="style.css?v=40">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -695,13 +695,13 @@
 
 <!-- Wasserblase: liegt bewusst AUSSERHALB des Homemenues, damit sie beim Oeffnen eines Tabs nach
      unten wandern und dort als Zurueck-Knopf sichtbar bleiben kann. -->
-<div class="ring-handle" id="ringHandle" role="button" aria-label="Menue" tabindex="0"></div>
+<div class="ring-handle is-boot" id="ringHandle" role="button" aria-label="Menue" tabindex="0"></div>
 
 <!-- MODAL / BOTTOM SHEET -->
 <div id="modalOverlay" class="modal-overlay hidden">
   <div class="modal" id="modalBody"></div>
 </div>
 
-<script src="app.js?v=32"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>

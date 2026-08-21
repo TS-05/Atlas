@@ -610,7 +610,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   top: 0;
   width: 88px;
   height: 88px;
-  z-index: 60;
+  z-index: 1000;   /* ueber dem Homemenue (998) und dem Splash (999) */
   pointer-events: auto;
   border-radius: 50%;
   cursor: grab;
@@ -668,6 +668,14 @@ textarea.input { min-height: 90px; resize: vertical; }
    der Positionierung (die ebenfalls transform nutzt) kollidieren. */
 .ring-handle.is-pop { --sx: 1.5; --sy: 1.5; opacity: 0; }
 .ring-handle.is-invisible { opacity: 0; }
+/* Bis der Startbildschirm weg ist bleibt sie unsichtbar (sonst laege sie ueber dem Splash). */
+.ring-handle.is-boot { opacity: 0; pointer-events: none; }
+/* Unten traegt die Blase das Globus-Symbol (Zurueck zum Hauptmenue). */
+.ring-handle.has-icon {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-accent-200);
+}
+.ring-handle.has-icon svg { display: block; }
 /* Fuer den lautlosen Sprung ans Ringsymbol: sonst wuerde die Blase sichtbar dorthin fliegen. */
 .ring-handle.no-anim { transition: none !important; }
 /* Beim Ziehen setzt JS --sx/--sy laufend aus dem Abstand zum Finger -> laenglich in Zugrichtung. */

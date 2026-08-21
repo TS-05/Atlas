@@ -4126,9 +4126,16 @@ if (splashEl) {
   }
 
   // Beim Oeffnen eines Tabs wandert die Blase nach unten und wird dort zum Zurueck-Knopf.
+  const GLOBE_ICON = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none">' +
+    '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>' +
+    '<ellipse cx="12" cy="12" rx="4" ry="9" stroke="currentColor" stroke-width="1.3"/>' +
+    '<path d="M3.2 9.2H20.8M3.2 14.8H20.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+
   function sendHandleHome() {
     if (!ringHandle) return;
     ringHandle.classList.remove("no-anim", "is-invisible");
+    ringHandle.innerHTML = GLOBE_ICON;   // unten zeigt die Blase das Globus-Symbol
+    ringHandle.classList.add("has-icon");
     handleMode = "home";
     ringHandle.classList.add("is-liquid", "is-tap");
     placeAtHome();
@@ -4161,17 +4168,20 @@ if (splashEl) {
       clearTimeout(tapTimer); clearTimeout(liquidTimer);
       // 1) unten zerplatzen lassen
       ringHandle.classList.remove("is-liquid", "is-tap");
+      ringHandle.style.opacity = "";      // Inline-Wert loesen, sonst kann is-pop nicht ausblenden
       ringHandle.classList.add("is-pop");
       setTimeout(() => {
         // 2) unsichtbar und ohne Animation ans Ringsymbol versetzen
         ringHandle.classList.add("no-anim", "is-invisible");
-        ringHandle.classList.remove("is-pop");
+        ringHandle.classList.remove("is-pop", "has-icon");
+        ringHandle.innerHTML = "";        // am Ring leer -- das Symbol liegt dort schon darunter
         placeAtSlot(cur);
         // 3) dort wieder normal auftauchen
         // Sichtbarkeit NOCH mit no-anim zuruecknehmen: so ist die Blase sofort da, auch wenn ein
         // Uebergang aus irgendeinem Grund nicht durchlaeuft (sonst bliebe sie unsichtbar haengen).
         setTimeout(() => {
           ringHandle.classList.remove("is-invisible");
+          ringHandle.style.opacity = "1";   // hart sichtbar -- unabhaengig von laufenden Uebergaengen
           setTimeout(() => ringHandle.classList.remove("no-anim"), 30);
         }, 40);
       }, 300);
@@ -4187,6 +4197,28 @@ if (splashEl) {
   }
   // Mehrfach anstossen: direkt, nach dem Layout und nach dem Splash -- so sitzt die Blase auch dann
   // richtig, wenn ein einzelner Zeitpunkt (z.B. rAF) ausfaellt oder das Layout noch nicht steht.
+  // Erst einblenden, wenn der Startbildschirm verschwunden ist -- danach sitzt sie am Ring.
+  function revealHandle(force) {
+    if (!ringHandle) return;
+    const splash = document.getElementById("splashScreen");
+    // Sobald der Splash ausblendet reicht -- NICHT darauf warten, dass er aus dem DOM faellt: das
+    // haengt an einem transitionend-Ereignis, und laeuft das nicht durch, bliebe die Blase fuer
+    // immer unsichtbar. Zusaetzlich unten ein hartes Sicherheitsnetz.
+    if (splash && !force && !splash.classList.contains("splash-hidden")) {
+      setTimeout(revealHandle, 150);
+      return;
+    }
+    // Ohne Uebergang einblenden: haengt das Einblenden an einer Transition und die laeuft nicht,
+    // bliebe die Blase unsichtbar (genau dieser Fehler ist hier schon zweimal aufgetreten).
+    ringHandle.classList.add("no-anim");
+    repositionHandle();
+    ringHandle.classList.remove("is-boot");
+    ringHandle.style.opacity = "1";
+    setTimeout(() => ringHandle.classList.remove("no-anim"), 50);
+  }
+  revealHandle();
+  setTimeout(() => revealHandle(true), 3600);
+
   repositionHandle();
   setTimeout(repositionHandle, 0);
   setTimeout(repositionHandle, 300);
