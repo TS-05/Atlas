@@ -4086,6 +4086,7 @@ if (splashEl) {
   const ringButtons = Array.from(homeMenu.querySelectorAll(".ring-btn"));
   const ringHandle = document.getElementById("ringHandle");
   let liquidTimer = null;
+  let tapTimer = null;
   const ringSlots = ringButtons.map(btn => ({
     btn,
     tab: btn.dataset.tab,
@@ -4101,9 +4102,11 @@ if (splashEl) {
 
   function moveHandleTo(slot) {
     if (!ringHandle) return;
-    ringHandle.classList.add("is-liquid");
+    // Antippen = Finger in Fluessigkeit: kurz gleichmaessig aufquellen, dann zurueckfallen.
+    ringHandle.classList.add("is-liquid", "is-tap");
     ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
-    clearTimeout(liquidTimer);
+    clearTimeout(tapTimer); clearTimeout(liquidTimer);
+    tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 230);
     liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 460);
   }
 
@@ -4123,6 +4126,7 @@ if (splashEl) {
   if (ringHandle) {
     const stage = homeMenu.querySelector(".globe-stage");
     let handleDragging = false;
+    let targetAngle = 0;
 
     function pointerAngle(e) {
       const r = stage.getBoundingClientRect();
@@ -4131,8 +4135,25 @@ if (splashEl) {
       return Math.atan2(dy, dx) * 180 / Math.PI;
     }
 
+    // Der Tropfen folgt dem Finger nicht starr, sondern zieht traege nach (Lerp). Der Rueckstand
+    // zum Finger bestimmt die Dehnung -- schnell gezogen = laenger und schmaler, genau wie ein
+    // echter Tropfen, der an der Oberflaeche haengt und hinterherlaeuft.
+    function dragFrame() {
+      if (!handleDragging) return;
+      const cur = parseFloat(ringHandle.style.getPropertyValue("--angle")) || targetAngle;
+      let lag = ((targetAngle - cur + 540) % 360) - 180;
+      const next = cur + lag * 0.22;                     // traeges Nachziehen
+      const pull = Math.min(1, Math.abs(lag) / 14);      // 0..1 Rueckstand
+      ringHandle.style.setProperty("--angle", `${next}deg`);
+      ringHandle.style.setProperty("--sy", (1 + pull * 0.45).toFixed(3));
+      ringHandle.style.setProperty("--sx", (1 - pull * 0.18).toFixed(3));
+      requestAnimationFrame(dragFrame);
+    }
+
     ringHandle.addEventListener("pointerdown", e => {
       handleDragging = true;
+      targetAngle = pointerAngle(e);
+      requestAnimationFrame(dragFrame);
       clearTimeout(liquidTimer);
       ringHandle.classList.add("is-dragging", "is-liquid");
       try { ringHandle.setPointerCapture(e.pointerId); } catch (err) {}
@@ -4140,13 +4161,7 @@ if (splashEl) {
     });
     ringHandle.addEventListener("pointermove", e => {
       if (!handleDragging) return;
-      const a = pointerAngle(e);
-      const prev = parseFloat(ringHandle.style.getPropertyValue("--angle")) || a;
-      let d = ((a - prev + 540) % 360) - 180;           // kuerzeste Winkeldifferenz
-      const speed = Math.min(1, Math.abs(d) / 9);        // 0..1
-      ringHandle.style.setProperty("--sy", (1 + speed * 0.42).toFixed(3));
-      ringHandle.style.setProperty("--sx", (1 - speed * 0.16).toFixed(3));
-      ringHandle.style.setProperty("--angle", `${a}deg`);
+      targetAngle = pointerAngle(e);
     });
     function endHandleDrag(e) {
       if (!handleDragging) return;
@@ -4155,7 +4170,9 @@ if (splashEl) {
       ringHandle.style.removeProperty("--sy");
       ringHandle.style.removeProperty("--sx");
       try { ringHandle.releasePointerCapture(e.pointerId); } catch (err) {}
-      const current = pointerAngle(e);
+      // Nach der FINGER-Position einrasten, nicht nach der (absichtlich nachhinkenden) Tropfen-
+      // position -- sonst landet man bei schnellem Ziehen auf dem Symbol, das man gerade verlassen hat.
+      const current = targetAngle;
       let nearest = ringSlots[0];
       ringSlots.forEach(slot => {
         if (angleDistance(slot.angle, current) < angleDistance(nearest.angle, current)) nearest = slot;
