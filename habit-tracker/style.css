@@ -725,3 +725,37 @@ textarea.input { min-height: 90px; resize: vertical; }
 .project-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .project-card-head .item-title { flex: 1; min-width: 0; }
 .project-notes { min-height: 90px; font-size: 13.5px; }
+
+/* ---------- Gym ---------- */
+.gym-daypicker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+.gym-day {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  background: var(--color-surface); color: var(--color-neutral-300);
+  font-family: var(--font-body); font-size: 13px; text-align: left;
+}
+.gym-day.active { border-color: var(--color-accent-500); color: var(--color-text); }
+.gym-day-tag {
+  font-family: var(--font-heading); font-size: 10.5px; letter-spacing: 0.06em;
+  color: var(--color-accent-300); border: 1px solid var(--color-accent-800);
+  border-radius: 5px; padding: 2px 5px; flex-shrink: 0;
+}
+.gym-summary { font-size: 12px; color: var(--color-neutral-400); margin-bottom: 12px; }
+.gym-ex { padding: 12px 0; border-top: 1px solid var(--color-divider); }
+.gym-ex-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.gym-target { font-size: 11px; color: var(--color-accent-300); flex-shrink: 0; }
+.gym-sets { display: flex; gap: 8px; margin-top: 8px; }
+.gym-set { display: flex; align-items: center; gap: 4px; flex: 1; }
+.gym-set input {
+  width: 100%; min-width: 0; height: 34px; padding: 4px 6px; text-align: center;
+  font: inherit; font-size: 13px; color: var(--color-text);
+  background: var(--color-bg); border: 1px solid var(--color-divider); border-radius: var(--radius-sm);
+}
+.gym-set input:focus-visible { border-color: var(--color-accent); outline: none; }
+.gym-set span { color: var(--color-neutral-600); font-size: 11px; }
+.gym-chart-title { font-size: 11.5px; letter-spacing: 0.04em; margin-bottom: 6px; }
+.gym-chart { background: var(--color-surface); border-radius: var(--radius-md); padding: 10px 12px 8px; }
+.gym-chart-svg { width: 100%; height: 96px; display: block; }
+.gym-chart-legend { display: flex; justify-content: space-between; font-size: 11px; color: var(--color-neutral-500); margin-top: 6px; }
+.gym-chart-legend .up { color: var(--color-accent-300); }
+.gym-chart-legend .down { color: var(--color-neutral-300); }

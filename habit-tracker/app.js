@@ -1111,7 +1111,7 @@ function budgetRingHtml(spent, limit, size = 40, maskIdx = 0) {
 }
 
 // ---------- Tabs ----------
-const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "projekte", "analyse"];
+const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "projekte", "gym", "analyse"];
 const TAB_ROT = [-6, 10, 5, -12, 7, 9, -4];
 const TAB_SCALE = [1.05, 0.92, 1, 1.1, 0.95, 1.03, 1.02];
 const tabBtns = Array.from(document.querySelectorAll(".tab-btn"));
@@ -2266,6 +2266,7 @@ function renderWeekStats() {
   renderAreaLoad();
   renderMoreStats();
   renderFinanceAnalysis();
+  renderGymAnalysis();
   renderReflection();
 }
 
@@ -2563,6 +2564,7 @@ function renderAll() {
   renderPlanning();
   renderFinance();
   renderProjekte();
+  renderGym();
   renderPrayers();
   renderWeekStats();
   updateNotifPermissionUI();
@@ -2797,6 +2799,202 @@ document.addEventListener("click", e => {
 });
 initRoutineDragReorder();
 initPrayerDragReorder();
+
+
+// ---------- Gym ----------
+// Trainingsplan 1:1 aus dem Vault (Tim/10_Persoenlich/Trainingsplan.md): 4-Tage Ober-/Unterkoerper-Split.
+// Zielwiederholungen laut Plan: Grunduebungen 8-12, Isolation 10-15, Rumpfrotation/Hyperextensions 12-15.
+const GYM_PLAN = [
+  { key: "oberA", label: "Oberkörper A", tag: "Mo", exercises: [
+    { n: "Überzüge (Aufwärmen)", r: "1–2 Sätze" }, { n: "Brustpresse", r: "8–12" },
+    { n: "Rudern breit/eng", r: "8–12" }, { n: "Latziehen breit/eng", r: "8–12" },
+    { n: "Schulterdrücken", r: "8–12" }, { n: "Butterfly", r: "10–15" },
+    { n: "Butterfly Reverse", r: "10–15" }, { n: "Seitheben", r: "10–15" },
+    { n: "Trizeps Pulldown", r: "10–15" }, { n: "Preacher/Hammercurls", r: "10–15" } ] },
+  { key: "unterA", label: "Unterkörper A", tag: "Di", exercises: [
+    { n: "Squat Maschine", r: "8–12" }, { n: "Beinpresse", r: "8–12" },
+    { n: "Hamstrings", r: "10–15" }, { n: "Beinstrecker", r: "10–15" },
+    { n: "Wadenheben", r: "10–15" }, { n: "Abduktoren", r: "10–15" },
+    { n: "Adduktoren", r: "10–15" }, { n: "Hyperextensions", r: "12–15" },
+    { n: "Landmine/Cable Rotation", r: "12–15 je Seite" } ] },
+  { key: "oberB", label: "Oberkörper B", tag: "Do", exercises: [
+    { n: "Schrägbankdrücken", r: "8–12" }, { n: "Latzug eng/breit", r: "8–12" },
+    { n: "Rudern eng/breit", r: "8–12" }, { n: "Schulterdrücken", r: "8–12" },
+    { n: "Butterfly", r: "10–15" }, { n: "Butterfly Reverse", r: "10–15" },
+    { n: "Seitheben", r: "10–15" }, { n: "Trizeps Pulldown", r: "10–15" },
+    { n: "Preacher/Hammercurls", r: "10–15" } ] },
+  { key: "unterB", label: "Unterkörper B", tag: "Fr", exercises: [
+    { n: "Kreuzheben", r: "8–12" }, { n: "Beinpresse", r: "8–12" },
+    { n: "Hamstrings", r: "10–15" }, { n: "Beinstrecker", r: "10–15" },
+    { n: "Wadenheben", r: "10–15" }, { n: "Abduktoren", r: "10–15" },
+    { n: "Adduktoren", r: "10–15" }, { n: "Landmine/Cablerotations", r: "12–15 je Seite" } ] }
+];
+// Wochentag -> vorgeschlagener Trainingstag (Mo/Di/Do/Fr laut Plan)
+const GYM_DAY_BY_WEEKDAY = { 1: "oberA", 2: "unterA", 4: "oberB", 5: "unterB" };
+let gymSelectedDay = GYM_DAY_BY_WEEKDAY[new Date().getDay()] || "oberA";
+
+// Letzte protokollierte Saetze einer Uebung -- als Referenz beim naechsten Training ("was hatte ich zuletzt?").
+function gymLastEntry(exerciseName, beforeDate) {
+  const sessions = (state.gymSessions || [])
+    .filter(s => s.entries && s.entries[exerciseName] && s.entries[exerciseName].some(x => x && x.weight))
+    .filter(s => !beforeDate || s.date < beforeDate)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return sessions.length ? { date: sessions[0].date, sets: sessions[0].entries[exerciseName] } : null;
+}
+
+// Bestes Satzgewicht einer Einheit -- Basis fuer die Staerke-Kurve.
+function gymSessionTopWeight(session) {
+  let top = 0;
+  Object.values(session.entries || {}).forEach(sets => (sets || []).forEach(x => {
+    if (x && x.weight > top) top = x.weight;
+  }));
+  return top;
+}
+
+function renderGym() {
+  const picker = document.getElementById("gymDayPicker");
+  if (!picker) return;
+  state.gymSessions = state.gymSessions || [];
+  picker.innerHTML = GYM_PLAN.map(d =>
+    `<button class="gym-day${d.key === gymSelectedDay ? " active" : ""}" data-gym-day="${d.key}">
+       <span class="gym-day-tag">${d.tag}</span>${escapeHtml(d.label)}</button>`).join("");
+
+  const day = GYM_PLAN.find(d => d.key === gymSelectedDay) || GYM_PLAN[0];
+  const today = todayStr();
+  let session = state.gymSessions.find(s => s.date === today && s.dayKey === day.key);
+  const wrap = document.getElementById("gymSession");
+
+  const rows = day.exercises.map(ex => {
+    const sets = (session && session.entries && session.entries[ex.n]) || [];
+    const last = gymLastEntry(ex.n, session ? null : undefined);
+    const lastTxt = last
+      ? `zuletzt ${last.date.slice(8, 10)}.${last.date.slice(5, 7)}: ` +
+        last.sets.filter(x => x && x.weight).map(x => `${x.weight}kg×${x.reps || "?"}`).join(", ")
+      : "noch keine Werte";
+    const setInputs = [0, 1, 2].map(i => {
+      const v = sets[i] || {};
+      return `<div class="gym-set">
+        <input type="number" inputmode="decimal" step="0.5" min="0" placeholder="kg"
+               data-gym-w="${escapeHtml(ex.n)}" data-gym-set="${i}" value="${v.weight != null ? v.weight : ""}">
+        <span>×</span>
+        <input type="number" inputmode="numeric" step="1" min="0" placeholder="Wdh"
+               data-gym-r="${escapeHtml(ex.n)}" data-gym-set="${i}" value="${v.reps != null ? v.reps : ""}">
+      </div>`;
+    }).join("");
+    return `<div class="gym-ex">
+      <div class="gym-ex-head"><div class="item-title">${escapeHtml(ex.n)}</div><span class="gym-target">${escapeHtml(ex.r)}</span></div>
+      <div class="item-meta">${escapeHtml(lastTxt)}</div>
+      <div class="gym-sets">${setInputs}</div>
+    </div>`;
+  }).join("");
+
+  const done = session ? Object.values(session.entries || {}).filter(a => (a || []).some(x => x && x.weight)).length : 0;
+  wrap.innerHTML = `<div class="gym-summary">${done} / ${day.exercises.length} Übungen heute erfasst</div>${rows}`;
+}
+
+document.addEventListener("click", e => {
+  const dayBtn = e.target.closest("[data-gym-day]");
+  if (dayBtn) { gymSelectedDay = dayBtn.dataset.gymDay; renderGym(); }
+});
+
+// Werte direkt beim Tippen sichern -- kein separater Speichern-Knopf, nichts geht verloren.
+document.addEventListener("input", e => {
+  const wEl = e.target.closest("[data-gym-w]"), rEl = e.target.closest("[data-gym-r]");
+  if (!wEl && !rEl) return;
+  const el = wEl || rEl;
+  const exercise = el.dataset.gymW || el.dataset.gymR;
+  const idx = parseInt(el.dataset.gymSet, 10);
+  const today = todayStr();
+  state.gymSessions = state.gymSessions || [];
+  let session = state.gymSessions.find(s => s.date === today && s.dayKey === gymSelectedDay);
+  if (!session) { session = { id: uid(), date: today, dayKey: gymSelectedDay, entries: {} }; state.gymSessions.push(session); }
+  session.entries[exercise] = session.entries[exercise] || [];
+  session.entries[exercise][idx] = session.entries[exercise][idx] || {};
+  const val = el.value === "" ? null : parseFloat(el.value);
+  if (wEl) session.entries[exercise][idx].weight = (val != null && !isNaN(val)) ? val : null;
+  else session.entries[exercise][idx].reps = (val != null && !isNaN(val)) ? val : null;
+  saveData();
+});
+
+
+// ---------- Gym-Auswertung: Gewichts- und Staerkeverlauf ----------
+// Zwei Linien-Diagramme als schlankes Inline-SVG (keine Chart-Bibliothek -- die App bleibt
+// abhaengigkeitsfrei und offline-tauglich). Koerpergewicht kommt aus der bestehenden Gewohnheit
+// mit type "weight", die Staerke aus dem hoechsten Satzgewicht je Trainingseinheit.
+function gymLineChart(points, unit) {
+  if (points.length < 2) {
+    return '<div class="empty-hint">Noch zu wenig Daten — ab zwei Einträgen entsteht hier eine Kurve.</div>';
+  }
+  const W = 300, H = 96, PAD = 6;
+  const vals = points.map(p => p.v);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const span = (max - min) || 1;
+  const x = i => PAD + (i / (points.length - 1)) * (W - 2 * PAD);
+  const y = v => H - PAD - ((v - min) / span) * (H - 2 * PAD);
+  const line = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(points.length - 1).toFixed(1)},${H - PAD} L${x(0).toFixed(1)},${H - PAD} Z`;
+  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.4" fill="var(--color-accent-300)"/>`).join("");
+  const first = points[0], last = points[points.length - 1];
+  const delta = last.v - first.v;
+  const sign = delta > 0 ? "+" : "";
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="gym-chart-svg">
+      <path d="${area}" fill="color-mix(in srgb, var(--color-accent-600) 18%, transparent)"/>
+      <path d="${line}" fill="none" stroke="var(--color-accent-300)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots}
+    </svg>
+    <div class="gym-chart-legend">
+      <span>${first.d.slice(8,10)}.${first.d.slice(5,7)} · ${first.v}${unit}</span>
+      <span class="${delta >= 0 ? "up" : "down"}">${sign}${Math.round(delta * 10) / 10}${unit}</span>
+      <span>${last.d.slice(8,10)}.${last.d.slice(5,7)} · ${last.v}${unit}</span>
+    </div>`;
+}
+
+function renderGymAnalysis() {
+  const statsEl = document.getElementById("gymStats");
+  if (!statsEl) return;
+  const sessions = (state.gymSessions || [])
+    .filter(s => gymSessionTopWeight(s) > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Koerpergewicht aus der Gewohnheit mit type "weight"
+  const wHabit = state.habits.find(h => h.type === "weight");
+  const weightPoints = wHabit
+    ? Object.entries(wHabit.history || {})
+        .filter(([, v]) => typeof v === "number" && v > 0)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .slice(-30)
+        .map(([d, v]) => ({ d, v }))
+    : [];
+
+  const strengthPoints = sessions.slice(-30).map(s => ({ d: s.date, v: gymSessionTopWeight(s) }));
+
+  // Gesamtvolumen (Gewicht x Wiederholungen) der letzten Einheit als Fortschrittsmass
+  const lastVol = sessions.length ? Object.values(sessions[sessions.length - 1].entries || {})
+    .flat().reduce((sum, x) => sum + ((x && x.weight && x.reps) ? x.weight * x.reps : 0), 0) : 0;
+
+  statsEl.innerHTML = `
+    <div class="stat-box"><div class="stat-num">${sessions.length}</div><div class="stat-label">Einheiten</div></div>
+    <div class="stat-box"><div class="stat-num">${weightPoints.length ? weightPoints[weightPoints.length-1].v + " kg" : "–"}</div><div class="stat-label">Körpergewicht</div></div>
+    <div class="stat-box"><div class="stat-num">${strengthPoints.length ? strengthPoints[strengthPoints.length-1].v + " kg" : "–"}</div><div class="stat-label">Bestes Satzgewicht</div></div>
+    <div class="stat-box"><div class="stat-num">${lastVol ? Math.round(lastVol).toLocaleString("de-DE") : "–"}</div><div class="stat-label">Volumen letzte Einheit</div></div>`;
+
+  document.getElementById("gymWeightChart").innerHTML = gymLineChart(weightPoints, " kg");
+  document.getElementById("gymStrengthChart").innerHTML = gymLineChart(strengthPoints, " kg");
+
+  // Bestleistung je Uebung
+  const best = {};
+  (state.gymSessions || []).forEach(s => Object.entries(s.entries || {}).forEach(([ex, sets]) => {
+    (sets || []).forEach(x => { if (x && x.weight && (!best[ex] || x.weight > best[ex].w)) best[ex] = { w: x.weight, r: x.reps, d: s.date }; });
+  }));
+  const rows = Object.entries(best).sort((a, b) => b[1].w - a[1].w).slice(0, 8);
+  document.getElementById("gymTopLifts").innerHTML = rows.length
+    ? `<div class="gym-chart-title text-muted" style="margin-bottom:8px;">Bestleistungen</div>` + rows.map(([ex, b]) => `
+        <div class="areaload-row">
+          <div class="areaload-name" style="width:auto; flex:1;">${escapeHtml(ex)}</div>
+          <div class="areaload-count" style="width:auto;">${b.w} kg × ${b.r || "?"}</div>
+        </div>`).join("")
+    : "";
+}
 
 // ---------- Add buttons ----------
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
