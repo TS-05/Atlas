@@ -490,7 +490,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* ---------- Homemenü ----------
    Liegt im DOM direkt unter dem Ladebildschirm (niedrigerer z-index) und wird dadurch automatisch
    sichtbar, sobald der Ladebildschirm sich ausblendet und entfernt wird — kein eigener Show-Trigger
-   nötig. Der Globus ist ein echtes 3D-Modell (assets/atlas_globe_v6.glb) über das lokal gehostete
+   nötig. Der Globus ist ein echtes 3D-Modell (assets/atlas_globe_v17.glb) über das lokal gehostete
    <model-viewer> (vendor/model-viewer.min.js, kein CDN). Er dreht sich von selbst und lässt sich
    per Wisch-/Ziehgeste zusätzlich drehen (camera-controls, min/max-camera-orbit fixieren den
    Polarwinkel, damit nur horizontal gedreht wird). Da die Kontinente im Modell EIN gemeinsames

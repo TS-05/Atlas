@@ -381,7 +381,7 @@
 </svg>
   <div class="home-stage">
     <div class="globe-stage">
-      <!-- Echtes 3D-Modell (assets/atlas_globe_v6.glb) über das lokal gehostete model-viewer
+      <!-- Echtes 3D-Modell (assets/atlas_globe_v17.glb) über das lokal gehostete model-viewer
            (habit-tracker/vendor/model-viewer.min.js, kein CDN -- bleibt offline-fähig, der Service
            Worker cacht beide Dateien wie jede andere same-origin Ressource). camera-controls ohne
            min/max-camera-orbit-Einschränkung erlaubt freies Drehen in alle Richtungen (auch nach
@@ -391,7 +391,7 @@
            die Spin-Achse selbst schräg steht statt nur die Kamera.
 
            Kontinent-Navigation: das GLB hat inzwischen echte 3D-Pin-Marker (kleine Silber-Oktaeder,
-           siehe assets/atlas_globe_v6.glb-Node "Pin*") an den vier Kontinent-Positionen sowie einen
+           siehe assets/atlas_globe_v17.glb-Node "Pin*") an den vier Kontinent-Positionen sowie einen
            kleinen Satelliten als Deko. Für zuverlässiges Antippen (nicht auf eigenes Raycasting
            gegen die Kugeloberfläche verlassen -- Längengrad-Konvention des Modells war nicht sicher
            kalibrierbar) liegen zusätzlich unsichtbare model-viewer-Hotspots exakt an denselben
@@ -404,7 +404,7 @@
       <model-viewer
         id="globeModel"
         class="globe-model"
-        src="assets/atlas_globe_v6.glb?v=9"
+        src="assets/atlas_globe_v17.glb?v=1"
         alt="Atlas-Globus"
         loading="eager"
         reveal="auto"
