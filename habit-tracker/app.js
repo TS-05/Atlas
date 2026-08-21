@@ -4104,19 +4104,32 @@ if (splashEl) {
     lon: parseFloat(btn.dataset.lon)
   }));
 
-  function moveHandleTo(slot) {
+  // Die Linse zeigt ausschliesslich das Symbol, ueber dem der Tropfen GERADE steht -- sonst leeres
+  // Glas. Ohne das wuerde die Kopie im Tropfen mitwandern, was keine Lupe ist, sondern ein Aufkleber.
+  function setLensTo(slot) {
     if (!ringHandle) return;
-    // Lupe: vergroesserte Kopie des Symbols in die Linse setzen, Original darunter ausblenden.
     let lens = ringHandle.querySelector(".ring-handle-lens");
     if (!lens) { lens = document.createElement("div"); lens.className = "ring-handle-lens"; ringHandle.appendChild(lens); }
-    lens.innerHTML = slot.btn.innerHTML;
     ringButtons.forEach(b => b.classList.remove("is-covered"));
-    slot.btn.classList.add("is-covered");
+    if (slot) { lens.innerHTML = slot.btn.innerHTML; slot.btn.classList.add("is-covered"); }
+    else { lens.innerHTML = ""; }
+  }
 
+  // Kuerzester Winkelabstand auf dem Kreis (beruecksichtigt den Sprung bei 360/0 Grad).
+  function angleDistance(a, b) {
+    return Math.abs(((a - b) % 360 + 540) % 360 - 180);
+  }
+
+  function moveHandleTo(slot) {
+    if (!ringHandle) return;
+    setLensTo(null);                                   // waehrend des Flugs nur Glas
     ringHandle.classList.add("is-liquid");
     ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
     clearTimeout(liquidTimer);
-    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 460);
+    liquidTimer = setTimeout(() => {
+      ringHandle.classList.remove("is-liquid");
+      setLensTo(slot);                                 // gelandet -> Symbol darunter vergroessern
+    }, 460);
   }
 
   function activateSlot(slot) {
@@ -4131,26 +4144,18 @@ if (splashEl) {
   }
 
   ringSlots.forEach(slot => slot.btn.addEventListener("click", () => activateSlot(slot)));
-  // Lupe initial auf den Startslot setzen (ohne Bewegungszustand)
+  // Lupe initial auf den Startslot setzen
+  let lensSlot = null;
   if (ringHandle && ringSlots.length) {
     const startAngle = parseFloat(ringHandle.style.getPropertyValue("--angle"));
-    const startSlot = ringSlots.find(s2 => Math.abs(s2.angle - startAngle) < 1) || ringSlots[0];
-    const lens0 = document.createElement("div");
-    lens0.className = "ring-handle-lens";
-    lens0.innerHTML = startSlot.btn.innerHTML;
-    ringHandle.appendChild(lens0);
-    startSlot.btn.classList.add("is-covered");
+    lensSlot = ringSlots.find(s2 => Math.abs(s2.angle - startAngle) < 1) || ringSlots[0];
+    setLensTo(lensSlot);
   }
 
   if (ringHandle) {
     const stage = homeMenu.querySelector(".globe-stage");
     let handleDragging = false;
 
-    // Kürzester Winkelabstand auf dem Kreis (berücksichtigt den Sprung bei 360°/0°).
-    function angleDistance(a, b) {
-      const d = Math.abs(((a - b) % 360 + 540) % 360 - 180);
-      return d;
-    }
     function pointerAngle(e) {
       const r = stage.getBoundingClientRect();
       const dx = e.clientX - (r.left + r.width / 2);
@@ -4174,6 +4179,10 @@ if (splashEl) {
       ringHandle.style.setProperty("--sy", (1 + speed * 0.42).toFixed(3));
       ringHandle.style.setProperty("--sx", (1 - speed * 0.16).toFixed(3));
       ringHandle.style.setProperty("--angle", `${a}deg`);
+      // Live-Lupe: liegt der Tropfen ueber einem Symbol, wird genau dieses vergroessert gezeigt.
+      let over = null;
+      ringSlots.forEach(sl => { if (angleDistance(sl.angle, a) < 20) over = sl; });
+      if (over !== lensSlot) { lensSlot = over; setLensTo(over); }
     });
     function endHandleDrag(e) {
       if (!handleDragging) return;
