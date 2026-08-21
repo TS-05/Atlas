@@ -692,7 +692,12 @@ textarea.input { min-height: 90px; resize: vertical; }
   height: 57%;
   width: 57%;
   --poster-color: transparent;
+  /* Ohne touch-action:none wertet der Browser das Wischen zeitweise als Seiten-Scroll und die
+     Drehung "haengt" -- war bei einem frueheren Umbau verloren gegangen. */
+  touch-action: none;
+  cursor: grab;
 }
+.globe-model:active { cursor: grabbing; }
 /* Unsichtbarer, aber großzügiger Tap-Ziel-Kreis über dem jeweiligen 3D-Pin (der Pin selbst ist echte
    GLB-Geometrie und liefert das sichtbare Marker-Design). model-viewer positioniert/verdeckt diese
    Hotspots automatisch passend zur aktuellen Rotation über die data-position/data-normal-Attribute. */
