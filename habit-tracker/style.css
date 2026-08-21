@@ -613,9 +613,8 @@ textarea.input { min-height: 90px; resize: vertical; }
    helle Glanzkanten oben/unten, und Farbsaum (chromatische Aberration) NUR an zwei gegenueberliegenden
    Stellen statt als kompletter Regenbogenring -- genau das unterscheidet echtes Glas von Deko. */
 /* Wassertropfen-Schieberegler.
-   Lupenwirkung: backdrop-filter kann nicht vergroessern, deshalb zeigt die Linse eine per JS
-   eingesetzte, hochskalierte KOPIE des Symbols darunter (.ring-handle-lens). Das Original wird
-   solange ausgeblendet -- dadurch wirkt es echt vergroessert statt doppelt.
+   Der Ring mit den Symbolen ist eine eigene Ebene DARUNTER: die Blase gleitet nur als Glas
+   darueber, sie zieht kein Symbol ein und blendet keines aus.
    Wasserverhalten: im Ruhezustand rund, beim Bewegen laengs der Bahn gestreckt und flacher
    (Squash & Stretch), beim Landen federt er kurz nach. scaleY wirkt im rotierten Rahmen, dessen
    y-Achse entlang des Rings zeigt -- die Streckung folgt also exakt der Bewegungsrichtung. */
@@ -640,27 +639,6 @@ textarea.input { min-height: 90px; resize: vertical; }
   transform: rotate(var(--angle)) translate(var(--ring-r)) scaleY(var(--sy,1)) scaleX(var(--sx,1));
   transition: transform 0.46s cubic-bezier(0.34, 1.32, 0.44, 1), box-shadow 0.2s ease;
 }
-/* Vergroesserte Kopie des Symbols = die eigentliche Lupe. */
-.ring-handle-lens {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  color: #f2f7fc;
-  font-family: var(--font-body);
-  font-size: 9.5px;
-  line-height: 1;
-  pointer-events: none;
-  transform: scale(1.38);
-  transition: transform 0.3s ease;
-}
-.ring-handle-lens svg { display: block; }
-.ring-handle.is-liquid .ring-handle-lens { transform: scale(1.5); }
-/* Symbol unter der Linse ausblenden, damit nichts doppelt erscheint. */
-.ring-btn.is-covered > * { opacity: 0; }
 .ring-handle::before,
 .ring-handle::after {
   content: "";
@@ -710,8 +688,8 @@ textarea.input { min-height: 90px; resize: vertical; }
   background: radial-gradient(circle at 50% 45%, transparent 26%, rgba(12, 15, 20, 0.5) 62%, rgba(9, 11, 15, 0.88) 100%);
 }
 .globe-model {
-  height: 58%;
-  width: 58%;
+  height: 55%;
+  width: 55%;
   --poster-color: transparent;
 }
 /* Unsichtbarer, aber großzügiger Tap-Ziel-Kreis über dem jeweiligen 3D-Pin (der Pin selbst ist echte

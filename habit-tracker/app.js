@@ -2508,43 +2508,33 @@ function isOnTime(task) {
 }
 
 // ---------- Render all ----------
-// ---------- Benachrichtigung: 2x hintereinander verpasste Tagesroutine ----------
-// Zählt rückwärts ab gestern, wie viele SCHEDULED Tage in Folge ein Routine-Schritt nicht erledigt wurde
-// (heute zählt bewusst nicht mit, da der Tag noch nicht vorbei ist).
-function consecutiveMissedDays(habit) {
-  let count = 0;
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  const createdDate = new Date(habit.createdAt);
-  let guard = 0;
-  while (guard++ < 60) {
-    if (d < createdDate) break;
-    if (!isScheduledToday(habit, d)) { d.setDate(d.getDate() - 1); continue; }
-    const key = localDateKey(d);
-    if (habit.history[key]) break;
-    count++;
-    d.setDate(d.getDate() - 1);
-  }
-  return count;
-}
-
+// Morgens einmal daran erinnern, was GESTERN liegen geblieben ist -- damit es nicht zweimal
+// hintereinander passiert. Bewusst nicht erst nach dem zweiten Versaeumnis (zu spaet, der Rueckfall
+// ist dann schon da) und hoechstens einmal pro Tag, egal wie oft die App geoeffnet wird.
 function checkMissedRoutineStreaks() {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
-  let changed = false;
-  state.habits.filter(h => h.routineOrder != null).forEach(h => {
-    const missed = consecutiveMissedDays(h);
-    if (missed >= 2) {
-      if (!h.missNotified) {
-        new Notification("Atlas – Tagesroutine", { body: `„${h.title}" wurde 2x hintereinander nicht erledigt.` });
-        h.missNotified = true;
-        changed = true;
-      }
-    } else if (h.missNotified) {
-      h.missNotified = false;
-      changed = true;
-    }
+  const today = todayStr();
+  if (state.lastMissReminderDate === today) return;   // heute schon erinnert
+
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  const yKey = localDateKey(y);
+
+  // Nur Routine-Gewohnheiten, die gestern tatsaechlich faellig waren und offen blieben.
+  const missed = state.habits.filter(h =>
+    h.routineOrder != null && isScheduledToday(h, y) && !h.history[yKey] &&
+    new Date(h.createdAt) <= y);
+  if (!missed.length) { state.lastMissReminderDate = today; saveData(); return; }
+
+  const names = missed.map(h => h.title);
+  const list = names.length <= 3
+    ? names.join(", ")
+    : `${names.slice(0, 3).join(", ")} und ${names.length - 3} weitere`;
+  new Notification("Atlas – gestern liegen geblieben", {
+    body: `Gestern hast du ${list} vergessen. Heute wieder dran denken!`,
+    tag: "atlas-miss-" + today   // ersetzt eine evtl. schon sichtbare Meldung statt zu stapeln
   });
-  if (changed) saveData();
+  state.lastMissReminderDate = today;
+  saveData();
 }
 
 function updateNotifPermissionUI() {
@@ -4104,17 +4094,6 @@ if (splashEl) {
     lon: parseFloat(btn.dataset.lon)
   }));
 
-  // Die Linse zeigt ausschliesslich das Symbol, ueber dem der Tropfen GERADE steht -- sonst leeres
-  // Glas. Ohne das wuerde die Kopie im Tropfen mitwandern, was keine Lupe ist, sondern ein Aufkleber.
-  function setLensTo(slot) {
-    if (!ringHandle) return;
-    let lens = ringHandle.querySelector(".ring-handle-lens");
-    if (!lens) { lens = document.createElement("div"); lens.className = "ring-handle-lens"; ringHandle.appendChild(lens); }
-    ringButtons.forEach(b => b.classList.remove("is-covered"));
-    if (slot) { lens.innerHTML = slot.btn.innerHTML; slot.btn.classList.add("is-covered"); }
-    else { lens.innerHTML = ""; }
-  }
-
   // Kuerzester Winkelabstand auf dem Kreis (beruecksichtigt den Sprung bei 360/0 Grad).
   function angleDistance(a, b) {
     return Math.abs(((a - b) % 360 + 540) % 360 - 180);
@@ -4122,14 +4101,10 @@ if (splashEl) {
 
   function moveHandleTo(slot) {
     if (!ringHandle) return;
-    setLensTo(null);                                   // waehrend des Flugs nur Glas
     ringHandle.classList.add("is-liquid");
     ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
     clearTimeout(liquidTimer);
-    liquidTimer = setTimeout(() => {
-      ringHandle.classList.remove("is-liquid");
-      setLensTo(slot);                                 // gelandet -> Symbol darunter vergroessern
-    }, 460);
+    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 460);
   }
 
   function activateSlot(slot) {
@@ -4144,13 +4119,6 @@ if (splashEl) {
   }
 
   ringSlots.forEach(slot => slot.btn.addEventListener("click", () => activateSlot(slot)));
-  // Lupe initial auf den Startslot setzen
-  let lensSlot = null;
-  if (ringHandle && ringSlots.length) {
-    const startAngle = parseFloat(ringHandle.style.getPropertyValue("--angle"));
-    lensSlot = ringSlots.find(s2 => Math.abs(s2.angle - startAngle) < 1) || ringSlots[0];
-    setLensTo(lensSlot);
-  }
 
   if (ringHandle) {
     const stage = homeMenu.querySelector(".globe-stage");
@@ -4179,10 +4147,6 @@ if (splashEl) {
       ringHandle.style.setProperty("--sy", (1 + speed * 0.42).toFixed(3));
       ringHandle.style.setProperty("--sx", (1 - speed * 0.16).toFixed(3));
       ringHandle.style.setProperty("--angle", `${a}deg`);
-      // Live-Lupe: liegt der Tropfen ueber einem Symbol, wird genau dieses vergroessert gezeigt.
-      let over = null;
-      ringSlots.forEach(sl => { if (angleDistance(sl.angle, a) < 20) over = sl; });
-      if (over !== lensSlot) { lensSlot = over; setLensTo(over); }
     });
     function endHandleDrag(e) {
       if (!handleDragging) return;
