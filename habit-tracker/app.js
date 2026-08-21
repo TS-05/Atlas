@@ -4106,11 +4106,17 @@ if (splashEl) {
 
   function moveHandleTo(slot) {
     if (!ringHandle) return;
-    // Glaslinse + Streckung nur waehrend der Bewegung; danach bleibt der schlichte runde Marker.
+    // Lupe: vergroesserte Kopie des Symbols in die Linse setzen, Original darunter ausblenden.
+    let lens = ringHandle.querySelector(".ring-handle-lens");
+    if (!lens) { lens = document.createElement("div"); lens.className = "ring-handle-lens"; ringHandle.appendChild(lens); }
+    lens.innerHTML = slot.btn.innerHTML;
+    ringButtons.forEach(b => b.classList.remove("is-covered"));
+    slot.btn.classList.add("is-covered");
+
     ringHandle.classList.add("is-liquid");
     ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
     clearTimeout(liquidTimer);
-    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 400);
+    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 460);
   }
 
   function activateSlot(slot) {
@@ -4125,6 +4131,16 @@ if (splashEl) {
   }
 
   ringSlots.forEach(slot => slot.btn.addEventListener("click", () => activateSlot(slot)));
+  // Lupe initial auf den Startslot setzen (ohne Bewegungszustand)
+  if (ringHandle && ringSlots.length) {
+    const startAngle = parseFloat(ringHandle.style.getPropertyValue("--angle"));
+    const startSlot = ringSlots.find(s2 => Math.abs(s2.angle - startAngle) < 1) || ringSlots[0];
+    const lens0 = document.createElement("div");
+    lens0.className = "ring-handle-lens";
+    lens0.innerHTML = startSlot.btn.innerHTML;
+    ringHandle.appendChild(lens0);
+    startSlot.btn.classList.add("is-covered");
+  }
 
   if (ringHandle) {
     const stage = homeMenu.querySelector(".globe-stage");
@@ -4151,12 +4167,20 @@ if (splashEl) {
     });
     ringHandle.addEventListener("pointermove", e => {
       if (!handleDragging) return;
-      ringHandle.style.setProperty("--angle", `${pointerAngle(e)}deg`);
+      const a = pointerAngle(e);
+      const prev = parseFloat(ringHandle.style.getPropertyValue("--angle")) || a;
+      let d = ((a - prev + 540) % 360) - 180;           // kuerzeste Winkeldifferenz
+      const speed = Math.min(1, Math.abs(d) / 9);        // 0..1
+      ringHandle.style.setProperty("--sy", (1 + speed * 0.42).toFixed(3));
+      ringHandle.style.setProperty("--sx", (1 - speed * 0.16).toFixed(3));
+      ringHandle.style.setProperty("--angle", `${a}deg`);
     });
     function endHandleDrag(e) {
       if (!handleDragging) return;
       handleDragging = false;
       ringHandle.classList.remove("is-dragging");
+      ringHandle.style.removeProperty("--sy");
+      ringHandle.style.removeProperty("--sx");
       try { ringHandle.releasePointerCapture(e.pointerId); } catch (err) {}
       const current = pointerAngle(e);
       let nearest = ringSlots[0];

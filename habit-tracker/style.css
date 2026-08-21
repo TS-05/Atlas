@@ -612,76 +612,93 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* Liquid-Glass-Linse nach Vorbild der Referenz-Leiste: fast unsichtbare Fuellung (man schaut durch),
    helle Glanzkanten oben/unten, und Farbsaum (chromatische Aberration) NUR an zwei gegenueberliegenden
    Stellen statt als kompletter Regenbogenring -- genau das unterscheidet echtes Glas von Deko. */
-/* Nach Vorbild des Referenz-Videos: im RUHEZUSTAND nur ein schlichter, etwas hellerer runder Marker --
-   kein Glas, kein Farbsaum. Sobald er sich bewegt (Ziehen oder Gleiten zum naechsten Symbol) wird
-   daraus die Glasblase, und sie bleibt es bis zum Loslassen.
-   Die Streckung laeuft ueber scaleY INNERHALB des rotierten Rahmens: nach rotate(--angle) zeigt die
-   lokale x-Achse nach aussen (radial), die lokale y-Achse entlang der Ringbahn -- scaleY zieht den
-   Tropfen also exakt in Bewegungsrichtung lang, wie ein echter Wassertropfen. */
+/* Wassertropfen-Schieberegler.
+   Lupenwirkung: backdrop-filter kann nicht vergroessern, deshalb zeigt die Linse eine per JS
+   eingesetzte, hochskalierte KOPIE des Symbols darunter (.ring-handle-lens). Das Original wird
+   solange ausgeblendet -- dadurch wirkt es echt vergroessert statt doppelt.
+   Wasserverhalten: im Ruhezustand rund, beim Bewegen laengs der Bahn gestreckt und flacher
+   (Squash & Stretch), beim Landen federt er kurz nach. scaleY wirkt im rotierten Rahmen, dessen
+   y-Achse entlang des Rings zeigt -- die Streckung folgt also exakt der Bewegungsrichtung. */
 .ring-handle {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 72px;
-  height: 72px;
-  margin: -36px 0 0 -36px;
-  z-index: 2;
+  width: 88px;
+  height: 88px;
+  margin: -44px 0 0 -44px;
+  z-index: 3;
   pointer-events: auto;
   border-radius: 50%;
   cursor: grab;
   touch-action: none;
-  background: rgba(255, 255, 255, 0.1);
-  transform: rotate(var(--angle)) translate(var(--ring-r)) scaleY(var(--stretch, 1));
-  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
-              background 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+  background: radial-gradient(circle at 34% 28%, rgba(255,255,255,0.16), rgba(255,255,255,0.05) 46%, rgba(255,255,255,0.10));
+  backdrop-filter: saturate(1.25) brightness(1.06);
+  -webkit-backdrop-filter: saturate(1.25) brightness(1.06);
+  box-shadow: inset 0 2px 3px rgba(255,255,255,0.45), inset 0 -3px 5px rgba(255,255,255,0.18),
+              inset 0 0 0 1px rgba(255,255,255,0.22), 0 6px 18px rgba(0,0,0,0.42);
+  transform: rotate(var(--angle)) translate(var(--ring-r)) scaleY(var(--sy,1)) scaleX(var(--sx,1));
+  transition: transform 0.46s cubic-bezier(0.34, 1.32, 0.44, 1), box-shadow 0.2s ease;
 }
+/* Vergroesserte Kopie des Symbols = die eigentliche Lupe. */
+.ring-handle-lens {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #f2f7fc;
+  font-family: var(--font-body);
+  font-size: 9.5px;
+  line-height: 1;
+  pointer-events: none;
+  transform: scale(1.38);
+  transition: transform 0.3s ease;
+}
+.ring-handle-lens svg { display: block; }
+.ring-handle.is-liquid .ring-handle-lens { transform: scale(1.5); }
+/* Symbol unter der Linse ausblenden, damit nichts doppelt erscheint. */
+.ring-btn.is-covered > * { opacity: 0; }
 .ring-handle::before,
 .ring-handle::after {
   content: "";
   position: absolute;
   border-radius: inherit;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.14s ease;
+  transition: opacity 0.16s ease;
 }
-/* Farbsaum (chromatische Aberration) an den Fuehrungskanten. */
+/* Farbsaum (chromatische Aberration) an den Raendern -- im Ruhezustand dezent, in Bewegung kraeftig. */
 .ring-handle::before {
-  inset: -1.5px;
-  padding: 1.8px;
+  inset: 0;
+  padding: 1.6px;
   background: conic-gradient(from 130deg,
-    rgba(120, 255, 190, 0.85) 0deg,
-    rgba(255, 240, 140, 0.75) 26deg,
-    rgba(255, 120, 190, 0.8) 52deg,
-    transparent 92deg,
-    transparent 190deg,
-    rgba(130, 220, 255, 0.8) 222deg,
-    rgba(190, 150, 255, 0.75) 250deg,
-    rgba(120, 255, 200, 0.6) 276deg,
+    rgba(120,255,190,0.8) 0deg, rgba(255,240,140,0.7) 26deg, rgba(255,120,190,0.75) 52deg,
+    transparent 92deg, transparent 190deg,
+    rgba(130,220,255,0.75) 222deg, rgba(190,150,255,0.7) 250deg, rgba(120,255,200,0.55) 276deg,
     transparent 312deg);
   filter: blur(0.9px);
+  opacity: 0.35;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
 }
-/* Dunkle Baender = Glasdicke/Totalreflexion, im Video deutlich sichtbar. */
+/* Randabdunklung wie bei einer echten Linse (Glasdicke). */
 .ring-handle::after {
   inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 22%,
-                                      rgba(0, 0, 0, 0) 78%, rgba(0, 0, 0, 0.55) 100%);
+  background: radial-gradient(circle at 50% 50%, transparent 58%, rgba(0,0,0,0.4) 100%);
+  opacity: 0.8;
 }
-/* Bewegungszustand: klare Linse mit Brechung, in Bewegungsrichtung gestreckt. */
+.ring-handle.is-liquid::before { opacity: 1; }
 .ring-handle.is-liquid {
-  --stretch: 1.34;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(0.6px) saturate(1.55) contrast(1.18) brightness(1.08);
-  -webkit-backdrop-filter: blur(0.6px) saturate(1.55) contrast(1.18) brightness(1.08);
-  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.5), inset 0 -1.5px 1px rgba(255, 255, 255, 0.3),
-              0 8px 20px rgba(0, 0, 0, 0.45);
+  --sy: 1.3;
+  --sx: 0.88;
+  backdrop-filter: saturate(1.5) brightness(1.12) contrast(1.06);
+  -webkit-backdrop-filter: saturate(1.5) brightness(1.12) contrast(1.06);
 }
-.ring-handle.is-liquid::before,
-.ring-handle.is-liquid::after { opacity: 1; }
-.ring-handle.is-dragging { cursor: grabbing; transition: background 0.2s ease, box-shadow 0.2s ease; }
+.ring-handle.is-dragging { cursor: grabbing; transition: box-shadow 0.2s ease; }
 /* Vignette ueber dem GESAMTEN Homemenue (nicht nur um die Globus-Buehne): als Rechteck um den Globus
    endete die Abdunklung vorher an dessen Kanten und erzeugte zwei sichtbare gerade Linien oben/unten. */
 .home-menu::after {
@@ -693,8 +710,8 @@ textarea.input { min-height: 90px; resize: vertical; }
   background: radial-gradient(circle at 50% 45%, transparent 26%, rgba(12, 15, 20, 0.5) 62%, rgba(9, 11, 15, 0.88) 100%);
 }
 .globe-model {
-  height: 64%;
-  width: 64%;
+  height: 61%;
+  width: 61%;
   --poster-color: transparent;
 }
 /* Unsichtbarer, aber großzügiger Tap-Ziel-Kreis über dem jeweiligen 3D-Pin (der Pin selbst ist echte
