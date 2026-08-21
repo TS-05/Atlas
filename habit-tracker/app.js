@@ -1172,18 +1172,6 @@ tabBtns.forEach(btn => {
 document.body.dataset.tab = "heute";
 renderTabIndicator(0, "settled");
 
-// Einziger Knopf unten: blendet das Erdball-Homemenue wieder ein.
-const homeReturnBtn = document.getElementById("homeReturnBtn");
-if (homeReturnBtn) {
-  homeReturnBtn.addEventListener("click", () => {
-    const menu = document.getElementById("homeMenu");
-    if (!menu) return;
-    menu.classList.remove("home-hidden");
-    const gm = document.getElementById("globeModel");
-    if (gm) gm.autoRotate = true; // Dauerdrehung wieder an, sie wird beim Auswaehlen abgeschaltet
-  });
-}
-
 // ---------- Kopfzeile: kontextabhängiger Plus-Button ----------
 const QUICK_ADD_BTN_IDS = {
   heute: ["addRoutineBtn", "addHabitBtn", "deviationAddWrap", "addExamBtn"],
@@ -4093,6 +4081,32 @@ if (splashEl) {
     lon: parseFloat(btn.dataset.lon)
   }));
 
+  // Die Blase liegt ausserhalb des Menues und wird deshalb in Bildschirmkoordinaten gesetzt.
+  // Ringposition = Mittelpunkt des jeweiligen Symbols (robuster als den Radius nachzurechnen).
+  const homeAnchor = document.getElementById("homeAnchor");
+  let handleMode = "ring";   // "ring" = am Symbolring, "home" = unten als Zurueck-Knopf
+
+  function centerOf(el) {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  function setHandlePos(x, y, rotDeg) {
+    if (!ringHandle) return;
+    ringHandle.style.setProperty("--hx", `${x}px`);
+    ringHandle.style.setProperty("--hy", `${y}px`);
+    if (rotDeg != null) ringHandle.style.setProperty("--rot", `${rotDeg}deg`);
+  }
+  function placeAtSlot(slot) {
+    const c = centerOf(slot.btn);
+    // Dehnung soll entlang der Ringbahn wirken -> Tangente steht senkrecht auf dem Radius.
+    setHandlePos(c.x, c.y, slot.angle + 90);
+  }
+  function placeAtHome() {
+    if (!homeAnchor) return;
+    const c = centerOf(homeAnchor);
+    setHandlePos(c.x, c.y, 90);   // Bewegung nach unten -> Dehnung vertikal
+  }
+
   // Kuerzester Winkelabstand auf dem Kreis (beruecksichtigt den Sprung bei 360/0 Grad).
   function angleDistance(a, b) {
     return Math.abs(((a - b) % 360 + 540) % 360 - 180);
@@ -4100,12 +4114,27 @@ if (splashEl) {
 
   function moveHandleTo(slot) {
     if (!ringHandle) return;
+    ringHandle.classList.remove("no-anim", "is-invisible");
     // Antippen = Finger in Fluessigkeit: kurz gleichmaessig aufquellen, dann zurueckfallen.
     ringHandle.classList.add("is-liquid", "is-tap");
     ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
+    handleMode = "ring";
+    placeAtSlot(slot);
     clearTimeout(tapTimer); clearTimeout(liquidTimer);
     tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 230);
     liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 460);
+  }
+
+  // Beim Oeffnen eines Tabs wandert die Blase nach unten und wird dort zum Zurueck-Knopf.
+  function sendHandleHome() {
+    if (!ringHandle) return;
+    ringHandle.classList.remove("no-anim", "is-invisible");
+    handleMode = "home";
+    ringHandle.classList.add("is-liquid", "is-tap");
+    placeAtHome();
+    clearTimeout(tapTimer); clearTimeout(liquidTimer);
+    tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 260);
+    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 560);
   }
 
   function activateSlot(slot) {
@@ -4113,18 +4142,74 @@ if (splashEl) {
     if (globeModel && !isNaN(slot.lat) && !isNaN(slot.lon)) {
       globeModel.autoRotate = false;
       globeModel.cameraOrbit = `${slot.lon}deg ${90 - slot.lat}deg 105%`;
-      setTimeout(() => goToTab(slot.tab), 850);
+      setTimeout(() => { goToTab(slot.tab); sendHandleHome(); }, 850);
     } else {
-      goToTab(slot.tab);
+      goToTab(slot.tab); sendHandleHome();
     }
   }
 
   ringSlots.forEach(slot => slot.btn.addEventListener("click", () => activateSlot(slot)));
 
+  // Im Home-Modus ist die Blase der Zurueck-Knopf; im Ring-Modus faengt der Drag-Handler den Klick ab.
+  if (ringHandle) {
+    ringHandle.addEventListener("click", () => {
+      if (handleMode !== "home") return;
+      homeMenu.classList.remove("home-hidden");
+      if (globeModel) globeModel.autoRotate = true;
+      handleMode = "ring";
+      const cur = ringSlots.find(sl => sl.tab === document.body.dataset.tab) || ringSlots[0];
+      clearTimeout(tapTimer); clearTimeout(liquidTimer);
+      // 1) unten zerplatzen lassen
+      ringHandle.classList.remove("is-liquid", "is-tap");
+      ringHandle.classList.add("is-pop");
+      setTimeout(() => {
+        // 2) unsichtbar und ohne Animation ans Ringsymbol versetzen
+        ringHandle.classList.add("no-anim", "is-invisible");
+        ringHandle.classList.remove("is-pop");
+        placeAtSlot(cur);
+        // 3) dort wieder normal auftauchen
+        // Sichtbarkeit NOCH mit no-anim zuruecknehmen: so ist die Blase sofort da, auch wenn ein
+        // Uebergang aus irgendeinem Grund nicht durchlaeuft (sonst bliebe sie unsichtbar haengen).
+        setTimeout(() => {
+          ringHandle.classList.remove("is-invisible");
+          setTimeout(() => ringHandle.classList.remove("no-anim"), 30);
+        }, 40);
+      }, 300);
+    });
+  }
+
+  // Startposition setzen, sobald das Layout steht, und bei Groessenaenderung nachziehen.
+  function repositionHandle() {
+    if (!ringHandle) return;
+    if (handleMode === "home") { placeAtHome(); return; }
+    const cur = ringSlots.find(sl => sl.tab === document.body.dataset.tab) || ringSlots[0];
+    if (cur) placeAtSlot(cur);
+  }
+  // Mehrfach anstossen: direkt, nach dem Layout und nach dem Splash -- so sitzt die Blase auch dann
+  // richtig, wenn ein einzelner Zeitpunkt (z.B. rAF) ausfaellt oder das Layout noch nicht steht.
+  repositionHandle();
+  setTimeout(repositionHandle, 0);
+  setTimeout(repositionHandle, 300);
+  setTimeout(repositionHandle, 3200);
+  window.addEventListener("load", repositionHandle);
+  window.addEventListener("resize", repositionHandle);
+  window.addEventListener("orientationchange", () => setTimeout(repositionHandle, 200));
+
   if (ringHandle) {
     const stage = homeMenu.querySelector(".globe-stage");
     let handleDragging = false;
     let targetAngle = 0;
+
+    // Mittelpunkt und Radius aus der echten Lage eines Symbols ableiten -- so bleibt es korrekt,
+    // egal wie die Buehne gerade skaliert.
+    function ringGeom() {
+      if (!ringSlots.length) return null;
+      const r = stage.getBoundingClientRect();
+      if (!r.width) return null;
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const c0 = centerOf(ringSlots[0].btn);
+      return { cx, cy, r: Math.hypot(c0.x - cx, c0.y - cy) };
+    }
 
     function pointerAngle(e) {
       const r = stage.getBoundingClientRect();
@@ -4145,10 +4230,14 @@ if (splashEl) {
       ringHandle.style.setProperty("--angle", `${next}deg`);
       ringHandle.style.setProperty("--sy", (1 + pull * 0.45).toFixed(3));
       ringHandle.style.setProperty("--sx", (1 - pull * 0.18).toFixed(3));
+      const g = ringGeom();
+      if (g) setHandlePos(g.cx + Math.cos(next * Math.PI / 180) * g.r,
+                          g.cy + Math.sin(next * Math.PI / 180) * g.r, next + 90);
       requestAnimationFrame(dragFrame);
     }
 
     ringHandle.addEventListener("pointerdown", e => {
+      if (handleMode !== "ring") return;   // unten ist sie Zurueck-Knopf, kein Schieberegler
       handleDragging = true;
       targetAngle = pointerAngle(e);
       requestAnimationFrame(dragFrame);

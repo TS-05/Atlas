@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=36">
+<link rel="stylesheet" href="style.css?v=38">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -456,7 +456,6 @@
         </button>
         <!-- Wassertropfen als Schieberegler-Griff: sitzt immer auf dem aktuell offenen Tab und laesst
              sich am Ring entlangziehen, um zu wechseln (rastet beim Loslassen auf das naechste Symbol). -->
-        <div class="ring-handle" id="ringHandle" style="--angle:-90deg" role="slider" aria-label="Tab waehlen" tabindex="0"></div>
       </div>
     </div>
   </div>
@@ -690,22 +689,19 @@
   </main>
 
   <!-- Statt der Tab-Leiste nur noch ein Knopf: zurueck zum Erdball-Homemenue. -->
-  <nav class="tabs">
-    <button class="home-return" id="homeReturnBtn" aria-label="Zurueck zum Globus">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
-        <ellipse cx="12" cy="12" rx="4" ry="9" stroke="currentColor" stroke-width="1.3"/>
-        <path d="M3.2 9.2H20.8M3.2 14.8H20.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-      </svg>
-    </button>
-  </nav>
+  <!-- Nur noch Positions-Anker: die Wasserblase selbst sitzt hier und dient als Zurueck-Knopf. -->
+  <nav class="tabs"><div id="homeAnchor" class="home-anchor" aria-hidden="true"></div></nav>
 </div>
+
+<!-- Wasserblase: liegt bewusst AUSSERHALB des Homemenues, damit sie beim Oeffnen eines Tabs nach
+     unten wandern und dort als Zurueck-Knopf sichtbar bleiben kann. -->
+<div class="ring-handle" id="ringHandle" role="button" aria-label="Menue" tabindex="0"></div>
 
 <!-- MODAL / BOTTOM SHEET -->
 <div id="modalOverlay" class="modal-overlay hidden">
   <div class="modal" id="modalBody"></div>
 </div>
 
-<script src="app.js?v=30"></script>
+<script src="app.js?v=32"></script>
 </body>
 </html>

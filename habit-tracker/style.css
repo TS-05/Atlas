@@ -241,20 +241,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   position: fixed; left: 0; right: 0; bottom: calc(26px + env(safe-area-inset-bottom));
   display: flex; justify-content: center; z-index: 40; pointer-events: none;
 }
-.home-return {
-  pointer-events: auto;
-  width: 60px; height: 60px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  padding: 0; cursor: pointer;
-  color: var(--color-accent-200);
-  background: linear-gradient(180deg, rgba(56,66,80,0.74), rgba(22,27,34,0.72));
-  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1.4px solid var(--color-accent-600);
-  box-shadow: 0 12px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12);
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-.home-return:active { transform: scale(0.93); }
-.home-return svg { display: block; }
+.home-anchor { width: 60px; height: 60px; }
 
 /* ---------- Abweichung / Arbeitsschicht ---------- */
 .deviation-input-row { display: flex; gap: 8px; margin-bottom: 8px; }
@@ -618,13 +605,12 @@ textarea.input { min-height: 90px; resize: vertical; }
    (Squash & Stretch), beim Landen federt er kurz nach. scaleY wirkt im rotierten Rahmen, dessen
    y-Achse entlang des Rings zeigt -- die Streckung folgt also exakt der Bewegungsrichtung. */
 .ring-handle {
-  position: absolute;
-  left: 50%;
-  top: 50%;
+  position: fixed;
+  left: 0;
+  top: 0;
   width: 88px;
   height: 88px;
-  margin: -44px 0 0 -44px;
-  z-index: 3;
+  z-index: 60;
   pointer-events: auto;
   border-radius: 50%;
   cursor: grab;
@@ -635,8 +621,9 @@ textarea.input { min-height: 90px; resize: vertical; }
   -webkit-backdrop-filter: saturate(1.25) brightness(1.06);
   box-shadow: inset 0 2px 3px rgba(255,255,255,0.45), inset 0 -3px 5px rgba(255,255,255,0.18),
               inset 0 0 0 1px rgba(255,255,255,0.22), 0 6px 18px rgba(0,0,0,0.42);
-  transform: rotate(var(--angle)) translate(var(--ring-r)) scaleY(var(--sy,1)) scaleX(var(--sx,1));
-  transition: transform 0.46s cubic-bezier(0.34, 1.32, 0.44, 1), box-shadow 0.2s ease;
+  transform: translate(var(--hx, -999px), var(--hy, -999px)) translate(-50%, -50%)
+             rotate(var(--rot, 0deg)) scale(var(--sy, 1), var(--sx, 1)) rotate(calc(-1 * var(--rot, 0deg)));
+  transition: transform 0.52s cubic-bezier(0.34, 1.22, 0.44, 1), box-shadow 0.2s ease, opacity 0.25s ease;
 }
 .ring-handle::before,
 .ring-handle::after {
@@ -676,6 +663,13 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* Antippen = Finger in Fluessigkeit: der Tropfen quillt kurz in ALLE Richtungen auf und faellt
    dann zurueck. Bewusst gleichmaessig (sx = sy), im Gegensatz zum gerichteten Ziehen. */
 .ring-handle.is-tap { --sx: 1.22; --sy: 1.22; }
+/* Zerplatzen wie eine Seifenblase: kurz aufblaehen und dabei verschwinden. Bewusst ueber die
+   vorhandenen Skalier-Variablen statt per Keyframes -- sonst wuerde eine transform-Animation mit
+   der Positionierung (die ebenfalls transform nutzt) kollidieren. */
+.ring-handle.is-pop { --sx: 1.5; --sy: 1.5; opacity: 0; }
+.ring-handle.is-invisible { opacity: 0; }
+/* Fuer den lautlosen Sprung ans Ringsymbol: sonst wuerde die Blase sichtbar dorthin fliegen. */
+.ring-handle.no-anim { transition: none !important; }
 /* Beim Ziehen setzt JS --sx/--sy laufend aus dem Abstand zum Finger -> laenglich in Zugrichtung. */
 .ring-handle.is-dragging { cursor: grabbing; transition: box-shadow 0.2s ease; }
 /* Vignette ueber dem GESAMTEN Homemenue (nicht nur um die Globus-Buehne): als Rechteck um den Globus
