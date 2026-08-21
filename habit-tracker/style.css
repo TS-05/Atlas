@@ -693,8 +693,8 @@ textarea.input { min-height: 90px; resize: vertical; }
   background: radial-gradient(circle at 50% 45%, transparent 26%, rgba(12, 15, 20, 0.5) 62%, rgba(9, 11, 15, 0.88) 100%);
 }
 .globe-model {
-  height: 76%;
-  width: 76%;
+  height: 64%;
+  width: 64%;
   --poster-color: transparent;
 }
 /* Unsichtbarer, aber großzügiger Tap-Ziel-Kreis über dem jeweiligen 3D-Pin (der Pin selbst ist echte
