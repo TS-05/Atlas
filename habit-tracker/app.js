@@ -787,6 +787,12 @@ migrateSeminararbeitRoadmap(state);
 migrateSeminararbeitRoadmapV2(state);
 migrateTaskEffortLevels(state);
 migrateTaskEffortLevelsV2(state);
+// Einmalig: die bestehende Routine "X Lust" auf "standardmaessig erledigt" umstellen.
+if (!state.xLustAutoDoneApplied) {
+  const h = state.habits.find(x => x.title && x.title.trim().toLowerCase() === "x lust");
+  if (h) h.autoDone = true;
+  state.xLustAutoDoneApplied = true;
+}
 migrateLearningOrder(state);
 repairCyclicGoalNodes(state);
 state.subjects = state.subjects || [];
@@ -2531,7 +2537,24 @@ function updateNotifPermissionUI() {
   row.style.display = ("Notification" in window && Notification.permission === "default") ? "flex" : "none";
 }
 
+// Gewohnheiten mit "autoDone" starten jeden Tag bereits abgehakt (z.B. Dinge, die nur im Ausnahmefall
+// NICHT passieren). Bewusst nur EINMAL pro Tag gesetzt (autoDoneDate) -- sonst wuerde ein bewusstes
+// Abwaehlen sofort wieder ueberschrieben.
+function applyAutoDoneHabits() {
+  const today = todayStr();
+  let changed = false;
+  state.habits.forEach(h => {
+    if (!h.autoDone || h.autoDoneDate === today) return;
+    if (!isScheduledToday(h, new Date())) return;
+    if (h.history[today] === undefined) h.history[today] = true;
+    h.autoDoneDate = today;
+    changed = true;
+  });
+  if (changed) saveData();
+}
+
 function renderAll() {
+  applyAutoDoneHabits();
   renderWeekCircle();
   renderDeviationLog();
   renderRoutineChain();
@@ -3161,6 +3184,10 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
       <input type="checkbox" id="mHabitRoutine" ${(isEdit ? editHabit.routineOrder != null : forceRoutine) ? "checked" : ""}>
       <label for="mHabitRoutine">Teil der festen Tagesroutine (Reihenfolge im Heute-Tab)</label>
     </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="mHabitAutoDone" ${isEdit && editHabit.autoDone ? "checked" : ""}>
+      <label for="mHabitAutoDone">Standardmäßig erledigt (jeden Tag vorab angehakt)</label>
+    </div>
     <div class="field">
       <label>Frequenz</label>
       <select id="mHabitFrequency">
@@ -3232,6 +3259,7 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
       }
       const isRoutine = body.querySelector("#mHabitRoutine").checked;
       const points = parseInt(body.querySelector("#mHabitPoints").value, 10) || 1;
+      const autoDone = body.querySelector("#mHabitAutoDone").checked;
       if (isEdit) {
         editHabit.title = title;
         editHabit.nodeId = nodeId;
@@ -3239,6 +3267,7 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
         delete editHabit.intervalDays; delete editHabit.weekday; delete editHabit.everyNWeeks;
         Object.assign(editHabit, extra);
         editHabit.points = points;
+        if (autoDone) editHabit.autoDone = true; else { delete editHabit.autoDone; delete editHabit.autoDoneDate; }
         if (isRoutine && editHabit.routineOrder == null) {
           editHabit.routineOrder = state.habits.reduce((max, h) => Math.max(max, h.routineOrder ?? -1), -1) + 1;
         } else if (!isRoutine) {
@@ -3246,7 +3275,7 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
         }
       } else {
         const routineOrder = isRoutine ? state.habits.reduce((max, h) => Math.max(max, h.routineOrder ?? -1), -1) + 1 : null;
-        state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check", points });
+        state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check", points, ...(autoDone ? { autoDone: true } : {}) });
       }
       saveData();
       closeModal();
