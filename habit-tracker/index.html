@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=42">
+<link rel="stylesheet" href="style.css?v=43">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -619,6 +619,7 @@
       <h1>Gym</h1>
       <p class="text-muted" style="margin-top:-6px;">Trainingsplan aus dem Vault — Gewicht und Wiederholungen pro Satz eintragen.</p>
       <div id="gymDayPicker" class="gym-daypicker"></div>
+      <div id="gymLastSession"></div>
       <div id="gymSession"></div>
     </section>
 
@@ -626,67 +627,107 @@
     <section id="tab-analyse" class="tab-panel">
       <h1>Analyse</h1>
 
-      <h6 class="metal-gold">Reflexion dieser Woche</h6>
-      <ul class="text-muted" style="font-size:12.5px; line-height:1.7; margin:0 0 10px; padding-left:18px;">
-        <li>Was lief gut/schlecht?</li>
-        <li>Was mache ich beim nächsten Mal besser?</li>
-        <li>Wie ist meine Beziehung zu Gott?</li>
-        <li>Wie würde mein Idealbild handeln?</li>
-        <li>Bin ich meinem Ziel näher gekommen?</li>
-        <li>Habe ich meine Werte eingehalten?</li>
-      </ul>
-      <textarea class="input reflection-textarea" id="reflectionText" placeholder="Wie lief die Woche? Was nimmst du mit?" style="margin-bottom: 28px;"></textarea>
+      <!-- Untertabs: die Analyse war eine einzige, sehr lange Scrollstrecke. Vier Bereiche, einer
+           sichtbar -- man sieht wieder, was es ueberhaupt gibt, statt daran vorbeizuscrollen. -->
+      <div class="subtabs" id="analyseSubtabs" role="tablist">
+        <button class="subtab active" data-subtab="ueberblick">Überblick</button>
+        <button class="subtab" data-subtab="gym">Gym</button>
+        <button class="subtab" data-subtab="finanzen">Finanzen</button>
+        <button class="subtab" data-subtab="reflexion">Reflexion</button>
+      </div>
 
-      <div class="stats-grid" id="statsGrid"></div>
+      <!-- ---------- Überblick ---------- -->
+      <div class="subpanel active" data-subpanel="ueberblick">
+        <div class="stats-grid" id="statsGrid"></div>
 
-      <h6 class="metal-gold">Aktivität · letzte 7 Wochen</h6>
-      <div class="heatmap-grid" id="activityHeatmap"></div>
-
-      <h6 class="metal-gold">Aufgaben je Bereich</h6>
-      <div id="areaLoad" style="display:flex; flex-direction:column; gap:10px; margin-bottom:30px;"></div>
-
-      <h6 class="metal-gold">Weitere Kennzahlen</h6>
-      <div class="stats-grid" id="moreStats"></div>
-
-      <h6 class="metal-gold" style="margin-top: 4px;">Gym</h6>
-      <div class="stats-grid" id="gymStats" style="margin-bottom: 14px;"></div>
-      <div class="gym-chart-title text-muted">Körpergewicht (kg)</div>
-      <div id="gymWeightChart" class="gym-chart"></div>
-      <div class="gym-chart-title text-muted" style="margin-top:18px;">Stärke — bestes Satzgewicht je Einheit (kg)</div>
-      <div id="gymStrengthChart" class="gym-chart"></div>
-      <div id="gymTopLifts" style="margin: 14px 0 30px;"></div>
-
-      <h6 class="metal-gold" style="margin-top: 4px;">Finanzen</h6>
-
-      <div class="stats-grid" id="financeAnalysisStats" style="margin-bottom: 18px;"></div>
-
-      <div style="display:flex; align-items:center; gap:14px; margin-bottom: 26px;">
-        <div id="financeBudgetRing"></div>
-        <div>
-          <div class="text-muted" style="font-size: 11.5px;">Budgetauslastung diesen Monat</div>
-          <div class="item-title" id="financeBudgetBarLabel" style="margin-top:2px;"></div>
+        <h6 class="metal-gold">Aktivität · letzte 7 Wochen</h6>
+        <div class="heatmap-wrap">
+          <div class="heatmap-weekdays" id="heatmapWeekdays"></div>
+          <div class="heatmap-grid" id="activityHeatmap"></div>
         </div>
+        <div class="heatmap-legend">
+          <span>wenig</span>
+          <i class="heatmap-legend-scale"></i>
+          <span>viel</span>
+        </div>
+
+        <h6 class="metal-gold">Pünktlichkeit erledigter Aufgaben</h6>
+        <div class="panel-card" style="margin-bottom:30px;">
+          <div class="progress-outer"><div class="progress-inner" id="punctualityFill"></div></div>
+          <p class="text-muted" id="punctualityText" style="font-size: 12.5px; margin:0;"></p>
+        </div>
+
+        <h6 class="metal-gold">Aufgaben je Bereich</h6>
+        <div id="areaLoad" class="panel-card" style="margin-bottom:30px;"></div>
+
+        <h6 class="metal-gold">Weitere Kennzahlen</h6>
+        <div class="stats-grid" id="moreStats"></div>
       </div>
 
-      <h6 class="metal-gold">Ausgaben nach Kategorie</h6>
-      <div id="financeCategoryBreakdown" style="display:flex; flex-direction:column; gap:10px; margin-bottom:30px;"></div>
+      <!-- ---------- Gym ---------- -->
+      <div class="subpanel" data-subpanel="gym">
+        <div class="stats-grid" id="gymStats"></div>
 
-      <h6 class="metal-gold">Ausgaben · letzte 6 Monate</h6>
-      <div class="finance-trend" id="financeTrend"></div>
-      <div class="finance-trend-labels" id="financeTrendLabels"></div>
+        <h6 class="metal-gold">Körpergewicht</h6>
+        <div id="gymWeightChart" class="gym-chart"></div>
 
-      <h6 class="metal-gold">Sparziele</h6>
-      <div class="finance-ring-row" id="financeGoalsRings"></div>
+        <h6 class="metal-gold" style="margin-top:28px;">Stärke je Übung</h6>
+        <div class="chart-picker">
+          <select class="input" id="gymStrengthPicker"></select>
+        </div>
+        <div id="gymStrengthChart" class="gym-chart"></div>
 
-      <h6 class="metal-gold">Pünktlichkeit erledigter Aufgaben</h6>
-      <div class="progress-outer"><div class="progress-inner" id="punctualityFill"></div></div>
-      <p class="text-muted" id="punctualityText" style="font-size: 12.5px;"></p>
+        <h6 class="metal-gold" style="margin-top:28px;">Volumen je Einheit</h6>
+        <div id="gymVolumeChart" class="gym-chart"></div>
 
-      <div id="notifPermissionRow" style="display:none; margin-top:24px;">
-        <button class="btn btn-secondary btn-block" id="enableNotifBtn">🔔 Benachrichtigung aktivieren (2x verpasste Routine)</button>
+        <h6 class="metal-gold" style="margin-top:28px;">Bestleistungen</h6>
+        <div id="gymTopLifts" class="panel-card" style="margin-bottom:30px;"></div>
       </div>
 
-      <button class="btn btn-ghost btn-block" id="importReviewBtn" style="margin-top:24px;">Wochenrückblick importieren (fehlende Aufgaben wiederherstellen)</button>
+      <!-- ---------- Finanzen ---------- -->
+      <div class="subpanel" data-subpanel="finanzen">
+        <div class="stats-grid" id="financeAnalysisStats"></div>
+
+        <div class="panel-card" style="display:flex; align-items:center; gap:14px; margin-bottom: 26px;">
+          <div id="financeBudgetRing"></div>
+          <div>
+            <div class="text-muted" style="font-size: 11.5px;">Budgetauslastung diesen Monat</div>
+            <div class="item-title" id="financeBudgetBarLabel" style="margin-top:2px;"></div>
+          </div>
+        </div>
+
+        <h6 class="metal-gold">Ausgaben nach Kategorie</h6>
+        <div id="financeCategoryBreakdown" class="panel-card" style="margin-bottom:30px;"></div>
+
+        <h6 class="metal-gold">Ausgaben · letzte 6 Monate</h6>
+        <div class="panel-card" style="margin-bottom:30px;">
+          <div class="finance-trend" id="financeTrend"></div>
+          <div class="finance-trend-labels" id="financeTrendLabels"></div>
+        </div>
+
+        <h6 class="metal-gold">Sparziele</h6>
+        <div class="finance-ring-row" id="financeGoalsRings"></div>
+      </div>
+
+      <!-- ---------- Reflexion ---------- -->
+      <div class="subpanel" data-subpanel="reflexion">
+        <h6 class="metal-gold">Reflexion dieser Woche</h6>
+        <ul class="reflection-prompts">
+          <li>Was lief gut/schlecht?</li>
+          <li>Was mache ich beim nächsten Mal besser?</li>
+          <li>Wie ist meine Beziehung zu Gott?</li>
+          <li>Wie würde mein Idealbild handeln?</li>
+          <li>Bin ich meinem Ziel näher gekommen?</li>
+          <li>Habe ich meine Werte eingehalten?</li>
+        </ul>
+        <textarea class="input reflection-textarea" id="reflectionText" placeholder="Wie lief die Woche? Was nimmst du mit?" style="margin-bottom: 24px;"></textarea>
+
+        <div id="notifPermissionRow" style="display:none; margin-bottom:14px;">
+          <button class="btn btn-secondary btn-block" id="enableNotifBtn">🔔 Benachrichtigung aktivieren (verpasste Routine)</button>
+        </div>
+
+        <button class="btn btn-ghost btn-block" id="importReviewBtn" style="margin-bottom:30px;">Wochenrückblick importieren (fehlende Aufgaben wiederherstellen)</button>
+      </div>
     </section>
   </main>
 
@@ -704,6 +745,6 @@
   <div class="modal" id="modalBody"></div>
 </div>
 
-<script src="app.js?v=35"></script>
+<script src="app.js?v=36"></script>
 </body>
 </html>

@@ -329,26 +329,84 @@ textarea.input { min-height: 90px; resize: vertical; }
 .prayer-attachment-file { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--color-accent-300); }
 
 /* ---------- Analyse ---------- */
+/* Untertabs: Überblick / Gym / Finanzen / Reflexion */
+.subtabs {
+  display: flex; gap: 4px; margin: 0 0 22px; padding: 3px;
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  border-radius: 999px; overflow-x: auto; scrollbar-width: none;
+}
+.subtabs::-webkit-scrollbar { display: none; }
+.subtab {
+  flex: 1; min-width: max-content; padding: 7px 13px; cursor: pointer;
+  border: 0; border-radius: 999px; background: transparent;
+  font-family: var(--font-body); font-size: 12.5px; color: var(--color-neutral-500);
+  white-space: nowrap; transition: color 0.18s ease, background 0.18s ease;
+}
+.subtab.active {
+  color: var(--color-bg); font-weight: 600;
+  background: linear-gradient(160deg, var(--color-accent-200), var(--color-accent-600));
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--color-accent-700) 45%, transparent);
+}
+.subpanel { display: none; }
+.subpanel.active { display: block; animation: subpanelIn 0.22s ease both; }
+@keyframes subpanelIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Neutraler Inhaltsrahmen — trennt die Blöcke voneinander, statt alles auf den Seitenhintergrund
+   zu legen. Ohne den wirkte die Analyse wie eine einzige ununterbrochene Textwand. */
+.panel-card {
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg); padding: 14px;
+}
+
+/* Kacheln als echte Karten statt nur einer Trennlinie oben. */
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 30px; }
-.stat-box { text-align: center; padding: 12px 0; border-top: 1px solid var(--color-divider); }
-.stat-num { font-size: 22px; font-family: var(--font-heading); font-weight: 600; }
-.stat-label { font-size: 11px; color: var(--color-neutral-400); }
-.stat-box.minor .stat-num { font-size: 17px; }
+.stat-box {
+  text-align: center; padding: 14px 8px 12px; border-radius: var(--radius-lg);
+  background: linear-gradient(168deg, color-mix(in srgb, var(--color-surface) 100%, white 3%), var(--color-surface));
+  border: 1px solid var(--color-divider);
+}
+.stat-num { font-size: 22px; font-family: var(--font-heading); font-weight: 600; line-height: 1.15; }
+.stat-label { font-size: 11px; color: var(--color-neutral-300); margin-top: 3px; }
+.stat-sub { font-size: 10px; color: var(--color-neutral-600); margin-top: 2px; }
+.stat-box.minor .stat-num { font-size: 18px; }
 .stat-box.minor .stat-label { font-size: 10.5px; }
 
-.heatmap-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 30px; }
+/* Heatmap: Spalten sind jetzt auf Mo–So ausgerichtet, deshalb bekommen sie auch Beschriftungen. */
+.heatmap-wrap { margin-bottom: 8px; }
+.heatmap-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 5px; }
+.heatmap-weekdays span { font-size: 9.5px; color: var(--color-neutral-600); text-align: center; }
+.heatmap-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .heatmap-cell { aspect-ratio: 1; border-radius: 3px; cursor: pointer; }
+.heatmap-cell.future { background: transparent; border: 1px dashed var(--color-divider); cursor: default; box-shadow: none; }
+.heatmap-cell.today { outline: 1.5px solid var(--color-accent-200); outline-offset: 1px; }
+.heatmap-legend { display: flex; align-items: center; gap: 8px; margin-bottom: 30px; font-size: 10px; color: var(--color-neutral-600); }
+.heatmap-legend-scale {
+  flex: 1; height: 5px; border-radius: 3px;
+  background: linear-gradient(90deg, #5b6072, #d4af37);
+}
 
-.areaload-row { display: flex; align-items: center; gap: 10px; }
-.areaload-name { width: 78px; font-size: 12.5px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.areaload-total { font-size: 11px; color: var(--color-neutral-500); margin-bottom: 12px; }
+.areaload-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.areaload-name { width: 96px; font-size: 12.5px; line-height: 1.3; flex-shrink: 0; overflow-wrap: anywhere; }
 .areaload-bar-outer { flex: 1; height: 6px; border-radius: 3px; background: var(--color-neutral-800); overflow: hidden; }
 .areaload-bar-inner { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--color-accent-300), var(--color-accent-600)); }
-.areaload-count { font-size: 11.5px; color: var(--color-neutral-400); width: 46px; text-align: right; flex-shrink: 0; }
+.areaload-count { font-size: 12px; color: var(--color-neutral-300); width: 34px; text-align: right; flex-shrink: 0; }
+.areaload-toggle {
+  margin-top: 6px; padding: 6px 0; cursor: pointer; border: 0; background: none;
+  font-family: var(--font-body); font-size: 11.5px; color: var(--color-accent-300);
+}
+
+.chart-picker { margin-bottom: 10px; }
+.chart-picker .input { height: 38px; padding: 6px 10px; font-size: 13px; margin: 0; }
 
 .progress-outer { height: 5px; border-radius: 3px; background: var(--color-neutral-800); margin-bottom: 8px; overflow: hidden; }
 .progress-inner { height: 100%; border-radius: 3px; background: var(--color-accent); }
 
-.reflection-textarea { min-height: 70px; margin-bottom: 0; }
+.reflection-prompts {
+  color: var(--color-neutral-400); font-size: 12.5px; line-height: 1.7;
+  margin: 0 0 10px; padding-left: 18px;
+}
+.reflection-textarea { min-height: 130px; margin-bottom: 0; }
 
 /* ---------- Modal / Bottom Sheet ---------- */
 .modal-overlay { position: fixed; inset: 0; background: color-mix(in srgb, #000 55%, transparent); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
@@ -715,38 +773,90 @@ textarea.input { min-height: 90px; resize: vertical; }
 .project-notes { min-height: 90px; font-size: 13.5px; }
 
 /* ---------- Gym ---------- */
-.gym-daypicker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+.gym-daypicker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
 .gym-day {
+  position: relative;
   display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer;
   border: 1px solid var(--color-divider); border-radius: var(--radius-md);
   background: var(--color-surface); color: var(--color-neutral-300);
   font-family: var(--font-body); font-size: 13px; text-align: left;
 }
 .gym-day.active { border-color: var(--color-accent-500); color: var(--color-text); }
+/* Kleiner Punkt = für diesen Tag ist heute schon etwas eingetragen. */
+.gym-day.logged::after {
+  content: ""; position: absolute; top: 7px; right: 7px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--color-accent-300);
+}
 .gym-day-tag {
   font-family: var(--font-heading); font-size: 10.5px; letter-spacing: 0.06em;
   color: var(--color-accent-300); border: 1px solid var(--color-accent-800);
   border-radius: 5px; padding: 2px 5px; flex-shrink: 0;
 }
-.gym-summary { font-size: 12px; color: var(--color-neutral-400); margin-bottom: 12px; }
-.gym-ex { padding: 12px 0; border-top: 1px solid var(--color-divider); }
+
+/* Kopfkarte: Bezugspunkt fürs heutige Training auf einen Blick. */
+.gym-lastcard {
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg); padding: 11px 13px; margin-bottom: 16px;
+}
+.gym-lastcard.empty { color: var(--color-neutral-500); font-size: 12.5px; }
+.gym-lastcard-head { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-accent-300); }
+.gym-lastcard-stats { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 7px; font-size: 11.5px; color: var(--color-neutral-500); }
+.gym-lastcard-stats b { font-size: 14px; font-family: var(--font-heading); font-weight: 600; color: var(--color-text); margin-right: 4px; }
+
+.gym-summary { font-size: 12px; color: var(--color-neutral-400); margin-bottom: 6px; }
+.gym-summary b { color: var(--color-text); font-size: 13px; }
+.gym-ex { padding: 13px 0 15px; border-top: 1px solid var(--color-divider); }
 .gym-ex-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .gym-target { font-size: 11px; color: var(--color-accent-300); flex-shrink: 0; }
-.gym-sets { display: flex; gap: 8px; margin-top: 8px; }
-.gym-set { display: flex; align-items: center; gap: 4px; flex: 1; }
+.gym-lastline { font-size: 10.5px; color: var(--color-neutral-600); margin-top: 3px; }
+
+/* Drei Satzspalten, drei Zeilen: Beschriftung, letzter Wert, Eingabe. Der Wert vom letzten Mal
+   steht damit genau über dem Feld, in das er ersetzt wird — Satz für Satz zuzuordnen. */
+.gym-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 8px; margin-top: 8px; }
+.gym-col-head { font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-600); text-align: center; }
+.gym-last-cell {
+  font-size: 12px; text-align: center; padding: 4px 2px; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-accent-900) 55%, transparent);
+  color: var(--color-accent-200); white-space: nowrap;
+}
+.gym-last-cell.none { background: transparent; color: var(--color-neutral-700); }
+.gym-trend { font-style: normal; font-size: 9.5px; }
+.gym-trend.up { color: var(--color-accent-200); }
+.gym-trend.down { color: #c98b8b; }
+.gym-trend.same { color: var(--color-neutral-500); }
+
+.gym-set { display: flex; align-items: center; gap: 3px; min-width: 0; }
 .gym-set input {
-  width: 100%; min-width: 0; height: 34px; padding: 4px 6px; text-align: center;
+  width: 100%; min-width: 0; height: 36px; padding: 4px 4px; text-align: center;
   font: inherit; font-size: 13px; color: var(--color-text);
   background: var(--color-bg); border: 1px solid var(--color-divider); border-radius: var(--radius-sm);
 }
+.gym-set input::placeholder { color: var(--color-neutral-700); }
 .gym-set input:focus-visible { border-color: var(--color-accent); outline: none; }
-.gym-set span { color: var(--color-neutral-600); font-size: 11px; }
+.gym-set span { color: var(--color-neutral-600); font-size: 11px; flex-shrink: 0; }
+
+/* Diagramme */
 .gym-chart-title { font-size: 11.5px; letter-spacing: 0.04em; margin-bottom: 6px; }
-.gym-chart { background: var(--color-surface); border-radius: var(--radius-md); padding: 10px 12px 8px; }
-.gym-chart-svg { width: 100%; height: 96px; display: block; }
-.gym-chart-legend { display: flex; justify-content: space-between; font-size: 11px; color: var(--color-neutral-500); margin-top: 6px; }
-.gym-chart-legend .up { color: var(--color-accent-300); }
-.gym-chart-legend .down { color: var(--color-neutral-300); }
+.gym-chart {
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg); padding: 12px 12px 9px;
+}
+.gym-chart-svg { width: 100%; height: 118px; display: block; }
+.gym-chart-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.gym-chart-value { font-family: var(--font-heading); font-weight: 600; font-size: 24px; line-height: 1; }
+.gym-chart-value span { font-size: 12px; font-weight: 400; color: var(--color-neutral-500); margin-left: 1px; }
+.gym-chart-delta { font-size: 12px; text-align: right; }
+.gym-chart-delta span { display: block; font-size: 10px; color: var(--color-neutral-600); }
+.gym-chart-delta.up { color: var(--color-accent-200); }
+.gym-chart-delta.down { color: #c98b8b; }
+.gym-chart-delta.flat { color: var(--color-neutral-400); }
+.gym-chart-axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-neutral-600); margin-top: 5px; }
+
+.gym-best-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--color-divider); }
+.gym-best-row:last-child { border-bottom: 0; }
+.gym-best-name { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.gym-best-date { font-size: 10.5px; color: var(--color-neutral-600); flex-shrink: 0; }
+.gym-best-val { font-size: 13px; font-family: var(--font-heading); font-weight: 600; color: var(--color-accent-200); flex-shrink: 0; }
 
 /* ---------- Homemenü: Spruch über und unter dem Ring ----------
    Gleicher Satz und gleiche Typografie wie auf dem Ladebildschirm, nur auf zwei Zeilen verteilt. */

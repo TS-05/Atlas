@@ -2241,12 +2241,17 @@ function renderWeekStats() {
   const doneTasks = state.tasks.filter(t => t.done).length;
   const longestStreak = state.habits.reduce((max, h) => Math.max(max, computeStreak(h)), 0);
 
-  grid.innerHTML = `
-    <div class="stat-box"><div class="stat-num">${childNodes(null).length}</div><div class="stat-label">Zielbereiche</div></div>
-    <div class="stat-box"><div class="stat-num">${doneTasks}/${totalTasks}</div><div class="stat-label">Aufgaben erledigt</div></div>
-    <div class="stat-box"><div class="stat-num">${state.habits.length}</div><div class="stat-label">Gewohnheiten</div></div>
-    <div class="stat-box"><div class="stat-num">${longestStreak}</div><div class="stat-label">Längste Serie</div></div>
-  `;
+  const todayPct = dayCompletionPct(new Date());
+  const dueToday = state.habits.filter(h => isScheduledToday(h, new Date()) && new Date(h.createdAt) <= new Date());
+  const doneToday = dueToday.filter(h => h.history[todayStr()]).length;
+  const taskPct = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+  grid.innerHTML = [
+    { num: `${doneToday}/${dueToday.length}`, label: "Heute erledigt", sub: todayPct === null ? "nichts fällig" : todayPct + "% der Punkte" },
+    { num: `${doneTasks}/${totalTasks}`, label: "Aufgaben erledigt", sub: taskPct + "% aller Aufgaben" },
+    { num: longestStreak, label: "Längste Serie", sub: longestStreak === 1 ? "Tag am Stück" : "Tage am Stück" },
+    { num: childNodes(null).length, label: "Zielbereiche", sub: `${state.habits.length} Gewohnheiten` }
+  ].map(b => `<div class="stat-box"><div class="stat-num">${b.num}</div><div class="stat-label">${b.label}</div><div class="stat-sub">${b.sub}</div></div>`).join("");
 
   const completed = state.tasks.filter(t => t.done && t.completedAt);
   let onTime = 0;
@@ -2271,20 +2276,6 @@ function taskCompletionRateInWindow(days) {
   return relevant.filter(t => t.done).length / relevant.length;
 }
 
-function weightTrend() {
-  const weightHabit = state.habits.find(h => h.type === "weight");
-  if (!weightHabit) return null;
-  const entries = Object.entries(weightHabit.history)
-    .filter(([, v]) => typeof v === "number")
-    .sort((a, b) => a[0].localeCompare(b[0]));
-  if (entries.length === 0) return null;
-  const latest = entries[entries.length - 1][1];
-  if (entries.length === 1) return { latest, arrow: "–" };
-  const prev = entries[entries.length - 2][1];
-  const arrow = latest > prev ? "↑" : latest < prev ? "↓" : "–";
-  return { latest, arrow };
-}
-
 function renderMoreStats() {
   const wrap = document.getElementById("moreStats");
   if (!wrap) return;
@@ -2295,20 +2286,19 @@ function renderMoreStats() {
   const devCount7 = state.deviations.filter(d => d.date >= todayStr(-7)).length;
   const devCount30 = state.deviations.filter(d => d.date >= todayStr(-30)).length;
   const prayerFulfilled = state.prayers.filter(p => p.status === "fulfilled").length;
-  const weight = weightTrend();
+  const prayerOpen = state.prayers.filter(p => p.status !== "fulfilled").length;
 
   const boxes = [
-    { num: rate7 !== null ? Math.round(rate7 * 100) + "%" : "–", label: "Aufgaben erledigt (7 Tage)" },
-    { num: rate30 !== null ? Math.round(rate30 * 100) + "%" : "–", label: "Aufgaben erledigt (30 Tage)" },
-    { num: rate60 !== null ? Math.round(rate60 * 100) + "%" : "–", label: "Aufgaben erledigt (60 Tage)" },
-    { num: devCount7, label: "Abweichungen (7 Tage)" },
-    { num: devCount30, label: "Abweichungen (30 Tage)" },
-    { num: prayerFulfilled, label: "Erhörungen gesamt" },
-    { num: weight ? `${weight.latest} kg ${weight.arrow}` : "–", label: "Gewichtstrend" }
+    { num: rate7 !== null ? Math.round(rate7 * 100) + "%" : "–", label: "Aufgaben erledigt", sub: "letzte 7 Tage" },
+    { num: rate30 !== null ? Math.round(rate30 * 100) + "%" : "–", label: "Aufgaben erledigt", sub: "letzte 30 Tage" },
+    { num: rate60 !== null ? Math.round(rate60 * 100) + "%" : "–", label: "Aufgaben erledigt", sub: "letzte 60 Tage" },
+    { num: devCount7, label: "Abweichungen", sub: "letzte 7 Tage" },
+    { num: devCount30, label: "Abweichungen", sub: "letzte 30 Tage" },
+    { num: prayerFulfilled, label: "Erhörungen", sub: `${prayerOpen} offen` }
   ];
 
   wrap.innerHTML = boxes.map(b => `
-    <div class="stat-box minor"><div class="stat-num">${b.num}</div><div class="stat-label">${b.label}</div></div>
+    <div class="stat-box minor"><div class="stat-num">${b.num}</div><div class="stat-label">${b.label}</div><div class="stat-sub">${b.sub}</div></div>
   `).join("");
 }
 
@@ -2376,29 +2366,40 @@ function heatmapColorT(pct) {
   return (pct - 25) / (80 - 25);
 }
 
+// Sieben Wochen, immer auf Mo-So ausgerichtet (endet am Sonntag der laufenden Woche). Vorher lief
+// das Raster einfach 49 Tage rueckwaerts ab heute -- dann steht in jeder Spalte ein anderer
+// Wochentag und die Spaltenbeschriftung waere gelogen.
 function renderActivityHeatmap() {
   const wrap = document.getElementById("activityHeatmap");
   if (!wrap) return;
+  const head = document.getElementById("heatmapWeekdays");
+  if (head) head.innerHTML = WEEKDAY_LABELS.map(w => `<span>${w}</span>`).join("");
+
   wrap.innerHTML = "";
-  const today = new Date();
-  const days = [];
+  const sunday = mondayOfWeek(new Date());
+  sunday.setDate(sunday.getDate() + 6);
+  const todayKey = todayStr();
+
   for (let i = 48; i >= 0; i--) {
-    const d = new Date(today);
+    const d = new Date(sunday);
     d.setDate(d.getDate() - i);
-    days.push(d);
-  }
-  days.forEach(d => {
-    const pct = dayCompletionPct(d);
+    const key = localDateKey(d);
     const cell = document.createElement("div");
     cell.className = "heatmap-cell";
-    const t = heatmapColorT(pct);
-    const base = lerpColor(HEATMAP_GREY, HEATMAP_GOLD, t);
+    if (key > todayKey) {                  // Rest der laufenden Woche: Platzhalter, nicht anklickbar
+      cell.classList.add("future");
+      wrap.appendChild(cell);
+      continue;
+    }
+    const pct = dayCompletionPct(d);
+    const base = lerpColor(HEATMAP_GREY, HEATMAP_GOLD, heatmapColorT(pct));
     cell.style.background = `linear-gradient(135deg, color-mix(in srgb, ${base} 100%, white 22%) 0%, ${base} 45%, color-mix(in srgb, ${base} 100%, black 25%) 100%)`;
     cell.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 2px rgba(0,0,0,0.35)";
-    cell.title = `${localDateKey(d)}${pct === null ? "" : ": " + pct + "%"}`;
-    cell.dataset.date = localDateKey(d);
+    if (key === todayKey) cell.classList.add("today");
+    cell.title = `${key}${pct === null ? "" : ": " + pct + "%"}`;
+    cell.dataset.date = key;
     wrap.appendChild(cell);
-  });
+  }
 }
 
 let currentDaySheetKey = null;
@@ -2464,20 +2465,35 @@ function countTasksInSubtree(nodeId, seen = new Set()) {
   return count;
 }
 
+// Absteigend sortiert und Nullzeilen eingeklappt: bei elf Bereichen, von denen zehn auf 0 stehen,
+// war die alte Liste zu 90% Rauschen. Namen duerfen jetzt umbrechen statt abgeschnitten zu werden.
+let areaLoadShowAll = false;
+
 function renderAreaLoad() {
   const wrap = document.getElementById("areaLoad");
   if (!wrap) return;
-  const roots = childNodes(null).map(n => ({ node: n, count: countTasksInSubtree(n.id) }));
+  const roots = childNodes(null)
+    .map(n => ({ node: n, count: countTasksInSubtree(n.id) }))
+    .sort((a, b) => b.count - a.count || a.node.title.localeCompare(b.node.title, "de"));
+  if (!roots.length) { wrap.innerHTML = '<div class="empty-hint">Noch keine Bereiche angelegt.</div>'; return; }
+
   const max = Math.max(1, ...roots.map(r => r.count));
-  wrap.innerHTML = roots.length
-    ? roots.map(r => `
-        <div class="areaload-row">
-          <div class="areaload-name">${escapeHtml(r.node.title)}</div>
-          <div class="areaload-bar-outer"><div class="areaload-bar-inner" style="width:${Math.round((r.count / max) * 100)}%"></div></div>
-          <div class="areaload-count">${r.count}</div>
-        </div>
-      `).join("")
-    : '<div class="empty-hint">Noch keine Bereiche angelegt.</div>';
+  const total = roots.reduce((s, r) => s + r.count, 0);
+  const empty = roots.filter(r => r.count === 0);
+  const shown = areaLoadShowAll ? roots : roots.filter(r => r.count > 0);
+
+  const rowHtml = r => `
+    <div class="areaload-row">
+      <div class="areaload-name">${escapeHtml(r.node.title)}</div>
+      <div class="areaload-bar-outer"><div class="areaload-bar-inner" style="width:${r.count ? Math.max(3, Math.round((r.count / max) * 100)) : 0}%"></div></div>
+      <div class="areaload-count">${r.count}</div>
+    </div>`;
+
+  wrap.innerHTML = `
+    <div class="areaload-total">${total} Aufgaben auf ${roots.length} Bereiche${empty.length ? ` · ${empty.length} ohne Aufgaben` : ""}</div>
+    ${(shown.length ? shown : roots).map(rowHtml).join("")}
+    ${empty.length ? `<button class="areaload-toggle" data-areaload-toggle>${areaLoadShowAll ? "Leere Bereiche ausblenden" : `Alle ${roots.length} Bereiche zeigen`}</button>` : ""}
+  `;
 }
 
 function weekStartKey(dateObj = new Date()) {
@@ -2500,6 +2516,22 @@ function isOnTime(task) {
   const completed = new Date(task.completedAt);
   return completed <= due;
 }
+
+// ---------- Analyse: Untertabs ----------
+// Die Analyse war eine einzige, sehr lange Scrollstrecke -- vier Bereiche, immer nur einer sichtbar.
+document.addEventListener("click", e => {
+  const st = e.target.closest("[data-subtab]");
+  if (st) {
+    const key = st.dataset.subtab;
+    document.querySelectorAll("#analyseSubtabs .subtab").forEach(b => b.classList.toggle("active", b === st));
+    document.querySelectorAll("#tab-analyse .subpanel").forEach(pnl => pnl.classList.toggle("active", pnl.dataset.subpanel === key));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  if (e.target.closest("[data-areaload-toggle]")) {
+    areaLoadShowAll = !areaLoadShowAll;
+    renderAreaLoad();
+  }
+});
 
 // ---------- Render all ----------
 // Morgens einmal daran erinnern, was GESTERN liegen geblieben ist -- damit es nicht zweimal
@@ -2830,17 +2862,39 @@ const GYM_PLAN = [
     { n: "Wadenheben", r: "10–15" }, { n: "Abduktoren", r: "10–15" },
     { n: "Adduktoren", r: "10–15" }, { n: "Landmine/Cablerotations", r: "12–15 je Seite" } ] }
 ];
+const GYM_SET_COUNT = 3;
 // Wochentag -> vorgeschlagener Trainingstag (Mo/Di/Do/Fr laut Plan)
 const GYM_DAY_BY_WEEKDAY = { 1: "oberA", 2: "unterA", 4: "oberB", 5: "unterB" };
 let gymSelectedDay = GYM_DAY_BY_WEEKDAY[new Date().getDay()] || "oberA";
 
-// Letzte protokollierte Saetze einer Uebung -- als Referenz beim naechsten Training ("was hatte ich zuletzt?").
+function gymNum(v) {
+  return (Math.round(v * 10) / 10).toLocaleString("de-DE");
+}
+function gymDateLabel(key) {
+  return dateFromKey(key).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+}
+function gymSessions() {
+  state.gymSessions = state.gymSessions || [];
+  return state.gymSessions;
+}
+function gymSetHasData(x) {
+  return !!(x && (x.weight != null || x.reps != null));
+}
+// Eine Einheit zaehlt erst, wenn wirklich etwas drinsteht -- sonst wuerde jedes versehentliche
+// Antippen eines Feldes als Training in der Auswertung landen.
+function gymSessionHasData(s) {
+  return Object.values(s.entries || {}).some(sets => (sets || []).some(gymSetHasData));
+}
+
+// Die letzte Einheit VOR einem Stichtag, in der diese Uebung protokolliert wurde.
+// beforeDate wird bewusst immer gesetzt (heute): sonst zeigt "zuletzt" die Werte, die man
+// gerade selbst eintippt, statt der Referenz vom letzten Training.
 function gymLastEntry(exerciseName, beforeDate) {
-  const sessions = (state.gymSessions || [])
-    .filter(s => s.entries && s.entries[exerciseName] && s.entries[exerciseName].some(x => x && x.weight))
+  const found = gymSessions()
+    .filter(s => s.entries && (s.entries[exerciseName] || []).some(gymSetHasData))
     .filter(s => !beforeDate || s.date < beforeDate)
     .sort((a, b) => b.date.localeCompare(a.date));
-  return sessions.length ? { date: sessions[0].date, sets: sessions[0].entries[exerciseName] } : null;
+  return found.length ? { date: found[0].date, sets: found[0].entries[exerciseName] } : null;
 }
 
 // Bestes Satzgewicht einer Einheit -- Basis fuer die Staerke-Kurve.
@@ -2851,46 +2905,99 @@ function gymSessionTopWeight(session) {
   }));
   return top;
 }
+// Gesamtvolumen (Gewicht x Wiederholungen) -- das ueblichste Mass fuer Trainingsfortschritt,
+// weil es Gewicht UND Wiederholungen beruecksichtigt statt nur den schwersten Satz.
+function gymSessionVolume(session) {
+  return Object.values(session.entries || {}).flat()
+    .reduce((sum, x) => sum + ((x && x.weight && x.reps) ? x.weight * x.reps : 0), 0);
+}
+
+// Kopfkarte: was war das letzte Training dieses Typs? Gibt beim Reinkommen sofort den Bezugspunkt.
+function gymLastSessionCardHtml(day, todayKey) {
+  const prev = gymSessions()
+    .filter(s => s.dayKey === day.key && s.date < todayKey && gymSessionHasData(s))
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (!prev) {
+    return `<div class="gym-lastcard empty">Noch kein ${escapeHtml(day.label)}-Training protokolliert.</div>`;
+  }
+  const exCount = Object.values(prev.entries || {}).filter(sets => (sets || []).some(gymSetHasData)).length;
+  const vol = gymSessionVolume(prev);
+  const top = gymSessionTopWeight(prev);
+  return `<div class="gym-lastcard">
+      <div class="gym-lastcard-head">Letztes ${escapeHtml(day.label)} · ${gymDateLabel(prev.date)}</div>
+      <div class="gym-lastcard-stats">
+        <span><b>${exCount}</b> Übungen</span>
+        <span><b>${top ? gymNum(top) + " kg" : "–"}</b> schwerster Satz</span>
+        <span><b>${vol ? gymNum(vol) + " kg" : "–"}</b> Volumen</span>
+      </div>
+    </div>`;
+}
+
+function gymTrendHtml(current, lastWeight) {
+  if (current == null || lastWeight == null) return "";
+  if (current > lastWeight) return ' <i class="gym-trend up">▲</i>';
+  if (current < lastWeight) return ' <i class="gym-trend down">▼</i>';
+  return ' <i class="gym-trend same">=</i>';
+}
 
 function renderGym() {
   const picker = document.getElementById("gymDayPicker");
   if (!picker) return;
-  state.gymSessions = state.gymSessions || [];
+  const today = todayStr();
+  const logged = new Set(gymSessions().filter(s => s.date === today && gymSessionHasData(s)).map(s => s.dayKey));
   picker.innerHTML = GYM_PLAN.map(d =>
-    `<button class="gym-day${d.key === gymSelectedDay ? " active" : ""}" data-gym-day="${d.key}">
+    `<button class="gym-day${d.key === gymSelectedDay ? " active" : ""}${logged.has(d.key) ? " logged" : ""}" data-gym-day="${d.key}">
        <span class="gym-day-tag">${d.tag}</span>${escapeHtml(d.label)}</button>`).join("");
 
   const day = GYM_PLAN.find(d => d.key === gymSelectedDay) || GYM_PLAN[0];
-  const today = todayStr();
-  let session = state.gymSessions.find(s => s.date === today && s.dayKey === day.key);
-  const wrap = document.getElementById("gymSession");
+  const session = gymSessions().find(s => s.date === today && s.dayKey === day.key);
+  const lastCard = document.getElementById("gymLastSession");
+  if (lastCard) lastCard.innerHTML = gymLastSessionCardHtml(day, today);
 
   const rows = day.exercises.map(ex => {
     const sets = (session && session.entries && session.entries[ex.n]) || [];
-    const last = gymLastEntry(ex.n, session ? null : undefined);
-    const lastTxt = last
-      ? `zuletzt ${last.date.slice(8, 10)}.${last.date.slice(5, 7)}: ` +
-        last.sets.filter(x => x && x.weight).map(x => `${x.weight}kg×${x.reps || "?"}`).join(", ")
-      : "noch keine Werte";
-    const setInputs = [0, 1, 2].map(i => {
+    const last = gymLastEntry(ex.n, today);
+    const lastSets = last ? last.sets : [];
+
+    const headCells = [], lastCells = [], inputCells = [];
+    for (let i = 0; i < GYM_SET_COUNT; i++) {
       const v = sets[i] || {};
-      return `<div class="gym-set">
-        <input type="number" inputmode="decimal" step="0.5" min="0" placeholder="kg"
+      const lv = lastSets[i] || {};
+      const hasLast = lv.weight != null;
+      headCells.push(`<div class="gym-col-head">Satz ${i + 1}</div>`);
+      lastCells.push(`<div class="gym-last-cell${hasLast ? "" : " none"}">${
+        hasLast ? `${gymNum(lv.weight)} kg × ${lv.reps != null ? lv.reps : "?"}${gymTrendHtml(v.weight, lv.weight)}` : "–"
+      }</div>`);
+      inputCells.push(`<div class="gym-set">
+        <input type="number" inputmode="decimal" step="0.5" min="0" aria-label="Satz ${i + 1} Gewicht"
+               placeholder="${hasLast ? gymNum(lv.weight) : "kg"}"
                data-gym-w="${escapeHtml(ex.n)}" data-gym-set="${i}" value="${v.weight != null ? v.weight : ""}">
         <span>×</span>
-        <input type="number" inputmode="numeric" step="1" min="0" placeholder="Wdh"
+        <input type="number" inputmode="numeric" step="1" min="0" aria-label="Satz ${i + 1} Wiederholungen"
+               placeholder="${hasLast && lv.reps != null ? lv.reps : "Wdh"}"
                data-gym-r="${escapeHtml(ex.n)}" data-gym-set="${i}" value="${v.reps != null ? v.reps : ""}">
-      </div>`;
-    }).join("");
+      </div>`);
+    }
+
     return `<div class="gym-ex">
       <div class="gym-ex-head"><div class="item-title">${escapeHtml(ex.n)}</div><span class="gym-target">${escapeHtml(ex.r)}</span></div>
-      <div class="item-meta">${escapeHtml(lastTxt)}</div>
-      <div class="gym-sets">${setInputs}</div>
+      <div class="gym-lastline">${last ? "Letztes Mal · " + gymDateLabel(last.date) : "Noch keine Werte"}</div>
+      <div class="gym-grid">
+        ${headCells.join("")}
+        ${lastCells.join("")}
+        ${inputCells.join("")}
+      </div>
     </div>`;
   }).join("");
 
-  const done = session ? Object.values(session.entries || {}).filter(a => (a || []).some(x => x && x.weight)).length : 0;
-  wrap.innerHTML = `<div class="gym-summary">${done} / ${day.exercises.length} Übungen heute erfasst</div>${rows}`;
+  document.getElementById("gymSession").innerHTML =
+    `<div class="gym-summary">${gymSummaryHtml(day, session)}</div>${rows}`;
+}
+
+function gymSummaryHtml(day, session) {
+  const done = session ? Object.values(session.entries || {}).filter(a => (a || []).some(gymSetHasData)).length : 0;
+  const vol = session ? gymSessionVolume(session) : 0;
+  return `<b>${done} / ${day.exercises.length}</b> Übungen heute erfasst${vol ? ` · ${gymNum(vol)} kg Volumen` : ""}`;
 }
 
 document.addEventListener("click", e => {
@@ -2906,8 +3013,7 @@ document.addEventListener("input", e => {
   const exercise = el.dataset.gymW || el.dataset.gymR;
   const idx = parseInt(el.dataset.gymSet, 10);
   const today = todayStr();
-  state.gymSessions = state.gymSessions || [];
-  let session = state.gymSessions.find(s => s.date === today && s.dayKey === gymSelectedDay);
+  let session = gymSessions().find(s => s.date === today && s.dayKey === gymSelectedDay);
   if (!session) { session = { id: uid(), date: today, dayKey: gymSelectedDay, entries: {} }; state.gymSessions.push(session); }
   session.entries[exercise] = session.entries[exercise] || [];
   session.entries[exercise][idx] = session.entries[exercise][idx] || {};
@@ -2915,87 +3021,170 @@ document.addEventListener("input", e => {
   if (wEl) session.entries[exercise][idx].weight = (val != null && !isNaN(val)) ? val : null;
   else session.entries[exercise][idx].reps = (val != null && !isNaN(val)) ? val : null;
   saveData();
+  // Bewusst kein volles renderGym(): das wuerde den Fokus aus dem Feld reissen, in das gerade
+  // getippt wird. Nur Trendpfeil des Satzes und Tageszusammenfassung auffrischen.
+  gymRefreshLive(el, exercise, idx, session);
 });
 
+function gymRefreshLive(el, exercise, idx, session) {
+  const day = GYM_PLAN.find(d => d.key === gymSelectedDay) || GYM_PLAN[0];
+  const sum = document.querySelector("#gymSession .gym-summary");
+  if (sum) sum.innerHTML = gymSummaryHtml(day, session);
 
-// ---------- Gym-Auswertung: Gewichts- und Staerkeverlauf ----------
-// Zwei Linien-Diagramme als schlankes Inline-SVG (keine Chart-Bibliothek -- die App bleibt
-// abhaengigkeitsfrei und offline-tauglich). Koerpergewicht kommt aus der bestehenden Gewohnheit
-// mit type "weight", die Staerke aus dem hoechsten Satzgewicht je Trainingseinheit.
-function gymLineChart(points, unit) {
+  const grid = el.closest(".gym-grid");
+  const cell = grid ? grid.querySelectorAll(".gym-last-cell")[idx] : null;
+  if (!cell) return;
+  const last = gymLastEntry(exercise, todayStr());
+  const lv = (last && last.sets[idx]) || {};
+  if (lv.weight == null) return;
+  const cur = session.entries[exercise][idx];
+  cell.innerHTML = `${gymNum(lv.weight)} kg × ${lv.reps != null ? lv.reps : "?"}${gymTrendHtml(cur.weight, lv.weight)}`;
+}
+
+
+// ---------- Gym-Auswertung: Gewichts-, Staerke- und Volumenverlauf ----------
+// Linien-Diagramme als schlankes Inline-SVG (keine Chart-Bibliothek -- die App bleibt
+// abhaengigkeitsfrei und offline-tauglich).
+function gymLineChart(points, unit, opts = {}) {
   if (points.length < 2) {
     return '<div class="empty-hint">Noch zu wenig Daten — ab zwei Einträgen entsteht hier eine Kurve.</div>';
   }
-  const W = 300, H = 96, PAD = 6;
+  const W = 320, H = 128, L = 6, R = 6, T = 14, B = 20;
   const vals = points.map(p => p.v);
-  const min = Math.min(...vals), max = Math.max(...vals);
-  const span = (max - min) || 1;
-  const x = i => PAD + (i / (points.length - 1)) * (W - 2 * PAD);
-  const y = v => H - PAD - ((v - min) / span) * (H - 2 * PAD);
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if (min === max) { min -= 1; max += 1; }            // flache Linie mittig statt am Rand
+  const pad = (max - min) * 0.14;                     // Luft, damit Punkte die Kante nicht beruehren
+  const lo = min - pad, hi = max + pad, span = hi - lo;
+  const x = i => L + (i / (points.length - 1)) * (W - L - R);
+  const y = v => T + (1 - (v - lo) / span) * (H - T - B);
+
   const line = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
-  const area = `${line} L${x(points.length - 1).toFixed(1)},${H - PAD} L${x(0).toFixed(1)},${H - PAD} Z`;
-  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.4" fill="var(--color-accent-300)"/>`).join("");
+  const area = `${line} L${x(points.length - 1).toFixed(1)},${H - B} L${x(0).toFixed(1)},${H - B} Z`;
+  const grid = [0, 0.5, 1].map(f => {
+    const gy = (T + f * (H - T - B)).toFixed(1);
+    return `<line x1="${L}" y1="${gy}" x2="${W - R}" y2="${gy}" stroke="var(--color-divider)" stroke-width="1"/>`;
+  }).join("");
+  const dots = points.map((p, i) => {
+    const isLast = i === points.length - 1;
+    return `<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="${isLast ? 4 : 2.2}"
+      fill="${isLast ? "var(--color-accent-200)" : "var(--color-accent-400)"}"${isLast ? ' stroke="var(--color-bg)" stroke-width="1.5"' : ""}
+      ><title>${p.d} · ${gymNum(p.v)}${unit}</title></circle>`;
+  }).join("");
+
   const first = points[0], last = points[points.length - 1];
   const delta = last.v - first.v;
-  const sign = delta > 0 ? "+" : "";
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="gym-chart-svg">
-      <path d="${area}" fill="color-mix(in srgb, var(--color-accent-600) 18%, transparent)"/>
+  const good = opts.lowerIsBetter ? delta < 0 : delta > 0;
+  const sign = delta > 0 ? "+" : delta < 0 ? "−" : "±";
+  const gid = "gymGrad" + Math.random().toString(36).slice(2, 8);
+  const dm = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.`;
+
+  return `<div class="gym-chart-top">
+      <div class="gym-chart-value">${gymNum(last.v)}<span>${unit}</span></div>
+      <div class="gym-chart-delta ${delta === 0 ? "flat" : good ? "up" : "down"}">${sign}${gymNum(Math.abs(delta))}${unit}
+        <span>seit ${dm(first.d)}</span></div>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" class="gym-chart-svg" preserveAspectRatio="none">
+      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--color-accent-500)" stop-opacity="0.32"/>
+        <stop offset="1" stop-color="var(--color-accent-500)" stop-opacity="0"/>
+      </linearGradient></defs>
+      ${grid}
+      <path d="${area}" fill="url(#${gid})"/>
       <path d="${line}" fill="none" stroke="var(--color-accent-300)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
       ${dots}
     </svg>
-    <div class="gym-chart-legend">
-      <span>${first.d.slice(8,10)}.${first.d.slice(5,7)} · ${first.v}${unit}</span>
-      <span class="${delta >= 0 ? "up" : "down"}">${sign}${Math.round(delta * 10) / 10}${unit}</span>
-      <span>${last.d.slice(8,10)}.${last.d.slice(5,7)} · ${last.v}${unit}</span>
-    </div>`;
+    <div class="gym-chart-axis"><span>${dm(first.d)}</span><span>${points.length} Einträge</span><span>${dm(last.d)}</span></div>`;
 }
+
+// Uebungen mit mindestens zwei protokollierten Einheiten -- nur die ergeben eine Kurve.
+function gymExercisesWithHistory() {
+  const map = new Map();
+  gymSessions().forEach(s => Object.entries(s.entries || {}).forEach(([ex, sets]) => {
+    const best = (sets || []).reduce((m, x) => (x && x.weight > m ? x.weight : m), 0);
+    if (!best) return;
+    if (!map.has(ex)) map.set(ex, []);
+    map.get(ex).push({ d: s.date, v: best });
+  }));
+  map.forEach(arr => arr.sort((a, b) => a.d.localeCompare(b.d)));
+  return map;
+}
+
+let gymStrengthExercise = null;
 
 function renderGymAnalysis() {
   const statsEl = document.getElementById("gymStats");
   if (!statsEl) return;
-  const sessions = (state.gymSessions || [])
-    .filter(s => gymSessionTopWeight(s) > 0)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const sessions = gymSessions().filter(gymSessionHasData).sort((a, b) => a.date.localeCompare(b.date));
+  const last30 = sessions.filter(s => s.date >= todayStr(-30)).length;
 
-  // Koerpergewicht aus der Gewohnheit mit type "weight"
   const wHabit = state.habits.find(h => h.type === "weight");
   const weightPoints = wHabit
     ? Object.entries(wHabit.history || {})
         .filter(([, v]) => typeof v === "number" && v > 0)
         .sort((a, b) => a[0].localeCompare(b[0]))
-        .slice(-30)
+        .slice(-40)
         .map(([d, v]) => ({ d, v }))
     : [];
 
-  const strengthPoints = sessions.slice(-30).map(s => ({ d: s.date, v: gymSessionTopWeight(s) }));
+  const volPoints = sessions.filter(s => gymSessionVolume(s) > 0).slice(-30)
+    .map(s => ({ d: s.date, v: Math.round(gymSessionVolume(s)) }));
+  const lastVol = sessions.length ? gymSessionVolume(sessions[sessions.length - 1]) : 0;
+  const bestTop = sessions.reduce((m, s) => Math.max(m, gymSessionTopWeight(s)), 0);
 
-  // Gesamtvolumen (Gewicht x Wiederholungen) der letzten Einheit als Fortschrittsmass
-  const lastVol = sessions.length ? Object.values(sessions[sessions.length - 1].entries || {})
-    .flat().reduce((sum, x) => sum + ((x && x.weight && x.reps) ? x.weight * x.reps : 0), 0) : 0;
+  statsEl.innerHTML = [
+    { num: sessions.length, label: "Einheiten gesamt" },
+    { num: last30, label: "Einheiten (30 Tage)" },
+    { num: weightPoints.length ? gymNum(weightPoints[weightPoints.length - 1].v) + " kg" : "–", label: "Körpergewicht" },
+    { num: bestTop ? gymNum(bestTop) + " kg" : "–", label: "Schwerster Satz" },
+    { num: lastVol ? gymNum(Math.round(lastVol)) + " kg" : "–", label: "Volumen letzte Einheit" },
+    { num: sessions.length ? gymDateLabel(sessions[sessions.length - 1].date) : "–", label: "Letztes Training" }
+  ].map(b => `<div class="stat-box"><div class="stat-num">${b.num}</div><div class="stat-label">${b.label}</div></div>`).join("");
 
-  statsEl.innerHTML = `
-    <div class="stat-box"><div class="stat-num">${sessions.length}</div><div class="stat-label">Einheiten</div></div>
-    <div class="stat-box"><div class="stat-num">${weightPoints.length ? weightPoints[weightPoints.length-1].v + " kg" : "–"}</div><div class="stat-label">Körpergewicht</div></div>
-    <div class="stat-box"><div class="stat-num">${strengthPoints.length ? strengthPoints[strengthPoints.length-1].v + " kg" : "–"}</div><div class="stat-label">Bestes Satzgewicht</div></div>
-    <div class="stat-box"><div class="stat-num">${lastVol ? Math.round(lastVol).toLocaleString("de-DE") : "–"}</div><div class="stat-label">Volumen letzte Einheit</div></div>`;
+  const setChart = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  setChart("gymWeightChart", gymLineChart(weightPoints, " kg"));
+  setChart("gymVolumeChart", gymLineChart(volPoints, " kg"));
 
-  document.getElementById("gymWeightChart").innerHTML = gymLineChart(weightPoints, " kg");
-  document.getElementById("gymStrengthChart").innerHTML = gymLineChart(strengthPoints, " kg");
+  // Staerke je Uebung: aussagekraeftiger als "schwerster Satz der Einheit", weil der je nach
+  // Trainingstag (Beinpresse vs. Seitheben) voellig unterschiedlich hoch ausfaellt.
+  const hist = gymExercisesWithHistory();
+  const usable = [...hist.entries()].filter(([, arr]) => arr.length >= 2)
+    .sort((a, b) => a[0].localeCompare(b[0], "de"));
+  const picker = document.getElementById("gymStrengthPicker");
+  const chartEl = document.getElementById("gymStrengthChart");
+  if (!picker || !chartEl) { /* nichts zu tun */ }
+  else if (!usable.length) {
+    picker.parentElement.style.display = "none";
+    chartEl.innerHTML = '<div class="empty-hint">Sobald eine Übung an zwei Tagen protokolliert ist, entsteht hier ihre Kurve.</div>';
+  } else {
+    picker.parentElement.style.display = "";
+    if (!usable.some(([ex]) => ex === gymStrengthExercise)) gymStrengthExercise = usable[0][0];
+    picker.innerHTML = usable.map(([ex, arr]) =>
+      `<option value="${escapeHtml(ex)}"${ex === gymStrengthExercise ? " selected" : ""}>${escapeHtml(ex)} (${arr.length})</option>`).join("");
+    chartEl.innerHTML = gymLineChart(hist.get(gymStrengthExercise).slice(-30), " kg");
+  }
 
-  // Bestleistung je Uebung
   const best = {};
-  (state.gymSessions || []).forEach(s => Object.entries(s.entries || {}).forEach(([ex, sets]) => {
+  gymSessions().forEach(s => Object.entries(s.entries || {}).forEach(([ex, sets]) => {
     (sets || []).forEach(x => { if (x && x.weight && (!best[ex] || x.weight > best[ex].w)) best[ex] = { w: x.weight, r: x.reps, d: s.date }; });
   }));
-  const rows = Object.entries(best).sort((a, b) => b[1].w - a[1].w).slice(0, 8);
+  const rows = Object.entries(best).sort((a, b) => b[1].w - a[1].w);
   document.getElementById("gymTopLifts").innerHTML = rows.length
-    ? `<div class="gym-chart-title text-muted" style="margin-bottom:8px;">Bestleistungen</div>` + rows.map(([ex, b]) => `
-        <div class="areaload-row">
-          <div class="areaload-name" style="width:auto; flex:1;">${escapeHtml(ex)}</div>
-          <div class="areaload-count" style="width:auto;">${b.w} kg × ${b.r || "?"}</div>
+    ? rows.map(([ex, b]) => `
+        <div class="gym-best-row">
+          <div class="gym-best-name">${escapeHtml(ex)}</div>
+          <div class="gym-best-date">${b.d.slice(8, 10)}.${b.d.slice(5, 7)}.</div>
+          <div class="gym-best-val">${gymNum(b.w)} kg × ${b.r || "?"}</div>
         </div>`).join("")
-    : "";
+    : '<div class="empty-hint">Noch keine Werte protokolliert.</div>';
 }
+
+document.addEventListener("change", e => {
+  if (e.target.id === "gymStrengthPicker") {
+    gymStrengthExercise = e.target.value;
+    renderGymAnalysis();
+  }
+});
+
 
 // ---------- Add buttons ----------
 document.getElementById("addTaskBtn").addEventListener("click", () => openTaskModal());
