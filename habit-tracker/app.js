@@ -2523,8 +2523,8 @@ document.addEventListener("click", e => {
   const st = e.target.closest("[data-subtab]");
   if (st) {
     const key = st.dataset.subtab;
-    document.querySelectorAll("#analyseSubtabs .subtab").forEach(b => b.classList.toggle("active", b === st));
-    document.querySelectorAll("#tab-analyse .subpanel").forEach(pnl => pnl.classList.toggle("active", pnl.dataset.subpanel === key));
+    st.closest(".subtabs").querySelectorAll(".subtab").forEach(b => b.classList.toggle("active", b === st));
+    st.closest(".tab-panel").querySelectorAll(":scope > .subpanel").forEach(pnl => pnl.classList.toggle("active", pnl.dataset.subpanel === key));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   if (e.target.closest("[data-areaload-toggle]")) {
@@ -2835,37 +2835,71 @@ initPrayerDragReorder();
 
 
 // ---------- Gym ----------
-// Trainingsplan 1:1 aus dem Vault (Tim/10_Persoenlich/Trainingsplan.md): 4-Tage Ober-/Unterkoerper-Split.
-// Zielwiederholungen laut Plan: Grunduebungen 8-12, Isolation 10-15, Rumpfrotation/Hyperextensions 12-15.
+// Trainingsplan 1:1 aus dem Vault (Tim/10_Persoenlich/Trainingsplan.md) -- inklusive der
+// Superset-Bloecke und Pausenzeiten aus dem Abschnitt "Trainingsablauf", die vorher nur im
+// Vault standen und in der App verlorengingen.
+// ACHTUNG: die Uebungsnamen sind zugleich die Schluessel, unter denen protokolliert wird.
+// Wer sie aendert, kappt die Historie dieser Uebung -- Reihenfolge und Gruppierung sind frei.
 const GYM_PLAN = [
-  { key: "oberA", label: "Oberkörper A", tag: "Mo", exercises: [
-    { n: "Überzüge (Aufwärmen)", r: "1–2 Sätze" }, { n: "Brustpresse", r: "8–12" },
-    { n: "Rudern breit/eng", r: "8–12" }, { n: "Latziehen breit/eng", r: "8–12" },
-    { n: "Schulterdrücken", r: "8–12" }, { n: "Butterfly", r: "10–15" },
-    { n: "Butterfly Reverse", r: "10–15" }, { n: "Seitheben", r: "10–15" },
-    { n: "Trizeps Pulldown", r: "10–15" }, { n: "Preacher/Hammercurls", r: "10–15" } ] },
-  { key: "unterA", label: "Unterkörper A", tag: "Di", exercises: [
-    { n: "Squat Maschine", r: "8–12" }, { n: "Beinpresse", r: "8–12" },
-    { n: "Hamstrings", r: "10–15" }, { n: "Beinstrecker", r: "10–15" },
-    { n: "Wadenheben", r: "10–15" }, { n: "Abduktoren", r: "10–15" },
-    { n: "Adduktoren", r: "10–15" }, { n: "Hyperextensions", r: "12–15" },
-    { n: "Landmine/Cable Rotation", r: "12–15 je Seite" } ] },
-  { key: "oberB", label: "Oberkörper B", tag: "Do", exercises: [
-    { n: "Schrägbankdrücken", r: "8–12" }, { n: "Latzug eng/breit", r: "8–12" },
-    { n: "Rudern eng/breit", r: "8–12" }, { n: "Schulterdrücken", r: "8–12" },
-    { n: "Butterfly", r: "10–15" }, { n: "Butterfly Reverse", r: "10–15" },
-    { n: "Seitheben", r: "10–15" }, { n: "Trizeps Pulldown", r: "10–15" },
-    { n: "Preacher/Hammercurls", r: "10–15" } ] },
-  { key: "unterB", label: "Unterkörper B", tag: "Fr", exercises: [
-    { n: "Kreuzheben", r: "8–12" }, { n: "Beinpresse", r: "8–12" },
-    { n: "Hamstrings", r: "10–15" }, { n: "Beinstrecker", r: "10–15" },
-    { n: "Wadenheben", r: "10–15" }, { n: "Abduktoren", r: "10–15" },
-    { n: "Adduktoren", r: "10–15" }, { n: "Landmine/Cablerotations", r: "12–15 je Seite" } ] }
+  { key: "oberA", label: "Oberkörper A", tag: "Mo", blocks: [
+    { title: "Aufwärmen", note: "1–2 Sätze, leicht", exercises: [
+      { n: "Überzüge (Aufwärmen)", r: "locker", s: 2 } ] },
+    { title: "Superset 1", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Brustpresse", r: "8–12" }, { n: "Rudern breit/eng", r: "8–12" } ] },
+    { title: "Superset 2", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Latziehen breit/eng", r: "8–12" }, { n: "Schulterdrücken", r: "8–12" } ] },
+    { title: "Superset 3", note: "2–3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Butterfly", r: "10–15" }, { n: "Butterfly Reverse", r: "10–15" } ] },
+    { title: "Solo", note: "3 Sätze", rest: 60, exercises: [
+      { n: "Seitheben", r: "10–15" } ] },
+    { title: "Superset 4", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Trizeps Pulldown", r: "10–15" }, { n: "Preacher/Hammercurls", r: "10–15" } ] }
+  ] },
+  { key: "unterA", label: "Unterkörper A", tag: "Di", blocks: [
+    { title: "Solo", note: "3 Sätze · vorher aufwärmen", rest: 180, exercises: [
+      { n: "Squat Maschine", r: "8–12" } ] },
+    { title: "Superset 1", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Beinpresse", r: "8–12" }, { n: "Hamstrings", r: "10–15" } ] },
+    { title: "Superset 2", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Beinstrecker", r: "10–15" }, { n: "Wadenheben", r: "10–15" } ] },
+    { title: "Superset 3", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Abduktoren", r: "10–15" }, { n: "Adduktoren", r: "10–15" } ] },
+    { title: "Solo", note: "2–3 Sätze", rest: 90, exercises: [
+      { n: "Hyperextensions", r: "12–15" } ] },
+    { title: "Solo", note: "2–3 Sätze je Seite", rest: 90, exercises: [
+      { n: "Landmine/Cable Rotation", r: "12–15 je Seite" } ] }
+  ] },
+  { key: "oberB", label: "Oberkörper B", tag: "Do", blocks: [
+    { title: "Superset 1", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Schrägbankdrücken", r: "8–12" }, { n: "Latzug eng/breit", r: "8–12" } ] },
+    { title: "Superset 2", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Rudern eng/breit", r: "8–12" }, { n: "Schulterdrücken", r: "8–12" } ] },
+    { title: "Superset 3", note: "2–3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Butterfly", r: "10–15" }, { n: "Butterfly Reverse", r: "10–15" } ] },
+    { title: "Solo", note: "3 Sätze", rest: 60, exercises: [
+      { n: "Seitheben", r: "10–15" } ] },
+    { title: "Superset 4", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Trizeps Pulldown", r: "10–15" }, { n: "Preacher/Hammercurls", r: "10–15" } ] }
+  ] },
+  { key: "unterB", label: "Unterkörper B", tag: "Fr", blocks: [
+    { title: "Solo", note: "3 Sätze · vorher aufwärmen", rest: 180, exercises: [
+      { n: "Kreuzheben", r: "8–12" } ] },
+    { title: "Superset 1", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Beinpresse", r: "8–12" }, { n: "Hamstrings", r: "10–15" } ] },
+    { title: "Superset 2", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Beinstrecker", r: "10–15" }, { n: "Wadenheben", r: "10–15" } ] },
+    { title: "Superset 3", note: "3 Sätze je Übung", rest: 90, exercises: [
+      { n: "Abduktoren", r: "10–15" }, { n: "Adduktoren", r: "10–15" } ] },
+    { title: "Solo", note: "2–3 Sätze je Seite", rest: 90, exercises: [
+      { n: "Landmine/Cablerotations", r: "12–15 je Seite" } ] }
+  ] }
 ];
-const GYM_SET_COUNT = 3;
-// Wochentag -> vorgeschlagener Trainingstag (Mo/Di/Do/Fr laut Plan)
+// Flache Uebungsliste je Tag -- der Rest des Codes (Zaehlungen, Auswertung) arbeitet damit weiter.
+GYM_PLAN.forEach(d => { d.exercises = d.blocks.flatMap(b => b.exercises); });
+
 const GYM_DAY_BY_WEEKDAY = { 1: "oberA", 2: "unterA", 4: "oberB", 5: "unterB" };
-let gymSelectedDay = GYM_DAY_BY_WEEKDAY[new Date().getDay()] || "oberA";
+const gymTodayKey = GYM_DAY_BY_WEEKDAY[new Date().getDay()] || null;
+let gymSelectedDay = gymTodayKey || "oberA";
 
 function gymNum(v) {
   return (Math.round(v * 10) / 10).toLocaleString("de-DE");
@@ -2884,6 +2918,11 @@ function gymSetHasData(x) {
 // Antippen eines Feldes als Training in der Auswertung landen.
 function gymSessionHasData(s) {
   return Object.values(s.entries || {}).some(sets => (sets || []).some(gymSetHasData));
+}
+// "Erledigt" heisst: mindestens ein Satz mit Gewicht steht drin.
+function gymExerciseDone(session, name) {
+  const sets = (session && session.entries && session.entries[name]) || [];
+  return sets.some(x => x && x.weight != null);
 }
 
 // Die letzte Einheit VOR einem Stichtag, in der diese Uebung protokolliert wurde.
@@ -2912,17 +2951,90 @@ function gymSessionVolume(session) {
     .reduce((sum, x) => sum + ((x && x.weight && x.reps) ? x.weight * x.reps : 0), 0);
 }
 
+function gymTrendHtml(current, lastWeight) {
+  if (current == null || lastWeight == null) return "";
+  if (current > lastWeight) return ' <i class="gym-trend up">▲</i>';
+  if (current < lastWeight) return ' <i class="gym-trend down">▼</i>';
+  return ' <i class="gym-trend same">=</i>';
+}
+
+// ---------- Pausen-Uhr ----------
+// Der Plan schreibt je Block eine Pause vor (60/90/180 Sek.). Die stand bisher nur im Vault.
+// Zustand liegt in einer Variablen, nicht im DOM: renderGym() baut den Kopf neu auf, die
+// laufende Uhr soll das ueberleben.
+let gymRest = null;          // { endsAt, total, label }
+let gymRestInterval = null;
+
+function gymStartRest(seconds, label) {
+  gymRest = { endsAt: Date.now() + seconds * 1000, total: seconds, label };
+  if (gymRestInterval) clearInterval(gymRestInterval);
+  gymRestInterval = setInterval(gymRestTick, 250);
+  gymRenderHeader();
+}
+function gymStopRest() {
+  gymRest = null;
+  if (gymRestInterval) { clearInterval(gymRestInterval); gymRestInterval = null; }
+  gymRenderHeader();
+}
+function gymRestTick() {
+  if (!gymRest) { gymStopRest(); return; }
+  if (Date.now() >= gymRest.endsAt) {
+    if (navigator.vibrate) navigator.vibrate([180, 90, 180]);
+    gymStopRest();
+    return;
+  }
+  gymRenderHeader();
+}
+function gymRestLeft() {
+  if (!gymRest) return 0;
+  return Math.max(0, Math.ceil((gymRest.endsAt - Date.now()) / 1000));
+}
+function gymMMSS(sec) {
+  return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+}
+
+// ---------- Rendering ----------
+// Kopfzeile bleibt beim Scrollen stehen: waehrend man bei Uebung 8 tippt, sieht man weiterhin,
+// wie weit die Einheit ist und wie lange die Pause noch laeuft.
+function gymRenderHeader() {
+  const el = document.getElementById("gymHeader");
+  if (!el) return;
+  const day = GYM_PLAN.find(d => d.key === gymSelectedDay) || GYM_PLAN[0];
+  const session = gymSessions().find(s => s.date === todayStr() && s.dayKey === day.key);
+  const total = day.exercises.length;
+  const done = day.exercises.filter(ex => gymExerciseDone(session, ex.n)).length;
+  const vol = session ? gymSessionVolume(session) : 0;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+
+  const left = gymRestLeft();
+  const timerHtml = gymRest
+    ? `<button class="gym-timer running" data-gym-rest-stop>
+         <span class="gym-timer-ring" style="--p:${gymRest.total ? (left / gymRest.total) * 100 : 0}%"></span>
+         <b>${gymMMSS(left)}</b><span>${escapeHtml(gymRest.label)}</span></button>`
+    : `<span class="gym-timer idle">Pause per Block starten</span>`;
+
+  el.innerHTML = `
+    <div class="gym-header-row">
+      <div class="gym-header-title"><span class="gym-day-tag">${day.tag}</span>${escapeHtml(day.label)}</div>
+      <div class="gym-header-count">${done}<span> / ${total}</span></div>
+    </div>
+    <div class="gym-header-bar"><i style="width:${pct}%"></i></div>
+    <div class="gym-header-foot">
+      <span>${vol ? gymNum(vol) + " kg Volumen" : "noch nichts erfasst"}</span>
+      ${timerHtml}
+    </div>`;
+}
+
 // Kopfkarte: was war das letzte Training dieses Typs? Gibt beim Reinkommen sofort den Bezugspunkt.
 function gymLastSessionCardHtml(day, todayKey) {
   const prev = gymSessions()
     .filter(s => s.dayKey === day.key && s.date < todayKey && gymSessionHasData(s))
     .sort((a, b) => b.date.localeCompare(a.date))[0];
   if (!prev) {
-    return `<div class="gym-lastcard empty">Noch kein ${escapeHtml(day.label)}-Training protokolliert.</div>`;
+    return `<div class="gym-lastcard empty">Noch kein ${escapeHtml(day.label)}-Training protokolliert — die Werte von heute sind dann beim nächsten Mal die Referenz.</div>`;
   }
   const exCount = Object.values(prev.entries || {}).filter(sets => (sets || []).some(gymSetHasData)).length;
-  const vol = gymSessionVolume(prev);
-  const top = gymSessionTopWeight(prev);
+  const top = gymSessionTopWeight(prev), vol = gymSessionVolume(prev);
   return `<div class="gym-lastcard">
       <div class="gym-lastcard-head">Letztes ${escapeHtml(day.label)} · ${gymDateLabel(prev.date)}</div>
       <div class="gym-lastcard-stats">
@@ -2933,11 +3045,44 @@ function gymLastSessionCardHtml(day, todayKey) {
     </div>`;
 }
 
-function gymTrendHtml(current, lastWeight) {
-  if (current == null || lastWeight == null) return "";
-  if (current > lastWeight) return ' <i class="gym-trend up">▲</i>';
-  if (current < lastWeight) return ' <i class="gym-trend down">▼</i>';
-  return ' <i class="gym-trend same">=</i>';
+function gymExerciseHtml(ex, session, today) {
+  const setCount = ex.s || 3;
+  const sets = (session && session.entries && session.entries[ex.n]) || [];
+  const last = gymLastEntry(ex.n, today);
+  const lastSets = last ? last.sets : [];
+  const done = gymExerciseDone(session, ex.n);
+
+  const headCells = [], lastCells = [], inputCells = [];
+  for (let i = 0; i < setCount; i++) {
+    const v = sets[i] || {};
+    const lv = lastSets[i] || {};
+    const hasLast = lv.weight != null;
+    headCells.push(`<div class="gym-col-head">Satz ${i + 1}</div>`);
+    lastCells.push(`<div class="gym-last-cell${hasLast ? "" : " none"}">${
+      hasLast ? `${gymNum(lv.weight)} kg × ${lv.reps != null ? lv.reps : "?"}${gymTrendHtml(v.weight, lv.weight)}` : "–"
+    }</div>`);
+    inputCells.push(`<div class="gym-set">
+      <input type="number" inputmode="decimal" step="0.5" min="0" aria-label="${escapeHtml(ex.n)} Satz ${i + 1} Gewicht"
+             placeholder="${hasLast ? gymNum(lv.weight) : "kg"}"
+             data-gym-w="${escapeHtml(ex.n)}" data-gym-set="${i}" value="${v.weight != null ? v.weight : ""}">
+      <span>×</span>
+      <input type="number" inputmode="numeric" step="1" min="0" aria-label="${escapeHtml(ex.n)} Satz ${i + 1} Wiederholungen"
+             placeholder="${hasLast && lv.reps != null ? lv.reps : "Wdh"}"
+             data-gym-r="${escapeHtml(ex.n)}" data-gym-set="${i}" value="${v.reps != null ? v.reps : ""}">
+    </div>`);
+  }
+
+  return `<div class="gym-ex${done ? " done" : ""}" data-gym-ex="${escapeHtml(ex.n)}">
+    <div class="gym-ex-head">
+      <span class="gym-ex-mark" aria-hidden="true"></span>
+      <div class="item-title">${escapeHtml(ex.n)}</div>
+      <span class="gym-target">${escapeHtml(ex.r)}</span>
+    </div>
+    <div class="gym-lastline">${last ? "Letztes Mal · " + gymDateLabel(last.date) : "Noch keine Werte"}</div>
+    <div class="gym-grid" style="grid-template-columns:repeat(${setCount},1fr);">
+      ${headCells.join("")}${lastCells.join("")}${inputCells.join("")}
+    </div>
+  </div>`;
 }
 
 function renderGym() {
@@ -2946,63 +3091,44 @@ function renderGym() {
   const today = todayStr();
   const logged = new Set(gymSessions().filter(s => s.date === today && gymSessionHasData(s)).map(s => s.dayKey));
   picker.innerHTML = GYM_PLAN.map(d =>
-    `<button class="gym-day${d.key === gymSelectedDay ? " active" : ""}${logged.has(d.key) ? " logged" : ""}" data-gym-day="${d.key}">
+    `<button class="gym-day${d.key === gymSelectedDay ? " active" : ""}${logged.has(d.key) ? " logged" : ""}${d.key === gymTodayKey ? " today" : ""}" data-gym-day="${d.key}">
        <span class="gym-day-tag">${d.tag}</span>${escapeHtml(d.label)}</button>`).join("");
 
   const day = GYM_PLAN.find(d => d.key === gymSelectedDay) || GYM_PLAN[0];
   const session = gymSessions().find(s => s.date === today && s.dayKey === day.key);
+
   const lastCard = document.getElementById("gymLastSession");
   if (lastCard) lastCard.innerHTML = gymLastSessionCardHtml(day, today);
 
-  const rows = day.exercises.map(ex => {
-    const sets = (session && session.entries && session.entries[ex.n]) || [];
-    const last = gymLastEntry(ex.n, today);
-    const lastSets = last ? last.sets : [];
-
-    const headCells = [], lastCells = [], inputCells = [];
-    for (let i = 0; i < GYM_SET_COUNT; i++) {
-      const v = sets[i] || {};
-      const lv = lastSets[i] || {};
-      const hasLast = lv.weight != null;
-      headCells.push(`<div class="gym-col-head">Satz ${i + 1}</div>`);
-      lastCells.push(`<div class="gym-last-cell${hasLast ? "" : " none"}">${
-        hasLast ? `${gymNum(lv.weight)} kg × ${lv.reps != null ? lv.reps : "?"}${gymTrendHtml(v.weight, lv.weight)}` : "–"
-      }</div>`);
-      inputCells.push(`<div class="gym-set">
-        <input type="number" inputmode="decimal" step="0.5" min="0" aria-label="Satz ${i + 1} Gewicht"
-               placeholder="${hasLast ? gymNum(lv.weight) : "kg"}"
-               data-gym-w="${escapeHtml(ex.n)}" data-gym-set="${i}" value="${v.weight != null ? v.weight : ""}">
-        <span>×</span>
-        <input type="number" inputmode="numeric" step="1" min="0" aria-label="Satz ${i + 1} Wiederholungen"
-               placeholder="${hasLast && lv.reps != null ? lv.reps : "Wdh"}"
-               data-gym-r="${escapeHtml(ex.n)}" data-gym-set="${i}" value="${v.reps != null ? v.reps : ""}">
-      </div>`);
-    }
-
-    return `<div class="gym-ex">
-      <div class="gym-ex-head"><div class="item-title">${escapeHtml(ex.n)}</div><span class="gym-target">${escapeHtml(ex.r)}</span></div>
-      <div class="gym-lastline">${last ? "Letztes Mal · " + gymDateLabel(last.date) : "Noch keine Werte"}</div>
-      <div class="gym-grid">
-        ${headCells.join("")}
-        ${lastCells.join("")}
-        ${inputCells.join("")}
-      </div>
-    </div>`;
-  }).join("");
-
-  document.getElementById("gymSession").innerHTML =
-    `<div class="gym-summary">${gymSummaryHtml(day, session)}</div>${rows}`;
-}
-
-function gymSummaryHtml(day, session) {
-  const done = session ? Object.values(session.entries || {}).filter(a => (a || []).some(gymSetHasData)).length : 0;
-  const vol = session ? gymSessionVolume(session) : 0;
-  return `<b>${done} / ${day.exercises.length}</b> Übungen heute erfasst${vol ? ` · ${gymNum(vol)} kg Volumen` : ""}`;
+  const wrap = document.getElementById("gymSession");
+  if (wrap) {
+    wrap.innerHTML = day.blocks.map(b => {
+      const pair = b.exercises.length > 1;
+      const restBtn = b.rest
+        ? `<button class="gym-rest-btn" data-gym-rest="${b.rest}" data-gym-rest-label="${escapeHtml(b.title)}">
+             <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true"><circle cx="6" cy="6.6" r="4.6" stroke="currentColor" stroke-width="1.3"/><path d="M6 4.4V6.8L7.5 7.6M4.4 1.2h3.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+             ${b.rest >= 60 ? gymMMSS(b.rest) : b.rest + "s"}
+           </button>`
+        : "";
+      return `<section class="gym-block${pair ? " superset" : ""}">
+        <div class="gym-block-head">
+          <div class="gym-block-title">${escapeHtml(b.title)}${pair ? '<i class="gym-block-link">⇄</i>' : ""}</div>
+          ${restBtn}
+        </div>
+        <div class="gym-block-note">${escapeHtml(b.note)}</div>
+        <div class="gym-block-body">${b.exercises.map(ex => gymExerciseHtml(ex, session, today)).join("")}</div>
+      </section>`;
+    }).join("");
+  }
+  gymRenderHeader();
 }
 
 document.addEventListener("click", e => {
   const dayBtn = e.target.closest("[data-gym-day]");
-  if (dayBtn) { gymSelectedDay = dayBtn.dataset.gymDay; renderGym(); }
+  if (dayBtn) { gymSelectedDay = dayBtn.dataset.gymDay; gymStopRest(); renderGym(); return; }
+  const restBtn = e.target.closest("[data-gym-rest]");
+  if (restBtn) { gymStartRest(parseInt(restBtn.dataset.gymRest, 10), restBtn.dataset.gymRestLabel || "Pause"); return; }
+  if (e.target.closest("[data-gym-rest-stop]")) gymStopRest();
 });
 
 // Werte direkt beim Tippen sichern -- kein separater Speichern-Knopf, nichts geht verloren.
@@ -3022,14 +3148,14 @@ document.addEventListener("input", e => {
   else session.entries[exercise][idx].reps = (val != null && !isNaN(val)) ? val : null;
   saveData();
   // Bewusst kein volles renderGym(): das wuerde den Fokus aus dem Feld reissen, in das gerade
-  // getippt wird. Nur Trendpfeil des Satzes und Tageszusammenfassung auffrischen.
+  // getippt wird. Nur Trendpfeil, Erledigt-Zustand und Kopfzeile auffrischen.
   gymRefreshLive(el, exercise, idx, session);
 });
 
 function gymRefreshLive(el, exercise, idx, session) {
-  const day = GYM_PLAN.find(d => d.key === gymSelectedDay) || GYM_PLAN[0];
-  const sum = document.querySelector("#gymSession .gym-summary");
-  if (sum) sum.innerHTML = gymSummaryHtml(day, session);
+  gymRenderHeader();
+  const card = el.closest(".gym-ex");
+  if (card) card.classList.toggle("done", gymExerciseDone(session, exercise));
 
   const grid = el.closest(".gym-grid");
   const cell = grid ? grid.querySelectorAll(".gym-last-cell")[idx] : null;
@@ -3040,7 +3166,6 @@ function gymRefreshLive(el, exercise, idx, session) {
   const cur = session.entries[exercise][idx];
   cell.innerHTML = `${gymNum(lv.weight)} kg × ${lv.reps != null ? lv.reps : "?"}${gymTrendHtml(cur.weight, lv.weight)}`;
 }
-
 
 // ---------- Gym-Auswertung: Gewichts-, Staerke- und Volumenverlauf ----------
 // Linien-Diagramme als schlankes Inline-SVG (keine Chart-Bibliothek -- die App bleibt
@@ -3624,105 +3749,208 @@ function totalMonthlyIncome() {
   return state.financeIncomeSources.reduce((s, i) => s + (i.amount || 0), 0);
 }
 
+// Große Beträge ohne Cent: in der Kopfzahl sind "2.450 €" lesbarer als "2.450,00 €".
+function formatEuro0(n) {
+  return Math.round(n || 0).toLocaleString("de-DE") + " €";
+}
+// Wie weit ist der Monat herum? Bezugsgröße dafür, ob das Budget im Plan liegt --
+// "78% verbraucht" heißt an Tag 3 etwas völlig anderes als an Tag 28.
+function financeMonthProgress() {
+  const now = new Date();
+  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return { day: now.getDate(), days, pct: (now.getDate() / days) * 100 };
+}
+function financeMonthLabel() {
+  return new Date().toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+}
+// Fortschrittsbalken mit Markierung, wie weit der Monat ist. Liegt der Balken deutlich vor der
+// Markierung, wird zu schnell ausgegeben -- das ist die eigentliche Aussage, nicht die Prozentzahl.
+function financePaceBar(spent, limit, small) {
+  if (!limit) return "";
+  const pct = (spent / limit) * 100;
+  const mp = financeMonthProgress();
+  const over = pct > 100;
+  const ahead = !over && pct > mp.pct + 8;
+  return `<div class="fin-pace-bar${small ? " small" : ""}${over ? " over" : ahead ? " ahead" : ""}">
+      <i style="width:${Math.min(100, pct)}%"></i>
+      <u style="left:${Math.min(100, mp.pct)}%" title="Tag ${mp.day} von ${mp.days}"></u>
+    </div>`;
+}
+
+function financeMonthHeroHtml(totalIncome, totalSpent, totalLimit) {
+  const mp = financeMonthProgress();
+  const left = totalIncome - totalSpent;
+  const rate = totalIncome > 0 ? Math.round((left / totalIncome) * 100) : null;
+
+  const bigHtml = totalIncome > 0
+    ? `<div class="fin-hero-big${left < 0 ? " neg" : ""}">${formatEuro0(left)}</div>
+       <div class="fin-hero-sub">übrig von ${formatEuro0(totalIncome)} Einkommen</div>`
+    : `<div class="fin-hero-big">${formatEuro0(totalSpent)}</div>
+       <div class="fin-hero-sub">ausgegeben — Einkommen unter „Vermögen“ eintragen, dann rechnet Atlas die Sparquote</div>`;
+
+  const budgetHtml = totalLimit > 0
+    ? `${financePaceBar(totalSpent, totalLimit)}
+       <div class="fin-pace-legend">
+         <span>${Math.round((totalSpent / totalLimit) * 100)}% von ${formatEuro0(totalLimit)} Budget</span>
+         <span>Tag ${mp.day} von ${mp.days}</span>
+       </div>`
+    : `<div class="fin-hero-hint">Noch kein Budget gesetzt — leg unten Kategorien mit Limit an.</div>`;
+
+  return `<div class="fin-hero">
+      <div class="fin-hero-month">${escapeHtml(financeMonthLabel())}</div>
+      ${bigHtml}
+      <div class="fin-hero-split">
+        <div><b>${formatEuro0(totalSpent)}</b><span>Ausgaben</span></div>
+        <div><b>${rate === null ? "–" : rate + "%"}</b><span>Sparquote</span></div>
+        <div><b>${state.financeExpenses.filter(e => e.date.slice(0, 7) === financeMonthKey()).length}</b><span>Buchungen</span></div>
+      </div>
+      ${budgetHtml}
+    </div>`;
+}
+
+function financeWealthHeroHtml() {
+  const total = state.financeAccounts.reduce((s, a) => s + (a.balance || 0), 0);
+  const emergency = state.financeAccounts.filter(a => a.isEmergencyFund).reduce((s, a) => s + (a.balance || 0), 0);
+  const income = totalMonthlyIncome();
+  return `<div class="fin-hero">
+      <div class="fin-hero-month">Gesamtvermögen</div>
+      <div class="fin-hero-big">${formatEuro0(total)}</div>
+      <div class="fin-hero-sub">${state.financeAccounts.length
+        ? `verteilt auf ${state.financeAccounts.length} ${state.financeAccounts.length === 1 ? "Position" : "Positionen"}`
+        : "Noch keine Konten angelegt."}</div>
+      <div class="fin-hero-split">
+        <div><b>${formatEuro0(emergency)}</b><span>Notgroschen</span></div>
+        <div><b>${formatEuro0(income)}</b><span>Einkommen / Monat</span></div>
+        <div><b>${income > 0 ? (Math.round(total / income * 10) / 10).toLocaleString("de-DE") + "×" : "–"}</b><span>Monatseinkommen</span></div>
+      </div>
+    </div>`;
+}
+
+// Ausgaben nach Tag gruppiert mit Tagessumme -- eine flache Liste macht nicht sichtbar,
+// an welchen Tagen viel zusammenkommt.
+function financeExpenseDayLabel(dateKey) {
+  if (dateKey === todayStr()) return "Heute";
+  if (dateKey === todayStr(-1)) return "Gestern";
+  return dateFromKey(dateKey).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+}
+
 function renderFinance() {
-  const netWorthEl = document.getElementById("financeNetWorth");
-  if (!netWorthEl) return;
-
-  const incomeWrap = document.getElementById("financeIncomeList");
-  incomeWrap.innerHTML = state.financeIncomeSources.length
-    ? state.financeIncomeSources.map(i => `
-        <div class="atlas-row">
-          <div style="flex:1; min-width:0; cursor:pointer;" data-edit-income="${i.id}">
-            <div class="item-title">${escapeHtml(i.title)}</div>
-          </div>
-          <div style="font-family:var(--font-heading); font-weight:600;">${formatEuro(i.amount || 0)}</div>
-          <button class="btn btn-icon btn-ghost" data-del-income="${i.id}" aria-label="Löschen">${DEL_ICON}</button>
-        </div>
-      `).join("")
-    : '<div class="empty-hint">Noch keine Einkommensquelle eingetragen.</div>';
-  const totalIncome = totalMonthlyIncome();
-  document.getElementById("financeIncomeTotal").textContent = state.financeIncomeSources.length ? formatEuro(totalIncome) : "";
-
-  const totalNetWorth = state.financeAccounts.reduce((s, a) => s + (a.balance || 0), 0);
-  netWorthEl.textContent = formatEuro(totalNetWorth);
-
-  const accountsWrap = document.getElementById("financeAccountsList");
-  accountsWrap.innerHTML = state.financeAccounts.length
-    ? state.financeAccounts.map(a => `
-        <div class="atlas-row">
-          <div style="flex:1; min-width:0; cursor:pointer;" data-edit-account="${a.id}">
-            <div class="item-title">${escapeHtml(a.title)}${a.isEmergencyFund ? ' <span class="tag tag-accent" style="margin-left:6px;">Notgroschen</span>' : ""}</div>
-          </div>
-          <div style="font-family:var(--font-heading); font-weight:600;">${formatEuro(a.balance || 0)}</div>
-          <button class="btn btn-icon btn-ghost" data-del-account="${a.id}" aria-label="Löschen">${DEL_ICON}</button>
-        </div>
-      `).join("")
-    : '<div class="empty-hint">Noch keine Konten/Vermögenswerte angelegt.</div>';
+  const heroEl = document.getElementById("financeMonthHero");
+  if (!heroEl) return;
 
   const monthKey = financeMonthKey();
   const monthExpenses = state.financeExpenses.filter(e => e.date.slice(0, 7) === monthKey);
   const totalSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
   const totalLimit = state.financeCategories.reduce((s, c) => s + (c.limit || 0), 0);
-  document.getElementById("financeMonthSpent").textContent = `${formatEuro(totalSpent)} / ${formatEuro(totalLimit)}`;
+  const totalIncome = totalMonthlyIncome();
 
-  const rateEl = document.getElementById("financeSavingsRate");
-  if (totalIncome > 0) {
-    const rate = Math.round(((totalIncome - totalSpent) / totalIncome) * 100);
-    rateEl.innerHTML = `Sparquote diesen Monat: <b>${rate}%</b> (${formatEuro(totalIncome - totalSpent)} übrig)`;
-  } else {
-    rateEl.textContent = "Einkommensquelle eintragen, um die Sparquote zu berechnen.";
-  }
+  heroEl.innerHTML = financeMonthHeroHtml(totalIncome, totalSpent, totalLimit);
+  document.getElementById("financeWealthHero").innerHTML = financeWealthHeroHtml();
 
+  // ----- Budget je Kategorie -----
   const categoriesWrap = document.getElementById("financeCategoriesList");
-  categoriesWrap.innerHTML = state.financeCategories.length
-    ? state.financeCategories.map((c, i) => {
-        const spent = monthExpenses.filter(e => e.categoryId === c.id).reduce((s, e) => s + e.amount, 0);
-        return `
-          <div class="atlas-row" style="padding:8px 0;">
-            ${budgetRingHtml(spent, c.limit || 0, 40, i)}
-            <div style="flex:1; min-width:0; cursor:pointer;" data-edit-category="${c.id}">
-              <div class="item-title">${escapeHtml(c.title)}</div>
-              <div class="item-meta">${formatEuro(spent)} / ${formatEuro(c.limit || 0)}</div>
-            </div>
+  const cats = state.financeCategories
+    .map(c => ({ c, spent: monthExpenses.filter(e => e.categoryId === c.id).reduce((s, e) => s + e.amount, 0) }))
+    .sort((a, b) => {
+      const ra = a.c.limit ? a.spent / a.c.limit : -1, rb = b.c.limit ? b.spent / b.c.limit : -1;
+      return rb - ra;                                   // knappste Kategorie zuerst
+    });
+  categoriesWrap.innerHTML = cats.length
+    ? cats.map(({ c, spent }) => {
+        const limit = c.limit || 0;
+        const rest = limit - spent;
+        return `<div class="fin-cat${limit && spent > limit ? " over" : ""}">
+          <div class="fin-cat-top">
+            <div class="fin-cat-name" data-edit-category="${c.id}">${escapeHtml(c.title)}</div>
+            <div class="fin-cat-amt"><b>${formatEuro0(spent)}</b>${limit ? " / " + formatEuro0(limit) : ""}</div>
             <button class="btn btn-icon btn-ghost" data-del-category="${c.id}" aria-label="Löschen">${DEL_ICON}</button>
           </div>
-        `;
+          ${limit ? financePaceBar(spent, limit, true) : ""}
+          <div class="fin-cat-foot">${limit
+            ? (rest >= 0 ? `noch ${formatEuro0(rest)}` : `<span class="over-txt">${formatEuro0(-rest)} über Limit</span>`)
+            : "kein Limit gesetzt"}</div>
+        </div>`;
       }).join("")
     : '<div class="empty-hint">Noch keine Budget-Kategorien angelegt.</div>';
 
+  // ----- Letzte Ausgaben, nach Tag gruppiert -----
   const expensesWrap = document.getElementById("financeExpensesList");
-  const recentExpenses = [...state.financeExpenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
-  expensesWrap.innerHTML = recentExpenses.length
-    ? recentExpenses.map(ex => {
-        const cat = state.financeCategories.find(c => c.id === ex.categoryId);
-        return `
-          <div class="atlas-row expense-row">
-            <div style="flex:1; min-width:0;">
-              <div class="item-title">${escapeHtml(cat ? cat.title : "Ohne Kategorie")}${ex.note ? " · " + escapeHtml(ex.note) : ""}</div>
-              <div class="item-meta"><span>${ex.date}</span><span class="amount">${formatEuro(ex.amount)}</span></div>
-            </div>
-            <button class="btn btn-icon btn-ghost" data-del-expense="${ex.id}" aria-label="Löschen">${DEL_ICON}</button>
+  const order = new Map(state.financeExpenses.map((e, i) => [e.id, i]));
+  const recent = [...state.financeExpenses]
+    .sort((a, b) => b.date.localeCompare(a.date) || order.get(b.id) - order.get(a.id))
+    .slice(0, 20);
+  const byDay = [];
+  recent.forEach(ex => {
+    let grp = byDay.find(g => g.date === ex.date);
+    if (!grp) { grp = { date: ex.date, items: [] }; byDay.push(grp); }
+    grp.items.push(ex);
+  });
+  expensesWrap.innerHTML = byDay.length
+    ? byDay.map(g => `
+        <div class="fin-day">
+          <div class="fin-day-head">
+            <span>${escapeHtml(financeExpenseDayLabel(g.date))}</span>
+            <span>${formatEuro(g.items.reduce((s, e) => s + e.amount, 0))}</span>
           </div>
-        `;
-      }).join("")
+          ${g.items.map(ex => {
+            const cat = state.financeCategories.find(c => c.id === ex.categoryId);
+            return `<div class="fin-exp">
+              <div class="fin-exp-body">
+                <div class="fin-exp-cat">${escapeHtml(cat ? cat.title : "Ohne Kategorie")}</div>
+                ${ex.note ? `<div class="fin-exp-note">${escapeHtml(ex.note)}</div>` : ""}
+              </div>
+              <div class="fin-exp-amt">${formatEuro(ex.amount)}</div>
+              <button class="btn btn-icon btn-ghost" data-del-expense="${ex.id}" aria-label="Löschen">${DEL_ICON}</button>
+            </div>`;
+          }).join("")}
+        </div>`).join("")
     : '<div class="empty-hint">Noch keine Ausgaben erfasst.</div>';
 
-  const goalsWrap = document.getElementById("savingsGoalsList");
-  goalsWrap.innerHTML = state.savingsGoals.length
+  // ----- Konten -----
+  document.getElementById("financeAccountsList").innerHTML = state.financeAccounts.length
+    ? state.financeAccounts.map(a => `
+        <div class="atlas-row">
+          <div style="flex:1; min-width:0; cursor:pointer;" data-edit-account="${a.id}">
+            <div class="item-title">${escapeHtml(a.title)}${a.isEmergencyFund ? ' <span class="tag tag-accent" style="margin-left:6px;">Notgroschen</span>' : ""}</div>
+          </div>
+          <div class="fin-amount">${formatEuro(a.balance || 0)}</div>
+          <button class="btn btn-icon btn-ghost" data-del-account="${a.id}" aria-label="Löschen">${DEL_ICON}</button>
+        </div>`).join("")
+    : '<div class="empty-hint">Noch keine Konten/Vermögenswerte angelegt.</div>';
+
+  // ----- Einkommensquellen -----
+  document.getElementById("financeIncomeList").innerHTML = state.financeIncomeSources.length
+    ? state.financeIncomeSources.map(i => `
+        <div class="atlas-row">
+          <div style="flex:1; min-width:0; cursor:pointer;" data-edit-income="${i.id}">
+            <div class="item-title">${escapeHtml(i.title)}</div>
+          </div>
+          <div class="fin-amount">${formatEuro(i.amount || 0)}</div>
+          <button class="btn btn-icon btn-ghost" data-del-income="${i.id}" aria-label="Löschen">${DEL_ICON}</button>
+        </div>`).join("") +
+      `<div class="fin-sumrow"><span>Summe pro Monat</span><b>${formatEuro(totalIncome)}</b></div>`
+    : '<div class="empty-hint">Noch keine Einkommensquelle eingetragen.</div>';
+
+  // ----- Sparziele -----
+  document.getElementById("savingsGoalsList").innerHTML = state.savingsGoals.length
     ? state.savingsGoals.map(g => {
-        return `
-          <div class="atlas-row">
-            <div style="cursor:pointer; display:flex; align-items:center; gap:12px; flex:1; min-width:0;" data-edit-goal="${g.id}">
-              ${budgetRingHtml(g.current || 0, g.target || 0, 34)}
-              <div style="flex:1; min-width:0;">
-                <div class="item-title">${escapeHtml(g.title)}</div>
-                <div class="item-meta">${formatEuro(g.current || 0)} / ${formatEuro(g.target || 0)}${g.dueDate ? " · bis " + g.dueDate : ""}</div>
-              </div>
+        const target = g.target || 0, cur = g.current || 0;
+        const pct = target ? Math.min(100, Math.round((cur / target) * 100)) : 0;
+        return `<div class="fin-goal">
+          <div class="fin-goal-top" data-edit-goal="${g.id}">
+            ${budgetRingHtml(cur, target, 40)}
+            <div class="fin-goal-body">
+              <div class="item-title">${escapeHtml(g.title)}</div>
+              <div class="item-meta">${formatEuro(cur)} von ${formatEuro(target)}${g.dueDate ? " · bis " + dateFromKey(g.dueDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}</div>
             </div>
-            <button class="btn btn-icon btn-ghost" data-add-goal-amount="${g.id}" aria-label="Betrag hinzufügen"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+            <div class="fin-goal-pct">${pct}%</div>
+          </div>
+          <div class="fin-goal-actions">
+            <button class="btn btn-secondary" data-add-goal-amount="${g.id}">+ Betrag</button>
+            ${target > cur ? `<span class="fin-goal-rest">noch ${formatEuro0(target - cur)}</span>` : '<span class="fin-goal-rest done">Ziel erreicht</span>'}
             <button class="btn btn-icon btn-ghost" data-del-goal="${g.id}" aria-label="Löschen">${DEL_ICON}</button>
           </div>
-        `;
+        </div>`;
       }).join("")
     : '<div class="empty-hint">Noch keine Sparziele angelegt.</div>';
 }

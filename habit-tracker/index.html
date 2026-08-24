@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=43">
+<link rel="stylesheet" href="style.css?v=45">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -524,44 +524,48 @@
 
     <!-- FINANZPLANUNG -->
     <section id="tab-finanzen" class="tab-panel">
-      <h1>Finanzplanung</h1>
+      <h1>Finanzen</h1>
 
-      <h6 class="metal-gold">Einkommen &amp; Sparquote</h6>
-      <div class="card elev-sm" style="margin-bottom: 14px;">
-        <div class="finance-income-row">
-          <span class="item-title">Einkommen / Monat gesamt</span>
-          <span class="item-title" id="financeIncomeTotal" style="font-family:var(--font-heading); font-weight:600;"></span>
-        </div>
-        <div class="finance-savingsrate" id="financeSavingsRate"></div>
-      </div>
-      <div id="financeIncomeList" class="list"></div>
-      <button class="btn btn-ghost btn-block" id="addIncomeSourceBtn" style="display:none;">+ Einkommensquelle hinzufügen</button>
-
-      <h6 class="metal-gold">Vermögensübersicht</h6>
-      <div class="card elev-sm" style="margin-bottom: 14px;">
-        <div class="stat-num" id="financeNetWorth" style="font-size: 26px;">0 €</div>
-        <div class="stat-label">Gesamtvermögen</div>
-      </div>
-      <div id="financeAccountsList" class="list"></div>
-      <button class="btn btn-ghost btn-block" id="addAccountBtn" style="display:none;">+ Konto/Vermögenswert hinzufügen</button>
-
-      <h6 class="metal-gold" style="margin-top: 26px;">Budget &amp; Ausgaben</h6>
-      <div class="card elev-sm" style="margin-bottom: 14px;">
-        <div class="stat-num" id="financeMonthSpent" style="font-size: 20px;">0 € / 0 €</div>
-        <div class="stat-label">Ausgaben diesen Monat</div>
-      </div>
-      <div id="financeCategoriesList" style="display:flex; flex-direction:column; gap:12px; margin-bottom:14px;"></div>
-      <div style="display:flex; gap:8px; margin-bottom: 22px;">
-        <button class="btn btn-secondary metal-gold" style="flex:1;" id="addExpenseBtn">+ Ausgabe erfassen</button>
-        <button class="btn btn-ghost" style="flex:1;" id="addCategoryBtn">+ Kategorie</button>
+      <!-- Drei Bereiche statt einer langen Scrollstrecke: der laufende Monat ist das Tagesgeschäft,
+           Vermögen und Sparziele schaut man selten an. -->
+      <div class="subtabs" role="tablist">
+        <button class="subtab active" data-subtab="monat">Monat</button>
+        <button class="subtab" data-subtab="vermoegen">Vermögen</button>
+        <button class="subtab" data-subtab="ziele">Sparziele</button>
       </div>
 
-      <h6 class="metal-gold">Letzte Ausgaben</h6>
-      <div id="financeExpensesList" class="list" style="margin-bottom: 14px;"></div>
+      <!-- ---------- Laufender Monat ---------- -->
+      <div class="subpanel active" data-subpanel="monat">
+        <div id="financeMonthHero"></div>
 
-      <h6 class="metal-gold" style="margin-top: 26px;">Sparziele</h6>
-      <div id="savingsGoalsList" class="list"></div>
-      <button class="btn btn-ghost btn-block" id="addSavingsGoalBtn" style="display:none;">+ Sparziel hinzufügen</button>
+        <button class="btn btn-primary btn-block" id="addExpenseBtn" style="margin-bottom:26px;">+ Ausgabe erfassen</button>
+
+        <h6 class="metal-gold">Budget je Kategorie</h6>
+        <div id="financeCategoriesList" style="margin-bottom:10px;"></div>
+        <button class="btn btn-ghost btn-block" id="addCategoryBtn" style="margin-bottom:28px;">+ Kategorie</button>
+
+        <h6 class="metal-gold">Letzte Ausgaben</h6>
+        <div id="financeExpensesList" style="margin-bottom:30px;"></div>
+      </div>
+
+      <!-- ---------- Vermögen &amp; Einkommen ---------- -->
+      <div class="subpanel" data-subpanel="vermoegen">
+        <div id="financeWealthHero"></div>
+
+        <h6 class="metal-gold">Konten &amp; Vermögenswerte</h6>
+        <div id="financeAccountsList" class="list"></div>
+        <button class="btn btn-ghost btn-block" id="addAccountBtn" style="display:none; margin-bottom:28px;">+ Konto/Vermögenswert hinzufügen</button>
+
+        <h6 class="metal-gold" style="margin-top:26px;">Einkommen pro Monat</h6>
+        <div id="financeIncomeList" class="list"></div>
+        <button class="btn btn-ghost btn-block" id="addIncomeSourceBtn" style="display:none; margin-bottom:30px;">+ Einkommensquelle hinzufügen</button>
+      </div>
+
+      <!-- ---------- Sparziele ---------- -->
+      <div class="subpanel" data-subpanel="ziele">
+        <div id="savingsGoalsList" class="list"></div>
+        <button class="btn btn-ghost btn-block" id="addSavingsGoalBtn" style="display:none; margin-bottom:30px;">+ Sparziel hinzufügen</button>
+      </div>
     </section>
 
     <!-- BEREICHE -->
@@ -619,6 +623,7 @@
       <h1>Gym</h1>
       <p class="text-muted" style="margin-top:-6px;">Trainingsplan aus dem Vault — Gewicht und Wiederholungen pro Satz eintragen.</p>
       <div id="gymDayPicker" class="gym-daypicker"></div>
+      <div id="gymHeader" class="gym-header"></div>
       <div id="gymLastSession"></div>
       <div id="gymSession"></div>
     </section>
@@ -745,6 +750,6 @@
   <div class="modal" id="modalBody"></div>
 </div>
 
-<script src="app.js?v=36"></script>
+<script src="app.js?v=38"></script>
 </body>
 </html>
