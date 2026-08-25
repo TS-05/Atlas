@@ -4550,7 +4550,6 @@ if (splashEl) {
   // beim Ziehen durch die Blase hindurch, statt mitgeschleift zu werden -- das war der Fehler der
   // frueheren Version ("sie saugt das Symbol ein"). overflow:hidden der Blase schneidet sie auf
   // die Blasenform zu, die Vergroesserung passiert um den Blasenmittelpunkt.
-  const LENS_ZOOM = 1.5;
   let lensLayer = null;
   function buildLens() {
     if (!ringHandle || lensLayer) return;
@@ -4599,8 +4598,9 @@ if (splashEl) {
     lensLayer.style.top = `${top}px`;
     lensLayer.style.width = `${rr.width}px`;
     lensLayer.style.height = `${rr.height}px`;
+    // Bezugspunkt der Vergroesserung ist die Blasenmitte; der Faktor selbst steht als
+    // --lens-zoom im Stylesheet (dort wird auch --grow herausgerechnet).
     lensLayer.style.transformOrigin = `${hw - left}px ${hh - top}px`;
-    lensLayer.style.transform = `scale(${LENS_ZOOM})`;
   }
   function placeAtSlot(slot) {
     const c = centerOf(slot.btn);

@@ -723,14 +723,18 @@ textarea.input { min-height: 90px; resize: vertical; }
 .ring-btn svg { display: block; }
 .ring-btn span { white-space: nowrap; opacity: 0.92; }
 /* ---------- Die Blase (Liquid Glass) ----------
-   Nachgebaut nach der Referenzaufnahme der WhatsApp-Tableiste. Was diese Blase ausmacht und was
-   sie von "runder Kreis mit Farbrand" unterscheidet:
-   1. Superellipse (Squircle), kein Kreis und kein Rechteck.
-   2. Innen fast vollstaendig klar -- man liest den Text darunter durch sie hindurch.
-   3. Was darunter liegt, wird VERGROESSERT und am Rand verdraengt (echte Linsenwirkung, .ring-lens).
-   4. Duenner heller Glanzrand, direkt darunter ein oelfilmartiger Farbsaum.
-   5. Der Farbsaum ist im Ruhezustand nur ein Hauch und flammt in Bewegung voll auf.
-   6. In Bewegung waechst sie und ragt ueber den Ring hinaus; eingerastet passt sie hinein. */
+   Zwei klar getrennte Zustaende, nach Vorgabe:
+
+   RUHE  -- wie der aktive Reiter auf dem Referenzbild: eine schlichte, etwas hellere graue
+            Kreisflaeche. Kein Glanzrand, kein Farbsaum, keine Lupe, kein Schatten. Sie sagt nur
+            "hier stehst du".
+   BEWEGUNG (.is-liquid / .is-dragging) -- daraus waechst die eigentliche Blase:
+            innen fast klar (man liest hindurch), darunter 2x vergroessert und am Rand verdraengt
+            (.ring-lens), 1 mm breiter Oelfilm-Saum mit hellem Glanzrand darueber, und sie waechst
+            zusaetzlich ueber den Ring hinaus.
+
+   Farblage des Saums (conic-gradient: 0deg = oben, im Uhrzeigersinn):
+   rechts magenta/orange, unten violett, links cyan/gruen. */
 .ring-handle {
   position: fixed;
   left: 0;
@@ -739,28 +743,22 @@ textarea.input { min-height: 90px; resize: vertical; }
   height: 92px;
   z-index: 1000;   /* ueber dem Homemenue (998) und dem Splash (999) */
   pointer-events: auto;
-  /* Squircle statt Kreis: an den Seiten flacher, an den Ecken weicher als eine Ellipse. */
-  border-radius: 39%;
+  border-radius: 50%;
+  --lens-zoom: 2;                   /* Vergroesserung der Lupe */
   cursor: grab;
   touch-action: none;
   overflow: hidden;
   isolation: isolate;
-  /* Fast klar -- nur eine Spur Aufhellung oben links, wo das Licht einfaellt. */
-  background:
-    radial-gradient(120% 100% at 30% 22%, rgba(255,255,255,0.13), rgba(255,255,255,0.02) 42%, rgba(255,255,255,0.035) 100%);
-  backdrop-filter: saturate(1.3) brightness(1.05);
-  -webkit-backdrop-filter: saturate(1.3) brightness(1.05);
-  /* Glanzrand: aussen eine helle Haarlinie, innen oben ein heller Bogen (Lichtsammlung im Glas). */
-  box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,0.42),
-    inset 0 2px 4px rgba(255,255,255,0.5),
-    inset 0 -4px 7px rgba(255,255,255,0.2),
-    0 8px 22px rgba(0,0,0,0.45);
+  /* Ruhezustand: flaeche, mehr nicht. */
+  background: rgba(255, 255, 255, 0.10);
+  box-shadow: none;
   transform: translate(var(--hx, -999px), var(--hy, -999px)) translate(-50%, -50%)
              rotate(var(--rot, 0deg))
              scale(calc(var(--sy, 1) * var(--grow, 1)), calc(var(--sx, 1) * var(--grow, 1)))
              rotate(calc(-1 * var(--rot, 0deg)));
-  transition: transform 0.52s cubic-bezier(0.34, 1.22, 0.44, 1), box-shadow 0.2s ease, opacity 0.25s ease;
+  transition: transform 0.52s cubic-bezier(0.34, 1.22, 0.44, 1),
+              box-shadow 0.28s ease, background 0.28s ease,
+              backdrop-filter 0.28s ease, opacity 0.25s ease;
 }
 
 /* Die Linse: eine nicht anklickbare Kopie des Symbolrings, die exakt ueber dem echten Ring liegt
@@ -772,7 +770,13 @@ textarea.input { min-height: 90px; resize: vertical; }
   pointer-events: none;
   z-index: 0;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.26s ease;
+  /* Die Blase waechst beim Ziehen (--grow) und skaliert als Elternelement ihren Inhalt mit.
+     Das wuerde die Vergroesserung heimlich auf 2 * 1.18 treiben. Also herausrechnen: die Lupe
+     bleibt bei genau --lens-zoom, die groessere Blase zeigt dafuer mehr vom Ring.
+     Die gerichtete Dehnung (--sx/--sy) bleibt bewusst drin -- dadurch verschmiert der Inhalt
+     beim schnellen Ziehen mit, so wie in der Vorlage. */
+  transform: scale(calc(var(--lens-zoom, 2) / var(--grow, 1)));
 }
 .ring-handle.is-lensing .ring-lens { opacity: 1; }
 .ring-lens .ring-btn {
@@ -793,21 +797,22 @@ textarea.input { min-height: 90px; resize: vertical; }
   border-radius: inherit;
   pointer-events: none;
   z-index: 2;
+  opacity: 0;                       /* in Ruhe komplett weg */
   transition: opacity 0.28s ease;
 }
-/* Farbsaum (chromatische Aberration). In der Vorlage ist das kein Haarstrich, sondern ein
-   weicher Oelfilm-Streifen dicht am Rand: gruen/cyan auf der einen, magenta/orange auf der
-   anderen Seite, violett unten. */
+/* Oelfilm-Saum (chromatische Aberration), 1 mm breit. */
 .ring-handle::before {
   inset: 0;
-  padding: 5px;
-  background: conic-gradient(from 118deg,
-    rgba(150,255,205,0.95) 0deg, rgba(255,246,150,0.9) 30deg, rgba(255,150,205,0.95) 62deg,
-    rgba(255,190,130,0.55) 88deg, rgba(255,255,255,0.18) 130deg,
-    rgba(140,225,255,0.9) 196deg, rgba(196,158,255,0.9) 232deg, rgba(150,255,210,0.75) 268deg,
-    rgba(255,255,255,0.16) 312deg, rgba(150,255,205,0.95) 360deg);
-  filter: blur(2.4px);
-  opacity: 0.3;
+  padding: 1mm;
+  background: conic-gradient(from 0deg,
+    rgba(255,255,255,0.22)   0deg,
+    rgba(255,150,205,0.95)  62deg,    /* rechts oben  -- magenta */
+    rgba(255,190,130,0.95) 112deg,    /* rechts unten -- orange  */
+    rgba(196,158,255,0.95) 180deg,    /* unten        -- violett */
+    rgba(140,225,255,0.95) 246deg,    /* links unten  -- cyan    */
+    rgba(150,255,205,0.95) 296deg,    /* links oben   -- gruen   */
+    rgba(255,255,255,0.22) 360deg);
+  filter: blur(1.6px);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -817,23 +822,26 @@ textarea.input { min-height: 90px; resize: vertical; }
 .ring-handle::after {
   inset: 0;
   background: radial-gradient(circle at 50% 50%, transparent 56%, rgba(0,0,0,0.42) 100%);
-  opacity: 0.75;
 }
 
-/* In Bewegung: Farbsaum voll da, Glas klarer, Blase groesser als der Ring. */
+/* Aus der ruhenden Flaeche wird die Blase. */
 .ring-handle.is-liquid::before { opacity: 1; }
+.ring-handle.is-liquid::after { opacity: 0.75; }
 .ring-handle.is-liquid {
+  /* Innen fast klar -- nur eine Spur Aufhellung oben links, wo das Licht einfaellt. */
+  background:
+    radial-gradient(120% 100% at 30% 22%, rgba(255,255,255,0.13), rgba(255,255,255,0.02) 42%, rgba(255,255,255,0.035) 100%);
   backdrop-filter: saturate(1.6) brightness(1.14) contrast(1.08);
   -webkit-backdrop-filter: saturate(1.6) brightness(1.14) contrast(1.08);
+  /* Heller Glanzrand ueber dem Farbsaum. */
   box-shadow:
     inset 0 0 0 1.2px rgba(255,255,255,0.62),
     inset 0 3px 6px rgba(255,255,255,0.6),
     inset 0 -5px 9px rgba(255,255,255,0.26),
     0 10px 26px rgba(0,0,0,0.5);
 }
-/* Beim Ziehen quillt sie zusaetzlich auf und ragt ueber den Ring hinaus -- wie in der Vorlage,
-   wo der Tropfen die Leiste oben und unten verlaesst. */
-.ring-handle.is-dragging { --grow: 1.13; cursor: grabbing; }
+/* Beim Ziehen quillt sie zusaetzlich auf und ragt ueber den Ring hinaus. */
+.ring-handle.is-dragging { --grow: 1.18; cursor: grabbing; }
 
 /* Antippen = Finger in Fluessigkeit: der Tropfen quillt kurz in ALLE Richtungen auf und faellt
    dann zurueck. Bewusst gleichmaessig (sx = sy), im Gegensatz zum gerichteten Ziehen. */
