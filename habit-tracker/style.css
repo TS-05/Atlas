@@ -722,72 +722,119 @@ textarea.input { min-height: 90px; resize: vertical; }
 .ring-btn:active { opacity: 0.75; }
 .ring-btn svg { display: block; }
 .ring-btn span { white-space: nowrap; opacity: 0.92; }
-/* Wassertropfen-Griff: markiert den aktuellen Tab und laesst sich am Ring entlangziehen. */
-/* Liquid-Glass-Linse nach Vorbild der Referenz-Leiste: fast unsichtbare Fuellung (man schaut durch),
-   helle Glanzkanten oben/unten, und Farbsaum (chromatische Aberration) NUR an zwei gegenueberliegenden
-   Stellen statt als kompletter Regenbogenring -- genau das unterscheidet echtes Glas von Deko. */
-/* Wassertropfen-Schieberegler.
-   Der Ring mit den Symbolen ist eine eigene Ebene DARUNTER: die Blase gleitet nur als Glas
-   darueber, sie zieht kein Symbol ein und blendet keines aus.
-   Wasserverhalten: im Ruhezustand rund, beim Bewegen laengs der Bahn gestreckt und flacher
-   (Squash & Stretch), beim Landen federt er kurz nach. scaleY wirkt im rotierten Rahmen, dessen
-   y-Achse entlang des Rings zeigt -- die Streckung folgt also exakt der Bewegungsrichtung. */
+/* ---------- Die Blase (Liquid Glass) ----------
+   Nachgebaut nach der Referenzaufnahme der WhatsApp-Tableiste. Was diese Blase ausmacht und was
+   sie von "runder Kreis mit Farbrand" unterscheidet:
+   1. Superellipse (Squircle), kein Kreis und kein Rechteck.
+   2. Innen fast vollstaendig klar -- man liest den Text darunter durch sie hindurch.
+   3. Was darunter liegt, wird VERGROESSERT und am Rand verdraengt (echte Linsenwirkung, .ring-lens).
+   4. Duenner heller Glanzrand, direkt darunter ein oelfilmartiger Farbsaum.
+   5. Der Farbsaum ist im Ruhezustand nur ein Hauch und flammt in Bewegung voll auf.
+   6. In Bewegung waechst sie und ragt ueber den Ring hinaus; eingerastet passt sie hinein. */
 .ring-handle {
   position: fixed;
   left: 0;
   top: 0;
-  width: 88px;
-  height: 88px;
+  width: 92px;
+  height: 92px;
   z-index: 1000;   /* ueber dem Homemenue (998) und dem Splash (999) */
   pointer-events: auto;
-  border-radius: 50%;
+  /* Squircle statt Kreis: an den Seiten flacher, an den Ecken weicher als eine Ellipse. */
+  border-radius: 39%;
   cursor: grab;
   touch-action: none;
   overflow: hidden;
-  background: radial-gradient(circle at 34% 28%, rgba(255,255,255,0.16), rgba(255,255,255,0.05) 46%, rgba(255,255,255,0.10));
-  backdrop-filter: saturate(1.25) brightness(1.06);
-  -webkit-backdrop-filter: saturate(1.25) brightness(1.06);
-  box-shadow: inset 0 2px 3px rgba(255,255,255,0.45), inset 0 -3px 5px rgba(255,255,255,0.18),
-              inset 0 0 0 1px rgba(255,255,255,0.22), 0 6px 18px rgba(0,0,0,0.42);
+  isolation: isolate;
+  /* Fast klar -- nur eine Spur Aufhellung oben links, wo das Licht einfaellt. */
+  background:
+    radial-gradient(120% 100% at 30% 22%, rgba(255,255,255,0.13), rgba(255,255,255,0.02) 42%, rgba(255,255,255,0.035) 100%);
+  backdrop-filter: saturate(1.3) brightness(1.05);
+  -webkit-backdrop-filter: saturate(1.3) brightness(1.05);
+  /* Glanzrand: aussen eine helle Haarlinie, innen oben ein heller Bogen (Lichtsammlung im Glas). */
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.42),
+    inset 0 2px 4px rgba(255,255,255,0.5),
+    inset 0 -4px 7px rgba(255,255,255,0.2),
+    0 8px 22px rgba(0,0,0,0.45);
   transform: translate(var(--hx, -999px), var(--hy, -999px)) translate(-50%, -50%)
-             rotate(var(--rot, 0deg)) scale(var(--sy, 1), var(--sx, 1)) rotate(calc(-1 * var(--rot, 0deg)));
+             rotate(var(--rot, 0deg))
+             scale(calc(var(--sy, 1) * var(--grow, 1)), calc(var(--sx, 1) * var(--grow, 1)))
+             rotate(calc(-1 * var(--rot, 0deg)));
   transition: transform 0.52s cubic-bezier(0.34, 1.22, 0.44, 1), box-shadow 0.2s ease, opacity 0.25s ease;
 }
+
+/* Die Linse: eine nicht anklickbare Kopie des Symbolrings, die exakt ueber dem echten Ring liegt
+   und um den Blasenmittelpunkt herum vergroessert wird. Weil sie an den RING geheftet ist und
+   nicht an die Blase, wandert sie beim Ziehen durch die Blase hindurch -- genau wie bei echtem
+   Glas. Das Original darunter bleibt sichtbar; innerhalb der Blase verdeckt die Kopie es. */
+.ring-lens {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.ring-handle.is-lensing .ring-lens { opacity: 1; }
+.ring-lens .ring-btn {
+  position: absolute;
+  pointer-events: none;
+  /* Die Kopien sollen sofort an ihrer Ringposition stehen. Ohne das erben sie die
+     transform-Transition von .ring-btn und wuerden bei jedem Neuaufbau erst hineinfahren. */
+  transition: none;
+  /* Im Glas wirkt alles heller und kontrastreicher als daneben. */
+  color: #fff;
+  filter: brightness(1.35) contrast(1.12) drop-shadow(0 0 3px rgba(255,255,255,0.35));
+}
+
 .ring-handle::before,
 .ring-handle::after {
   content: "";
   position: absolute;
   border-radius: inherit;
   pointer-events: none;
-  transition: opacity 0.16s ease;
+  z-index: 2;
+  transition: opacity 0.28s ease;
 }
-/* Farbsaum (chromatische Aberration) an den Raendern -- im Ruhezustand dezent, in Bewegung kraeftig. */
+/* Farbsaum (chromatische Aberration). In der Vorlage ist das kein Haarstrich, sondern ein
+   weicher Oelfilm-Streifen dicht am Rand: gruen/cyan auf der einen, magenta/orange auf der
+   anderen Seite, violett unten. */
 .ring-handle::before {
   inset: 0;
-  padding: 1.6px;
-  background: conic-gradient(from 130deg,
-    rgba(120,255,190,0.8) 0deg, rgba(255,240,140,0.7) 26deg, rgba(255,120,190,0.75) 52deg,
-    transparent 92deg, transparent 190deg,
-    rgba(130,220,255,0.75) 222deg, rgba(190,150,255,0.7) 250deg, rgba(120,255,200,0.55) 276deg,
-    transparent 312deg);
-  filter: blur(0.9px);
-  opacity: 0.35;
+  padding: 5px;
+  background: conic-gradient(from 118deg,
+    rgba(150,255,205,0.95) 0deg, rgba(255,246,150,0.9) 30deg, rgba(255,150,205,0.95) 62deg,
+    rgba(255,190,130,0.55) 88deg, rgba(255,255,255,0.18) 130deg,
+    rgba(140,225,255,0.9) 196deg, rgba(196,158,255,0.9) 232deg, rgba(150,255,210,0.75) 268deg,
+    rgba(255,255,255,0.16) 312deg, rgba(150,255,205,0.95) 360deg);
+  filter: blur(2.4px);
+  opacity: 0.3;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
 }
-/* Randabdunklung wie bei einer echten Linse (Glasdicke). */
+/* Randabdunklung wie bei einer echten Linse (Glasdicke laeuft zum Rand hin zu). */
 .ring-handle::after {
   inset: 0;
-  background: radial-gradient(circle at 50% 50%, transparent 58%, rgba(0,0,0,0.4) 100%);
-  opacity: 0.8;
+  background: radial-gradient(circle at 50% 50%, transparent 56%, rgba(0,0,0,0.42) 100%);
+  opacity: 0.75;
 }
+
+/* In Bewegung: Farbsaum voll da, Glas klarer, Blase groesser als der Ring. */
 .ring-handle.is-liquid::before { opacity: 1; }
 .ring-handle.is-liquid {
-  backdrop-filter: saturate(1.5) brightness(1.12) contrast(1.06);
-  -webkit-backdrop-filter: saturate(1.5) brightness(1.12) contrast(1.06);
+  backdrop-filter: saturate(1.6) brightness(1.14) contrast(1.08);
+  -webkit-backdrop-filter: saturate(1.6) brightness(1.14) contrast(1.08);
+  box-shadow:
+    inset 0 0 0 1.2px rgba(255,255,255,0.62),
+    inset 0 3px 6px rgba(255,255,255,0.6),
+    inset 0 -5px 9px rgba(255,255,255,0.26),
+    0 10px 26px rgba(0,0,0,0.5);
 }
+/* Beim Ziehen quillt sie zusaetzlich auf und ragt ueber den Ring hinaus -- wie in der Vorlage,
+   wo der Tropfen die Leiste oben und unten verlaesst. */
+.ring-handle.is-dragging { --grow: 1.13; cursor: grabbing; }
+
 /* Antippen = Finger in Fluessigkeit: der Tropfen quillt kurz in ALLE Richtungen auf und faellt
    dann zurueck. Bewusst gleichmaessig (sx = sy), im Gegensatz zum gerichteten Ziehen. */
 .ring-handle.is-tap { --sx: 1.22; --sy: 1.22; }
@@ -803,11 +850,11 @@ textarea.input { min-height: 90px; resize: vertical; }
   display: flex; align-items: center; justify-content: center;
   color: var(--color-accent-200);
 }
+.ring-handle.has-icon .ring-lens { display: none; }
 .ring-handle.has-icon svg { display: block; }
 /* Fuer den lautlosen Sprung ans Ringsymbol: sonst wuerde die Blase sichtbar dorthin fliegen. */
 .ring-handle.no-anim { transition: none !important; }
-/* Beim Ziehen setzt JS --sx/--sy laufend aus dem Abstand zum Finger -> laenglich in Zugrichtung. */
-.ring-handle.is-dragging { cursor: grabbing; transition: box-shadow 0.2s ease; }
+
 /* Vignette ueber dem GESAMTEN Homemenue (nicht nur um die Globus-Buehne): als Rechteck um den Globus
    endete die Abdunklung vorher an dessen Kanten und erzeugte zwei sichtbare gerade Linien oben/unten. */
 .home-menu::after {
@@ -981,332 +1028,6 @@ textarea.input { min-height: 90px; resize: vertical; }
 .gym-lastcard-stats b { font-size: 14px; font-family: var(--font-heading); font-weight: 600; color: var(--color-text); margin-right: 4px; }
 
 /* Diagramme (Analyse-Untertab) */
-.gym-chart-title { font-size: 11.5px; letter-spacing: 0.04em; margin-bottom: 6px; }
-.gym-chart {
-  background: var(--color-surface); border: 1px solid var(--color-divider);
-  border-radius: var(--radius-lg); padding: 12px 12px 9px;
-}
-.gym-chart-svg { width: 100%; height: 118px; display: block; }
-.gym-chart-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
-.gym-chart-value { font-family: var(--font-heading); font-weight: 600; font-size: 24px; line-height: 1; }
-.gym-chart-value span { font-size: 12px; font-weight: 400; color: var(--color-neutral-500); margin-left: 1px; }
-.gym-chart-delta { font-size: 12px; text-align: right; }
-.gym-chart-delta span { display: block; font-size: 10px; color: var(--color-neutral-600); }
-.gym-chart-delta.up { color: var(--color-accent-200); }
-.gym-chart-delta.down { color: #c98b8b; }
-.gym-chart-delta.flat { color: var(--color-neutral-400); }
-.gym-chart-axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-neutral-600); margin-top: 5px; }
-
-.gym-best-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--color-divider); }
-.gym-best-row:last-child { border-bottom: 0; }
-.gym-best-name { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
-.gym-best-date { font-size: 10.5px; color: var(--color-neutral-600); flex-shrink: 0; }
-.gym-best-val { font-size: 13px; font-family: var(--font-heading); font-weight: 600; color: var(--color-accent-200); flex-shrink: 0; }
-
-/* ---------- Homemenü ----------
-   Liegt im DOM direkt unter dem Ladebildschirm (niedrigerer z-index) und wird dadurch automatisch
-   sichtbar, sobald der Ladebildschirm sich ausblendet und entfernt wird — kein eigener Show-Trigger
-   nötig. Der Globus ist ein echtes 3D-Modell (assets/atlas_globe_v17.glb) über das lokal gehostete
-   <model-viewer> (vendor/model-viewer.min.js, kein CDN). Er dreht sich von selbst und lässt sich
-   per Wisch-/Ziehgeste zusätzlich drehen (camera-controls, min/max-camera-orbit fixieren den
-   Polarwinkel, damit nur horizontal gedreht wird). Da die Kontinente im Modell EIN gemeinsames
-   Material sind statt einzelner Objekte, ist präzises Antippen einzelner Kontinente nicht zuverlässig
-   möglich — alle sieben Tabs hängen stattdessen als Button-Raster unter dem Globus. */
-.home-menu {
-  position: fixed;
-  inset: 0;
-  z-index: 998;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 22px;
-  background: var(--color-bg);
-  overflow: hidden;
-  transition: opacity 0.4s ease;
-}
-/* WICHTIG: visibility:hidden zusaetzlich zu pointer-events:none. Die Ring-Knoepfe setzen selbst
-   pointer-events:auto und ueberschreiben damit das :none des Elternelements -- die unsichtbaren
-   Knoepfe haben sonst weiter Tipps abgefangen (Habits liessen sich nicht abhaken, stattdessen
-   sprang die App in einen anderen Tab). visibility:hidden nimmt den ganzen Teilbaum aus der
-   Treffererkennung; die Verzoegerung laesst das Ausblenden vorher sauber durchlaufen. */
-.home-menu.home-hidden {
-  opacity: 0;
-  pointer-events: none;
-  visibility: hidden;
-  transition: opacity 0.4s ease, visibility 0s linear 0.4s;
-}
-.home-mesh {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.home-stage {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  width: 100%;
-  padding: 0 10px;
-}
-/* Bühne = Quadrat, das Globus UND Navigations-Ring umfasst. Der Globus füllt nur die inneren ~64 %,
-   der Rest ist Platz für den Goldring mit den Kontinent-Symbolen. */
-.globe-stage {
-  /* Radius, auf dem die Ring-Knöpfe sitzen: knapp innerhalb des Bühnenrands (Bühne ist doppelt so
-     breit). Muss eine echte Länge sein -- Prozentwerte in translate() beziehen sich sonst auf die
-     Knopfgröße statt auf den Ring. */
-  --ring-r: min(35vw, 214px);
-  --ring-w: 70px;
-  position: relative;
-  width: min(94vw, 560px);
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  touch-action: none;
-}
-/* Breites goldenes Band, auf dem die Symbole sitzen (wie in der Skizze) -- genauso breit wie die
-   Klickflaechen. Die Box ist 2*ring-r + ring-w gross, dadurch liegt die Bandmitte exakt auf --ring-r. */
-.globe-stage::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: calc(2 * var(--ring-r) + var(--ring-w));
-  height: calc(2 * var(--ring-r) + var(--ring-w));
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  pointer-events: none;
-  background: rgba(52, 58, 68, 0.34);
-  backdrop-filter: blur(6px) saturate(1.3);
-  -webkit-backdrop-filter: blur(6px) saturate(1.3);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13), 0 8px 26px rgba(0, 0, 0, 0.4);
-  /* Volle Kreisflaeche statt ausgestanztem Ring: die Milchglas-Unschaerfe liegt damit auch HINTER
-     dem Globus, nicht nur auf dem Symbolband. */
-}
-.globe-ring {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.ring-btn {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 66px;
-  height: 60px;
-  margin: -30px 0 0 -33px;
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #eef3f8;
-  font-family: var(--font-body);
-  font-size: 9.5px;
-  letter-spacing: 0.01em;
-  line-height: 1;
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: transform 0.15s ease, opacity 0.15s ease;
-  transform: rotate(var(--angle)) translate(var(--ring-r)) rotate(calc(-1 * var(--angle)));
-}
-.ring-btn:active { opacity: 0.75; }
-.ring-btn svg { display: block; }
-.ring-btn span { white-space: nowrap; opacity: 0.92; }
-/* Wassertropfen-Griff: markiert den aktuellen Tab und laesst sich am Ring entlangziehen. */
-/* Liquid-Glass-Linse nach Vorbild der Referenz-Leiste: fast unsichtbare Fuellung (man schaut durch),
-   helle Glanzkanten oben/unten, und Farbsaum (chromatische Aberration) NUR an zwei gegenueberliegenden
-   Stellen statt als kompletter Regenbogenring -- genau das unterscheidet echtes Glas von Deko. */
-/* Wassertropfen-Schieberegler.
-   Der Ring mit den Symbolen ist eine eigene Ebene DARUNTER: die Blase gleitet nur als Glas
-   darueber, sie zieht kein Symbol ein und blendet keines aus.
-   Wasserverhalten: im Ruhezustand rund, beim Bewegen laengs der Bahn gestreckt und flacher
-   (Squash & Stretch), beim Landen federt er kurz nach. scaleY wirkt im rotierten Rahmen, dessen
-   y-Achse entlang des Rings zeigt -- die Streckung folgt also exakt der Bewegungsrichtung. */
-.ring-handle {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 88px;
-  height: 88px;
-  z-index: 1000;   /* ueber dem Homemenue (998) und dem Splash (999) */
-  pointer-events: auto;
-  border-radius: 50%;
-  cursor: grab;
-  touch-action: none;
-  overflow: hidden;
-  background: radial-gradient(circle at 34% 28%, rgba(255,255,255,0.16), rgba(255,255,255,0.05) 46%, rgba(255,255,255,0.10));
-  backdrop-filter: saturate(1.25) brightness(1.06);
-  -webkit-backdrop-filter: saturate(1.25) brightness(1.06);
-  box-shadow: inset 0 2px 3px rgba(255,255,255,0.45), inset 0 -3px 5px rgba(255,255,255,0.18),
-              inset 0 0 0 1px rgba(255,255,255,0.22), 0 6px 18px rgba(0,0,0,0.42);
-  transform: translate(var(--hx, -999px), var(--hy, -999px)) translate(-50%, -50%)
-             rotate(var(--rot, 0deg)) scale(var(--sy, 1), var(--sx, 1)) rotate(calc(-1 * var(--rot, 0deg)));
-  transition: transform 0.52s cubic-bezier(0.34, 1.22, 0.44, 1), box-shadow 0.2s ease, opacity 0.25s ease;
-}
-.ring-handle::before,
-.ring-handle::after {
-  content: "";
-  position: absolute;
-  border-radius: inherit;
-  pointer-events: none;
-  transition: opacity 0.16s ease;
-}
-/* Farbsaum (chromatische Aberration) an den Raendern -- im Ruhezustand dezent, in Bewegung kraeftig. */
-.ring-handle::before {
-  inset: 0;
-  padding: 1.6px;
-  background: conic-gradient(from 130deg,
-    rgba(120,255,190,0.8) 0deg, rgba(255,240,140,0.7) 26deg, rgba(255,120,190,0.75) 52deg,
-    transparent 92deg, transparent 190deg,
-    rgba(130,220,255,0.75) 222deg, rgba(190,150,255,0.7) 250deg, rgba(120,255,200,0.55) 276deg,
-    transparent 312deg);
-  filter: blur(0.9px);
-  opacity: 0.35;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-}
-/* Randabdunklung wie bei einer echten Linse (Glasdicke). */
-.ring-handle::after {
-  inset: 0;
-  background: radial-gradient(circle at 50% 50%, transparent 58%, rgba(0,0,0,0.4) 100%);
-  opacity: 0.8;
-}
-.ring-handle.is-liquid::before { opacity: 1; }
-.ring-handle.is-liquid {
-  backdrop-filter: saturate(1.5) brightness(1.12) contrast(1.06);
-  -webkit-backdrop-filter: saturate(1.5) brightness(1.12) contrast(1.06);
-}
-/* Antippen = Finger in Fluessigkeit: der Tropfen quillt kurz in ALLE Richtungen auf und faellt
-   dann zurueck. Bewusst gleichmaessig (sx = sy), im Gegensatz zum gerichteten Ziehen. */
-.ring-handle.is-tap { --sx: 1.22; --sy: 1.22; }
-/* Zerplatzen wie eine Seifenblase: kurz aufblaehen und dabei verschwinden. Bewusst ueber die
-   vorhandenen Skalier-Variablen statt per Keyframes -- sonst wuerde eine transform-Animation mit
-   der Positionierung (die ebenfalls transform nutzt) kollidieren. */
-.ring-handle.is-pop { --sx: 1.5; --sy: 1.5; opacity: 0; }
-.ring-handle.is-invisible { opacity: 0; }
-/* Bis der Startbildschirm weg ist bleibt sie unsichtbar (sonst laege sie ueber dem Splash). */
-.ring-handle.is-boot { opacity: 0; pointer-events: none; }
-/* Unten traegt die Blase das Globus-Symbol (Zurueck zum Hauptmenue). */
-.ring-handle.has-icon {
-  display: flex; align-items: center; justify-content: center;
-  color: var(--color-accent-200);
-}
-.ring-handle.has-icon svg { display: block; }
-/* Fuer den lautlosen Sprung ans Ringsymbol: sonst wuerde die Blase sichtbar dorthin fliegen. */
-.ring-handle.no-anim { transition: none !important; }
-/* Beim Ziehen setzt JS --sx/--sy laufend aus dem Abstand zum Finger -> laenglich in Zugrichtung. */
-.ring-handle.is-dragging { cursor: grabbing; transition: box-shadow 0.2s ease; }
-/* Vignette ueber dem GESAMTEN Homemenue (nicht nur um die Globus-Buehne): als Rechteck um den Globus
-   endete die Abdunklung vorher an dessen Kanten und erzeugte zwei sichtbare gerade Linien oben/unten. */
-.home-menu::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at 50% 45%, transparent 26%, rgba(12, 15, 20, 0.5) 62%, rgba(9, 11, 15, 0.88) 100%);
-}
-.globe-model {
-  height: 57%;
-  width: 57%;
-  --poster-color: transparent;
-  /* Ohne touch-action:none wertet der Browser das Wischen zeitweise als Seiten-Scroll und die
-     Drehung "haengt" -- war bei einem frueheren Umbau verloren gegangen. */
-  touch-action: none;
-  cursor: grab;
-}
-.globe-model:active { cursor: grabbing; }
-.home-hint {
-  position: relative;
-  z-index: 1;
-  font-size: 12px;
-  color: var(--color-neutral-500);
-  letter-spacing: 0.02em;
-}
-
-/* ---------- Projekte-Tab ---------- */
-.project-card { padding: 14px 16px; }
-.project-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.project-card-head .item-title { flex: 1; min-width: 0; }
-.project-notes { min-height: 90px; font-size: 13.5px; }
-
-/* ---------- Gym ---------- */
-.gym-daypicker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
-.gym-day {
-  position: relative;
-  display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer;
-  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
-  background: var(--color-surface); color: var(--color-neutral-300);
-  font-family: var(--font-body); font-size: 13px; text-align: left;
-}
-.gym-day.active { border-color: var(--color-accent-500); color: var(--color-text); }
-/* Kleiner Punkt = für diesen Tag ist heute schon etwas eingetragen. */
-.gym-day.logged::after {
-  content: ""; position: absolute; top: 7px; right: 7px; width: 6px; height: 6px;
-  border-radius: 50%; background: var(--color-accent-300);
-}
-.gym-day-tag {
-  font-family: var(--font-heading); font-size: 10.5px; letter-spacing: 0.06em;
-  color: var(--color-accent-300); border: 1px solid var(--color-accent-800);
-  border-radius: 5px; padding: 2px 5px; flex-shrink: 0;
-}
-
-/* Kopfkarte: Bezugspunkt fürs heutige Training auf einen Blick. */
-.gym-lastcard {
-  background: var(--color-surface); border: 1px solid var(--color-divider);
-  border-radius: var(--radius-lg); padding: 11px 13px; margin-bottom: 16px;
-}
-.gym-lastcard.empty { color: var(--color-neutral-500); font-size: 12.5px; }
-.gym-lastcard-head { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-accent-300); }
-.gym-lastcard-stats { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 7px; font-size: 11.5px; color: var(--color-neutral-500); }
-.gym-lastcard-stats b { font-size: 14px; font-family: var(--font-heading); font-weight: 600; color: var(--color-text); margin-right: 4px; }
-
-.gym-summary { font-size: 12px; color: var(--color-neutral-400); margin-bottom: 6px; }
-.gym-summary b { color: var(--color-text); font-size: 13px; }
-.gym-ex { padding: 13px 0 15px; border-top: 1px solid var(--color-divider); }
-.gym-ex-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.gym-target { font-size: 11px; color: var(--color-accent-300); flex-shrink: 0; }
-.gym-lastline { font-size: 10.5px; color: var(--color-neutral-600); margin-top: 3px; }
-
-/* Drei Satzspalten, drei Zeilen: Beschriftung, letzter Wert, Eingabe. Der Wert vom letzten Mal
-   steht damit genau über dem Feld, in das er ersetzt wird — Satz für Satz zuzuordnen. */
-.gym-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 8px; margin-top: 8px; }
-.gym-col-head { font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-600); text-align: center; }
-.gym-last-cell {
-  font-size: 12px; text-align: center; padding: 4px 2px; border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-accent-900) 55%, transparent);
-  color: var(--color-accent-200); white-space: nowrap;
-}
-.gym-last-cell.none { background: transparent; color: var(--color-neutral-700); }
-.gym-trend { font-style: normal; font-size: 9.5px; }
-.gym-trend.up { color: var(--color-accent-200); }
-.gym-trend.down { color: #c98b8b; }
-.gym-trend.same { color: var(--color-neutral-500); }
-
-.gym-set { display: flex; align-items: center; gap: 3px; min-width: 0; }
-.gym-set input {
-  width: 100%; min-width: 0; height: 36px; padding: 4px 4px; text-align: center;
-  font: inherit; font-size: 13px; color: var(--color-text);
-  background: var(--color-bg); border: 1px solid var(--color-divider); border-radius: var(--radius-sm);
-}
-.gym-set input::placeholder { color: var(--color-neutral-700); }
-.gym-set input:focus-visible { border-color: var(--color-accent); outline: none; }
-.gym-set span { color: var(--color-neutral-600); font-size: 11px; flex-shrink: 0; }
-
-/* Diagramme */
 .gym-chart-title { font-size: 11.5px; letter-spacing: 0.04em; margin-bottom: 6px; }
 .gym-chart {
   background: var(--color-surface); border: 1px solid var(--color-divider);

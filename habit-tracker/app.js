@@ -4541,6 +4541,66 @@ if (splashEl) {
     ringHandle.style.setProperty("--hx", `${x}px`);
     ringHandle.style.setProperty("--hy", `${y}px`);
     if (rotDeg != null) ringHandle.style.setProperty("--rot", `${rotDeg}deg`);
+    alignLens(x, y);
+  }
+
+  // ---------- Linsenwirkung ----------
+  // Eine nicht anklickbare Kopie aller Ringsymbole liegt in der Blase und wird per left/top exakt
+  // ueber den echten Symbolen gehalten. Weil sie am RING klebt und nicht an der Blase, wandert sie
+  // beim Ziehen durch die Blase hindurch, statt mitgeschleift zu werden -- das war der Fehler der
+  // frueheren Version ("sie saugt das Symbol ein"). overflow:hidden der Blase schneidet sie auf
+  // die Blasenform zu, die Vergroesserung passiert um den Blasenmittelpunkt.
+  const LENS_ZOOM = 1.5;
+  let lensLayer = null;
+  function buildLens() {
+    if (!ringHandle || lensLayer) return;
+    const ring = homeMenu.querySelector(".globe-ring");
+    if (!ring) return;
+    lensLayer = document.createElement("div");
+    lensLayer.className = "ring-lens";
+    lensLayer.setAttribute("aria-hidden", "true");
+    ringButtons.forEach(btn => {
+      const copy = btn.cloneNode(true);
+      copy.removeAttribute("data-tab");
+      copy.removeAttribute("aria-label");
+      copy.setAttribute("tabindex", "-1");
+      lensLayer.appendChild(copy);
+    });
+    ringHandle.appendChild(lensLayer);
+  }
+  // Die Kopie deckungsgleich ueber den echten Ring legen -- in Blasen-Koordinaten, weil sie ein
+  // Kind der Blase ist. Bezugspunkt der Vergroesserung ist die Blasenmitte, damit sie sich wie
+  // eine Lupe verhaelt und nicht wie ein skaliertes Bild.
+  let lensRect = null;
+  function refreshLensRect() {
+    const ring = homeMenu.querySelector(".globe-ring");
+    const r = ring && ring.getBoundingClientRect();
+    lensRect = (r && r.width) ? r : null;
+  }
+  function alignLens(hx, hy) {
+    if (!lensLayer) return;
+    if (!lensRect) refreshLensRect();
+    const rr = lensRect;
+    if (!rr) return;
+    // --ring-r/--ring-w stehen auf .globe-stage. Die Blase haengt am <body> und erbt sie nicht --
+    // ohne sie wird translate(var(--ring-r)) ungueltig, das komplette transform faellt weg und
+    // alle Kopien landen uebereinander in der Ringmitte. Also ausdruecklich uebernehmen.
+    const stageEl = homeMenu.querySelector(".globe-stage");
+    if (stageEl) {
+      const st = getComputedStyle(stageEl);
+      lensLayer.style.setProperty("--ring-r", st.getPropertyValue("--ring-r"));
+      lensLayer.style.setProperty("--ring-w", st.getPropertyValue("--ring-w"));
+    }
+
+    const hw = ringHandle.offsetWidth / 2, hh = ringHandle.offsetHeight / 2;
+    const left = hw + (rr.left - hx);
+    const top = hh + (rr.top - hy);
+    lensLayer.style.left = `${left}px`;
+    lensLayer.style.top = `${top}px`;
+    lensLayer.style.width = `${rr.width}px`;
+    lensLayer.style.height = `${rr.height}px`;
+    lensLayer.style.transformOrigin = `${hw - left}px ${hh - top}px`;
+    lensLayer.style.transform = `scale(${LENS_ZOOM})`;
   }
   function placeAtSlot(slot) {
     const c = centerOf(slot.btn);
@@ -4562,13 +4622,13 @@ if (splashEl) {
     if (!ringHandle) return;
     ringHandle.classList.remove("no-anim", "is-invisible");
     // Antippen = Finger in Fluessigkeit: kurz gleichmaessig aufquellen, dann zurueckfallen.
-    ringHandle.classList.add("is-liquid", "is-tap");
+    ringHandle.classList.add("is-liquid", "is-tap", "is-lensing");
     ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
     handleMode = "ring";
     placeAtSlot(slot);
     clearTimeout(tapTimer); clearTimeout(liquidTimer);
     tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 230);
-    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 460);
+    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid", "is-lensing"), 460);
   }
 
   // Beim Oeffnen eines Tabs wandert die Blase nach unten und wird dort zum Zurueck-Knopf.
@@ -4580,14 +4640,16 @@ if (splashEl) {
   function sendHandleHome() {
     if (!ringHandle) return;
     ringHandle.classList.remove("no-anim", "is-invisible");
+    lensLayer = null;                    // wird von innerHTML mit entfernt
     ringHandle.innerHTML = GLOBE_ICON;   // unten zeigt die Blase das Globus-Symbol
+    ringHandle.classList.remove("is-lensing");
     ringHandle.classList.add("has-icon");
     handleMode = "home";
     ringHandle.classList.add("is-liquid", "is-tap");
     placeAtHome();
     clearTimeout(tapTimer); clearTimeout(liquidTimer);
     tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 260);
-    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 560);
+    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid", "is-lensing"), 560);
   }
 
   function activateSlot(slot) {
@@ -4621,6 +4683,9 @@ if (splashEl) {
         ringHandle.classList.add("no-anim", "is-invisible");
         ringHandle.classList.remove("is-pop", "has-icon");
         ringHandle.innerHTML = "";        // am Ring leer -- das Symbol liegt dort schon darunter
+        lensLayer = null;
+        buildLens();
+        refreshLensRect();
         placeAtSlot(cur);
         // 3) dort wieder normal auftauchen
         // Sichtbarkeit NOCH mit no-anim zuruecknehmen: so ist die Blase sofort da, auch wenn ein
@@ -4637,6 +4702,7 @@ if (splashEl) {
   // Startposition setzen, sobald das Layout steht, und bei Groessenaenderung nachziehen.
   function repositionHandle() {
     if (!ringHandle) return;
+    lensRect = null;                      // Layout hat sich geaendert -> neu vermessen
     if (handleMode === "home") { placeAtHome(); return; }
     const cur = ringSlots.find(sl => sl.tab === document.body.dataset.tab) || ringSlots[0];
     if (cur) placeAtSlot(cur);
@@ -4718,6 +4784,9 @@ if (splashEl) {
       if (handleMode !== "ring") return;   // unten ist sie Zurueck-Knopf, kein Schieberegler
       handleDragging = true;
       targetAngle = pointerAngle(e);
+      buildLens();
+      refreshLensRect();
+      ringHandle.classList.add("is-lensing");
       requestAnimationFrame(dragFrame);
       clearTimeout(liquidTimer);
       ringHandle.classList.add("is-dragging", "is-liquid");
