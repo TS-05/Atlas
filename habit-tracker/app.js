@@ -4769,8 +4769,10 @@ if (splashEl) {
       if (!handleDragging) return;
       const cur = parseFloat(ringHandle.style.getPropertyValue("--angle")) || targetAngle;
       let lag = ((targetAngle - cur + 540) % 360) - 180;
-      const next = cur + lag * 0.22;                     // traeges Nachziehen
-      const pull = Math.min(1, Math.abs(lag) / 14);      // 0..1 Rueckstand
+      const next = cur + lag * 0.34;                     // Nachziehen (groesser = folgt schneller)
+      // Der Rueckstand faellt durch das schnellere Folgen kleiner aus. Damit die Dehnung gleich
+      // stark bleibt, wird der Bezugswert im selben Verhaeltnis mitgezogen (14 * 0.22/0.34 ~ 9).
+      const pull = Math.min(1, Math.abs(lag) / 9);       // 0..1 Rueckstand
       ringHandle.style.setProperty("--angle", `${next}deg`);
       ringHandle.style.setProperty("--sy", (1 + pull * 0.45).toFixed(3));
       ringHandle.style.setProperty("--sx", (1 - pull * 0.18).toFixed(3));

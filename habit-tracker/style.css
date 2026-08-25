@@ -739,8 +739,10 @@ textarea.input { min-height: 90px; resize: vertical; }
   position: fixed;
   left: 0;
   top: 0;
-  width: 92px;
-  height: 92px;
+  /* Ruhegroesse: passt in die Breite des Symbolbands (--ring-w: 70px), sitzt also IM Ring
+     statt darueber -- so wie der aktive Reiter auf der Referenzleiste in seiner Zelle sitzt. */
+  width: 72px;
+  height: 72px;
   z-index: 1000;   /* ueber dem Homemenue (998) und dem Splash (999) */
   pointer-events: auto;
   border-radius: 50%;
@@ -756,7 +758,7 @@ textarea.input { min-height: 90px; resize: vertical; }
              rotate(var(--rot, 0deg))
              scale(calc(var(--sy, 1) * var(--grow, 1)), calc(var(--sx, 1) * var(--grow, 1)))
              rotate(calc(-1 * var(--rot, 0deg)));
-  transition: transform 0.52s cubic-bezier(0.34, 1.22, 0.44, 1),
+  transition: transform 0.42s cubic-bezier(0.34, 1.22, 0.44, 1),
               box-shadow 0.28s ease, background 0.28s ease,
               backdrop-filter 0.28s ease, opacity 0.25s ease;
 }
@@ -841,7 +843,10 @@ textarea.input { min-height: 90px; resize: vertical; }
     0 10px 26px rgba(0,0,0,0.5);
 }
 /* Beim Ziehen quillt sie zusaetzlich auf und ragt ueber den Ring hinaus. */
-.ring-handle.is-dragging { --grow: 1.18; cursor: grabbing; }
+/* Beim Ziehen quillt sie deutlich auf und ragt damit sichtbar ueber das 70px-Band hinaus
+   (72px -> 94px). Ohne die groessere Aufblaehung waere der Unterschied zur Ruhegroesse zu klein,
+   seit die Ruhegroesse ins Band passt. */
+.ring-handle.is-dragging { --grow: 1.3; cursor: grabbing; }
 
 /* Antippen = Finger in Fluessigkeit: der Tropfen quillt kurz in ALLE Richtungen auf und faellt
    dann zurueck. Bewusst gleichmaessig (sx = sy), im Gegensatz zum gerichteten Ziehen. */
