@@ -693,6 +693,18 @@ textarea.input { min-height: 90px; resize: vertical; }
   inset: 0;
   pointer-events: none;
 }
+.globe-ring.has-hole {
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 94%, transparent 100%), linear-gradient(#000 0 0);
+  -webkit-mask-size: var(--hole-d, 0px) var(--hole-d, 0px), 100% 100%;
+  -webkit-mask-position: var(--hole-x, 0px) var(--hole-y, 0px), 0 0;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-composite: xor;
+  mask-image: radial-gradient(circle closest-side, #000 94%, transparent 100%), linear-gradient(#000 0 0);
+  mask-size: var(--hole-d, 0px) var(--hole-d, 0px), 100% 100%;
+  mask-position: var(--hole-x, 0px) var(--hole-y, 0px), 0 0;
+  mask-repeat: no-repeat, no-repeat;
+  mask-composite: exclude;
+}
 .ring-btn {
   position: absolute;
   left: 50%;
@@ -746,7 +758,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   z-index: 1000;   /* ueber dem Homemenue (998) und dem Splash (999) */
   pointer-events: auto;
   border-radius: 50%;
-  --lens-zoom: 2;                   /* Vergroesserung der Lupe */
+  --lens-zoom: 1.35;                   /* Vergroesserung der Lupe */
   cursor: grab;
   touch-action: none;
   overflow: hidden;
@@ -789,7 +801,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   transition: none;
   /* Im Glas wirkt alles heller und kontrastreicher als daneben. */
   color: #fff;
-  filter: brightness(1.35) contrast(1.12) drop-shadow(0 0 3px rgba(255,255,255,0.35));
+  filter: brightness(1.12) contrast(1.05);
 }
 
 .ring-handle::before,
@@ -807,14 +819,18 @@ textarea.input { min-height: 90px; resize: vertical; }
   inset: 0;
   padding: 1mm;
   background: conic-gradient(from 0deg,
-    rgba(255,255,255,0.22)   0deg,
-    rgba(255,150,205,0.95)  62deg,    /* rechts oben  -- magenta */
-    rgba(255,190,130,0.95) 112deg,    /* rechts unten -- orange  */
-    rgba(196,158,255,0.95) 180deg,    /* unten        -- violett */
-    rgba(140,225,255,0.95) 246deg,    /* links unten  -- cyan    */
-    rgba(150,255,205,0.95) 296deg,    /* links oben   -- gruen   */
-    rgba(255,255,255,0.22) 360deg);
-  filter: blur(1.6px);
+    rgba(120,200,255,0.85)   0deg,    /* oben        -- blau    */
+    rgba(255,190,130,0.80)  18deg,    /* oben rechts -- orange  */
+    rgba(255,255,255,0.00)  48deg,
+    rgba(255,255,255,0.00) 132deg,
+    rgba(255,170,120,0.80) 162deg,    /* unten       -- orange  */
+    rgba(150,120,255,0.85) 186deg,    /* unten       -- violett */
+    rgba(120,220,255,0.70) 206deg,
+    rgba(255,255,255,0.00) 228deg,
+    rgba(255,255,255,0.00) 312deg,
+    rgba(190,150,255,0.80) 342deg,    /* oben links  -- violett */
+    rgba(120,200,255,0.85) 360deg);
+  filter: blur(2px);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -823,24 +839,26 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* Randabdunklung wie bei einer echten Linse (Glasdicke laeuft zum Rand hin zu). */
 .ring-handle::after {
   inset: 0;
-  background: radial-gradient(circle at 50% 50%, transparent 56%, rgba(0,0,0,0.42) 100%);
+  background: radial-gradient(circle at 50% 50%, transparent 74%, rgba(0,0,0,0.16) 100%);
 }
 
 /* Aus der ruhenden Flaeche wird die Blase. */
 .ring-handle.is-liquid::before { opacity: 1; }
-.ring-handle.is-liquid::after { opacity: 0.75; }
+.ring-handle.is-liquid::after { opacity: 1; }
 .ring-handle.is-liquid {
   /* Innen fast klar -- nur eine Spur Aufhellung oben links, wo das Licht einfaellt. */
+  /* Praktisch klar: in der Vorlage sieht man die Leistenkante durch die Blase hindurchlaufen
+     und ueber der Leiste den schwarzen Hintergrund. Nur ein Hauch Aufhellung oben links. */
   background:
-    radial-gradient(120% 100% at 30% 22%, rgba(255,255,255,0.13), rgba(255,255,255,0.02) 42%, rgba(255,255,255,0.035) 100%);
-  backdrop-filter: saturate(1.6) brightness(1.14) contrast(1.08);
-  -webkit-backdrop-filter: saturate(1.6) brightness(1.14) contrast(1.08);
-  /* Heller Glanzrand ueber dem Farbsaum. */
+    radial-gradient(125% 105% at 32% 20%, rgba(255,255,255,0.09), rgba(255,255,255,0.015) 45%, rgba(255,255,255,0.02) 100%);
+  backdrop-filter: saturate(1.2) brightness(1.06);
+  -webkit-backdrop-filter: saturate(1.2) brightness(1.06);
+  /* Feine helle Kante statt Leuchtrand -- in der Vorlage ist sie kaum mehr als ein Haarstrich. */
   box-shadow:
-    inset 0 0 0 1.2px rgba(255,255,255,0.62),
-    inset 0 3px 6px rgba(255,255,255,0.6),
-    inset 0 -5px 9px rgba(255,255,255,0.26),
-    0 10px 26px rgba(0,0,0,0.5);
+    inset 0 0 0 1px rgba(255,255,255,0.34),
+    inset 0 2px 5px rgba(255,255,255,0.26),
+    inset 0 -3px 6px rgba(255,255,255,0.12),
+    0 8px 22px rgba(0,0,0,0.42);
 }
 /* Beim Ziehen quillt sie zusaetzlich auf und ragt ueber den Ring hinaus. */
 /* Beim Ziehen quillt sie deutlich auf und ragt damit sichtbar ueber das 70px-Band hinaus

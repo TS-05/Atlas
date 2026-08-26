@@ -4601,6 +4601,29 @@ if (splashEl) {
     // Bezugspunkt der Vergroesserung ist die Blasenmitte; der Faktor selbst steht als
     // --lens-zoom im Stylesheet (dort wird auch --grow herausgerechnet).
     lensLayer.style.transformOrigin = `${hw - left}px ${hh - top}px`;
+    // Nur stanzen, solange das Glas wirklich da ist. Sonst bliebe nach dem Ausblenden ein
+    // Symbol unsichtbar, weil die Maske einfach stehen bliebe.
+    if (ringHandle.classList.contains("is-lensing")) punchRingHole(hx, hy, rr);
+    else clearRingHole();
+  }
+
+  // Ohne Loch stuende jede Beschriftung doppelt da: klein im Original, gross in der Lupe darueber.
+  // Echtes Glas ersetzt, was darunter liegt -- also wird der echte Ring genau unter der Blase
+  // ausgeblendet. Nur die drei Zahlen wechseln pro Bild, die Maske selbst bleibt stehen.
+  function punchRingHole(hx, hy, rr) {
+    const ring = homeMenu.querySelector(".globe-ring");
+    if (!ring) return;
+    const d = ringHandle.getBoundingClientRect().width;   // sichtbarer Durchmesser inkl. --grow
+    if (!d) return;
+    ring.classList.add("has-hole");
+    ring.style.setProperty("--hole-d", `${d}px`);
+    ring.style.setProperty("--hole-x", `${hx - rr.left - d / 2}px`);
+    ring.style.setProperty("--hole-y", `${hy - rr.top - d / 2}px`);
+  }
+  // Ohne Glas kein Loch -- sonst fehlte ein Symbol, sobald die Lupe aus ist.
+  function clearRingHole() {
+    const ring = homeMenu.querySelector(".globe-ring");
+    if (ring) ring.classList.remove("has-hole");
   }
   function placeAtSlot(slot) {
     const c = centerOf(slot.btn);
@@ -4628,7 +4651,7 @@ if (splashEl) {
     placeAtSlot(slot);
     clearTimeout(tapTimer); clearTimeout(liquidTimer);
     tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 230);
-    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid", "is-lensing"), 460);
+    liquidTimer = setTimeout(() => { ringHandle.classList.remove("is-liquid", "is-lensing"); clearRingHole(); }, 460);
   }
 
   // Beim Oeffnen eines Tabs wandert die Blase nach unten und wird dort zum Zurueck-Knopf.
@@ -4641,6 +4664,7 @@ if (splashEl) {
     if (!ringHandle) return;
     ringHandle.classList.remove("no-anim", "is-invisible");
     lensLayer = null;                    // wird von innerHTML mit entfernt
+    clearRingHole();
     ringHandle.innerHTML = GLOBE_ICON;   // unten zeigt die Blase das Globus-Symbol
     ringHandle.classList.remove("is-lensing");
     ringHandle.classList.add("has-icon");
@@ -4649,7 +4673,7 @@ if (splashEl) {
     placeAtHome();
     clearTimeout(tapTimer); clearTimeout(liquidTimer);
     tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 260);
-    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid", "is-lensing"), 560);
+    liquidTimer = setTimeout(() => { ringHandle.classList.remove("is-liquid", "is-lensing"); clearRingHole(); }, 560);
   }
 
   function activateSlot(slot) {
