@@ -48,6 +48,10 @@
 
   --radius-sm: 4px; --radius-md: 8px; --radius-lg: 14px;
 
+  /* Breite des Symbolbands im Homemenue. Steht hier oben, weil die Blase ihre Ruhegroesse
+     daraus ableitet und als <body>-Kind nichts von der Buehne erbt. */
+  --ring-w: 70px;
+
   --shadow-sm: 0 0 0 1px #3f424d;
   --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0,0,0,0.55);
   --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0,0,0,0.65);
@@ -660,7 +664,6 @@ textarea.input { min-height: 90px; resize: vertical; }
      breit). Muss eine echte Länge sein -- Prozentwerte in translate() beziehen sich sonst auf die
      Knopfgröße statt auf den Ring. */
   --ring-r: min(35vw, 214px);
-  --ring-w: 70px;
   position: relative;
   width: min(94vw, 560px);
   aspect-ratio: 1;
@@ -751,10 +754,12 @@ textarea.input { min-height: 90px; resize: vertical; }
   position: fixed;
   left: 0;
   top: 0;
-  /* Ruhegroesse: passt in die Breite des Symbolbands (--ring-w: 70px), sitzt also IM Ring
-     statt darueber -- so wie der aktive Reiter auf der Referenzleiste in seiner Zelle sitzt. */
-  width: 72px;
-  height: 72px;
+  /* Ruhegroesse aus der Ringgeometrie statt als abgeschriebene Zahl: das Symbol sitzt in der
+     Mitte des Bands, vom Symbolmittelpunkt bis zur Aussenkante des Rings sind es --ring-w/2.
+     Davon je Seite 2mm Abstand abziehen ergibt --ring-w - 4mm (bei 70px Band also ~54.9px).
+     Bleibt damit auch richtig, falls das Band spaeter breiter oder schmaler wird. */
+  width: calc(var(--ring-w) - 4mm);
+  height: calc(var(--ring-w) - 4mm);
   z-index: 1000;   /* ueber dem Homemenue (998) und dem Splash (999) */
   pointer-events: auto;
   border-radius: 50%;
@@ -861,10 +866,11 @@ textarea.input { min-height: 90px; resize: vertical; }
     0 8px 22px rgba(0,0,0,0.42);
 }
 /* Beim Ziehen quillt sie zusaetzlich auf und ragt ueber den Ring hinaus. */
-/* Beim Ziehen quillt sie deutlich auf und ragt damit sichtbar ueber das 70px-Band hinaus
-   (72px -> 94px). Ohne die groessere Aufblaehung waere der Unterschied zur Ruhegroesse zu klein,
-   seit die Ruhegroesse ins Band passt. */
-.ring-handle.is-dragging { --grow: 1.3; cursor: grabbing; }
+/* Beim Ziehen quillt sie deutlich auf und ragt sichtbar ueber das Band hinaus. Der Faktor haelt
+   die Bewegungsgroesse bei ~93px, wo sie vorher schon stimmte -- die Ruhegroesse ist kleiner
+   geworden, also muss die Aufblaehung entsprechend groesser sein (54.9 * 1.7 = 93.3).
+   Auf die Lupe wirkt das nicht: --grow wird in .ring-lens wieder herausgerechnet. */
+.ring-handle.is-dragging { --grow: 1.7; cursor: grabbing; }
 
 /* Antippen = Finger in Fluessigkeit: der Tropfen quillt kurz in ALLE Richtungen auf und faellt
    dann zurueck. Bewusst gleichmaessig (sx = sy), im Gegensatz zum gerichteten Ziehen. */
