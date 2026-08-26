@@ -756,10 +756,10 @@ textarea.input { min-height: 90px; resize: vertical; }
   top: 0;
   /* Ruhegroesse aus der Ringgeometrie statt als abgeschriebene Zahl: das Symbol sitzt in der
      Mitte des Bands, vom Symbolmittelpunkt bis zur Aussenkante des Rings sind es --ring-w/2.
-     Davon je Seite 2mm Abstand abziehen ergibt --ring-w - 4mm (bei 70px Band also ~54.9px).
+     Davon je Seite 1.5mm Abstand abziehen ergibt --ring-w - 3mm (bei 70px Band also ~58.7px).
      Bleibt damit auch richtig, falls das Band spaeter breiter oder schmaler wird. */
-  width: calc(var(--ring-w) - 4mm);
-  height: calc(var(--ring-w) - 4mm);
+  width: calc(var(--ring-w) - 3mm);
+  height: calc(var(--ring-w) - 3mm);
   z-index: 1000;   /* ueber dem Homemenue (998) und dem Splash (999) */
   pointer-events: auto;
   border-radius: 50%;
@@ -868,9 +868,9 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* Beim Ziehen quillt sie zusaetzlich auf und ragt ueber den Ring hinaus. */
 /* Beim Ziehen quillt sie deutlich auf und ragt sichtbar ueber das Band hinaus. Der Faktor haelt
    die Bewegungsgroesse bei ~93px, wo sie vorher schon stimmte -- die Ruhegroesse ist kleiner
-   geworden, also muss die Aufblaehung entsprechend groesser sein (54.9 * 1.7 = 93.3).
+   geworden, also muss die Aufblaehung entsprechend groesser sein (58.7 * 1.59 = 93.3).
    Auf die Lupe wirkt das nicht: --grow wird in .ring-lens wieder herausgerechnet. */
-.ring-handle.is-dragging { --grow: 1.7; cursor: grabbing; }
+.ring-handle.is-dragging { --grow: 1.59; cursor: grabbing; }
 
 /* Antippen = Finger in Fluessigkeit: der Tropfen quillt kurz in ALLE Richtungen auf und faellt
    dann zurueck. Bewusst gleichmaessig (sx = sy), im Gegensatz zum gerichteten Ziehen. */
