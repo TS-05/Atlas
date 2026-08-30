@@ -801,10 +801,36 @@ state.workShifts = state.workShifts || [];
 state.deviations = state.deviations || [];
 state.weeklyReflection = state.weeklyReflection || {};
 state.prayers = state.prayers || [];
+// Frueher wurde auch ein Dank ueber "Erfuellt" abgeschlossen und landete damit unter den
+// Erhoerungen — inhaltlich verkehrt: die Erhoerung ist das, wofuer gedankt wird, nicht der Dank.
+// Bestehende Eintraege werden einmalig auf den eigenen Status "thanked" umgezogen (idempotent,
+// die Bedingung greift nach dem ersten Lauf nicht mehr).
+state.prayers.forEach(p => {
+  if (p.status === "fulfilled" && (p.type || "bitte") === "dank") {
+    p.status = "thanked";
+    p.thankedAt = p.fulfilledAt || p.thankedAt || null;
+    p.thanksText = p.fulfillmentText || p.thanksText || "";
+    delete p.fulfilledAt;
+    delete p.fulfillmentText;
+  }
+});
 state.subjectOverride = state.subjectOverride || {};
+// Klassenarbeiten sind reine Vorschau: Ist der Termin vorbei, wird der Eintrag beim naechsten Start
+// entfernt statt die Liste zuzumuellen. Streng "aelter als heute" — der Termin des laufenden Tages
+// bleibt den ganzen Tag stehen. (Bewusst eng gehalten: automatisches Loeschen hat in diesem Projekt
+// schon einmal echte Daten gekostet, hier betrifft es ausschliesslich abgelaufene Termine.)
+if (Array.isArray(state.exams)) {
+  const heuteKey = localDateKey(new Date());
+  state.exams = state.exams.filter(e => !e.date || e.date >= heuteKey);
+}
+// Reste des 2026-07 wieder ausgebauten "Minimal-Tag"-Features (blendete Gewohnheiten aus, statt
+// die Latte zu senken). Die Aufraeumzeile fuer h.minVersion ist entfallen: die neue Ideal/Minimal-
+// Funktion legt ihre Daten in h.minimalTitle und h.levelByDate ab, die alte Feldbezeichnung wird
+// nicht mehr beschrieben — und eine pauschale Loeschzeile waere eine Falle fuer jedes kuenftige
+// Feld mit aehnlichem Namen.
 delete state.badDayMode;
 delete state.minimalDayMode;
-if (state.habits) state.habits.forEach(h => delete h.minVersion);
+if (state.habits) state.habits.forEach(h => { h.levelByDate = h.levelByDate || {}; });
 state.financeAccounts = state.financeAccounts || [];
 state.financeCategories = state.financeCategories || [];
 state.financeExpenses = state.financeExpenses || [];
@@ -989,7 +1015,12 @@ function splatSvg(id) {
     </g>
   </svg>`;
 }
-const RING_MASKS = ["ring-mask-1.png", "ring-mask-2.png", "ring-mask-3.png", "ring-mask-4.png", "ring-mask-5.png", "ring-mask-6.png", "ring-mask-7.png"];
+// ?v=2: die Masken hatten einen Alpha-Boden von 2/255 ueber die gesamte Bildflaeche (kein Pixel war
+// wirklich transparent), wodurch das komplette Quadrat schwach mitgemalt und vom drop-shadow-Filter
+// als quadratischer Schein verstaerkt wurde; bei Mi/Fr lief der Pinselstrich zusaetzlich hart in den
+// Bildrand. Beides ist in den PNGs behoben — der Query-Parameter erzwingt, dass der Service-Worker-
+// Cache (cache-first) die neuen Dateien holt statt der alten.
+const RING_MASKS = ["ring-mask-1.png?v=2", "ring-mask-2.png?v=2", "ring-mask-3.png?v=2", "ring-mask-4.png?v=2", "ring-mask-5.png?v=2", "ring-mask-6.png?v=2", "ring-mask-7.png?v=2"];
 function pieSlicePath(pct) {
   const cx = 100, cy = 100, R = 105;
   if (pct >= 99.5) return "M0,0 H200 V200 H0 Z";
@@ -1034,31 +1065,40 @@ function metallicRingGradient(base) {
 // erledigte / fällige-oder-überfällige Aufgaben (bei 4 fälligen füllt jede erledigte den Ring um 25%,
 // bei 5 fälligen um 20% usw. — unabhängig von Klein/Groß). Startet stahlgrau glänzend und wandert mit
 // jeder erledigten Aufgabe einen Schritt weiter durch die Anlassfarben; bei 100% (alles erledigt) geht
-// der Ring in einen "geglühten" Sonderzustand über: weißgelb-flüssiger Kern + orangener Halo, der über
-// den Rand hinaus ausblutet, plus sanftes Pulsieren.
+// der Ring in einen weißglühenden Sonderzustand über: weißgoldener Kern + warmer goldoranger Halo,
+// der über den Rand hinaus ausblutet, plus sanftes Pulsieren.
+// Weissglut = Belohnungszustand des ToDo-Rings bei 100 %. Frueher war das ein reines Rot; das las
+// sich wie eine Warnung statt wie ein Abschluss und war der unbefriedigendste Punkt des ganzen
+// Verlaufs. Jetzt endet der Ring auf der hellsten Stufe der Gluehfarben-Skala (weissgold, warmer
+// goldoranger Halo) -- passend zum Messing-Akzent der App und eindeutig als "geschafft" lesbar.
+const FORGE_COLOR = "#ffe9b0";
+const FORGE_HALO = "#ff9f2e";
+// Rot bleibt dort, wo es semantisch stimmt: Budget-Limit ueberschritten (siehe budgetRingHtml).
 const MOLTEN_COLOR = "#ff2020";
 const MOLTEN_HALO = "#a80000";
 
-function dayBudgetRing(dueCount, doneCount, size = 200) {
+// celebrate = true nur im Moment des Uebergangs auf 100 % (siehe renderTodo) — dann flammt der
+// Ring einmal auf. Ohne das Flag leuchtet er ruhig und konstant weiter.
+function dayBudgetRing(dueCount, doneCount, size = 200, celebrate = false, ohneTermin = 0) {
   const t = dueCount > 0 ? doneCount / dueCount : 0;
   const pct = Math.min(100, Math.round(t * 100));
   const allDueDone = dueCount > 0 && doneCount >= dueCount;
-  const baseColor = allDueDone ? MOLTEN_COLOR : steelColorForProgress(t);
+  const baseColor = allDueDone ? FORGE_COLOR : steelColorForProgress(t);
   const today = new Date();
   const todayIdx = (today.getDay() + 6) % 7;
   const maskUrl = `assets/${RING_MASKS[todayIdx]}`;
   const percentMask = conicPercentMask(pct);
-  // Bei 100% (glühend) denselben nahtlosen Metall-Verlauf wie sonst nutzen (erster/letzter Stop
-  // identisch, kein harter Rand bei 0°) statt eines eigenen Musters mit Orange-Bändern im Ring
-  // selbst — der Ring glüht einfach direkt orange-rot, kein weicher Mehrfach-Halo.
+  // Bei 100% (Weißglut) denselben nahtlosen Metall-Verlauf wie sonst nutzen (erster/letzter Stop
+  // identisch, kein harter Rand bei 0°) statt eines eigenen Musters mit Farbbändern im Ring selbst
+  // — der Ring leuchtet einfach direkt weißgolden, kein weicher Mehrfach-Halo.
   const gradient = metallicRingGradient(baseColor);
   const glowFilter = allDueDone
-    ? `drop-shadow(0 0 6px ${MOLTEN_COLOR}) drop-shadow(0 0 14px ${MOLTEN_HALO})`
+    ? `drop-shadow(0 0 7px ${FORGE_COLOR}) drop-shadow(0 0 16px ${FORGE_HALO})`
     : `drop-shadow(0 0 4px color-mix(in srgb, ${baseColor} 70%, transparent)) drop-shadow(0 0 11px color-mix(in srgb, ${baseColor} 32%, transparent))`;
 
   return `
     <div style="display:flex; justify-content:center; margin-bottom:16px;">
-      <div class="${allDueDone ? "ring-glow-pulse" : ""}" style="position:relative; width:${size}px; height:${size}px;">
+      <div class="${allDueDone && celebrate ? "ring-flare" : ""}" style="position:relative; width:${size}px; height:${size}px;">
         <div style="position:absolute; inset:0;
           background:rgba(255,255,255,0.16);
           -webkit-mask-image:url('${maskUrl}'); -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat; -webkit-mask-position:center;
@@ -1074,7 +1114,7 @@ function dayBudgetRing(dueCount, doneCount, size = 200) {
           mix-blend-mode:overlay; opacity:${allDueDone ? 0.85 : 0.6};
           -webkit-mask-image:url('${maskUrl}'), ${percentMask}; -webkit-mask-size:100% 100%, 100% 100%; -webkit-mask-repeat:no-repeat, no-repeat; -webkit-mask-position:center, center; -webkit-mask-composite:source-in;
           mask-image:url('${maskUrl}'), ${percentMask}; mask-size:100% 100%, 100% 100%; mask-repeat:no-repeat, no-repeat; mask-position:center, center; mask-composite:intersect;"></div>
-        <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:${Math.round(size * 0.17)}px; font-family:var(--font-heading); color:var(--color-neutral-100); text-shadow:0 1px 4px rgba(0,0,0,0.6);">${dueCount}/${doneCount}</span>
+        <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:${Math.round(size * 0.17)}px; font-family:var(--font-heading); color:var(--color-neutral-100); text-shadow:0 1px 4px rgba(0,0,0,0.6);">${dueCount === 0 && ohneTermin > 0 ? ohneTermin + " offen" : (dueCount === 0 ? "–" : doneCount + "/" + dueCount)}</span>
       </div>
     </div>
   `;
@@ -1234,10 +1274,28 @@ const LERNTYPEN = [
 ];
 function lerntypById(id) { return LERNTYPEN.find(l => l.id === id) || LERNTYPEN[0]; }
 
+// Ist eine Liste leer, muss ihr Hinzufuegen-Knopf sichtbar bleiben — sonst sagt der Bildschirm nur
+// "hier ist nichts" und bietet keinen Weg, das zu aendern.
+function listeIstLeer(id) {
+  const wrap = document.getElementById(id);
+  return !!wrap && !!wrap.querySelector(".empty-hint");
+}
+const LEER_AUSNAHMEN = {
+  addRoutineBtn: () => listeIstLeer("routineChain"),
+  addHabitBtn:   () => listeIstLeer("todayHabits"),
+  addExamBtn:    () => listeIstLeer("examsList"),
+  addTaskBtn:    () => listeIstLeer("todoList")
+};
+
 function updateHeaderPlusButton() {
   const tab = document.body.dataset.tab;
   const ids = QUICK_ADD_BTN_IDS[tab];
-  if (ids) ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = quickAddVisible ? "" : "none"; });
+  if (ids) ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const trotzdemZeigen = LEER_AUSNAHMEN[id] ? LEER_AUSNAHMEN[id]() : false;
+    el.style.display = (quickAddVisible || trotzdemZeigen) ? "" : "none";
+  });
   const prayerCard = document.getElementById("prayerAddCard");
   if (prayerCard) prayerCard.style.display = (tab === "gebete" && quickAddVisible) ? "flex" : "none";
   const searchCard = document.getElementById("bereicheSearchCard");
@@ -1259,7 +1317,13 @@ function updateHeaderPlusButton() {
 
 document.getElementById("headerPlusBtn").addEventListener("click", () => {
   const tab = document.body.dataset.tab;
-  if (tab === "heute" || tab === "todo" || tab === "finanzen") {
+  if (tab === "todo") {
+    // Auf ToDo gibt es genau ein Ziel — hier war das Plus vorher ein Moduswechsel, der erst einen
+    // zweiten Knopf einblendete. Zwei Tipps fuer die haeufigste Aktion der App.
+    openTaskModal();
+  } else if (tab === "heute" || tab === "finanzen") {
+    // Dort gibt es mehrere Ziele (Routine, Gewohnheit, Abweichung, Klassenarbeit), deshalb bleibt
+    // das Einblenden der jeweiligen Knoepfe der richtige Weg.
     quickAddVisible = !quickAddVisible;
     updateHeaderPlusButton();
     renderAll();
@@ -1307,6 +1371,25 @@ document.getElementById("todayLabel").textContent = new Date().toLocaleDateStrin
 const overlay = document.getElementById("modalOverlay");
 const modalBody = document.getElementById("modalBody");
 
+// Markiert ein Pflichtfeld sichtbar und nennt den Grund, statt den Speichern-Klick verpuffen zu
+// lassen. Die Markierung verschwindet, sobald wieder getippt wird.
+function markiereFehlendesFeld(feld, text) {
+  feld.classList.add("feld-fehlt");
+  feld.focus();
+  const feldBlock = feld.closest(".field") || feld.parentElement;
+  let hinweis = feldBlock.querySelector(".feld-fehler");
+  if (!hinweis) {
+    hinweis = document.createElement("p");
+    hinweis.className = "feld-fehler";
+    feldBlock.appendChild(hinweis);
+  }
+  hinweis.textContent = text;
+  feld.addEventListener("input", () => {
+    feld.classList.remove("feld-fehlt");
+    hinweis.remove();
+  }, { once: true });
+}
+
 function openModal(html, onMount, mode = "dialog") {
   overlay.classList.toggle("dialog-mode", mode === "dialog");
   modalBody.innerHTML = mode === "sheet" ? '<div class="modal-grabber"></div>' + html : html;
@@ -1319,6 +1402,16 @@ function closeModal() {
   currentDaySheetKey = null;
 }
 overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
+// Escape schliesst, Enter in einem einzeiligen Feld speichert — vorher ging beides nur mit der Maus
+// bzw. gar nicht, waehrend das Gebets-Eingabefeld Enter laengst konnte (dieselbe App, zwei Regeln).
+document.addEventListener("keydown", e => {
+  if (overlay.classList.contains("hidden")) return;
+  if (e.key === "Escape") { e.preventDefault(); closeModal(); return; }
+  if (e.key === "Enter" && !e.shiftKey && e.target.tagName === "INPUT" && e.target.type !== "date" && e.target.type !== "time") {
+    const speichern = modalBody.querySelector("#mSave");
+    if (speichern) { e.preventDefault(); speichern.click(); }
+  }
+});
 
 // ---------- Zielbereiche: verschachtelte Knoten-Helfer ----------
 function nodeById(id) {
@@ -1436,6 +1529,61 @@ function habitCompletionRate(habit, days = 30) {
   return total === 0 ? 0 : done / total;
 }
 
+// ---------- Ideal- und Minimalstufe einer Gewohnheit ----------
+// Jede Gewohnheit kann eine zweite, niedrigere Latte haben (h.minimalTitle), z. B. "6 Uhr aufstehen"
+// als Ideal und "7 Uhr aufstehen" als Minimum. Der Regler in der Zeile waehlt die Stufe fuer den
+// jeweiligen Tag; gespeichert wird sie in h.levelByDate[Datum]. Jeder Tag startet auf "ideal".
+// Wichtig zur Abgrenzung vom 2026-07 wieder entfernten "Minimal-Tag": hier wird nichts ausgeblendet,
+// nur die Anforderung gesenkt — die Gewohnheit bleibt sichtbar und zaehlt weiter mit.
+const HABIT_MINIMAL_FACTOR = 0.5;
+
+function habitHasMinimal(habit) {
+  return !!(habit.minimalTitle && habit.minimalTitle.trim());
+}
+// Reglerstellung fuer einen Tag. Ohne Minimalstufe gibt es nichts zu waehlen.
+function habitLevelOn(habit, dateKey) {
+  if (!habitHasMinimal(habit)) return "ideal";
+  return (habit.levelByDate || {})[dateKey] === "minimal" ? "minimal" : "ideal";
+}
+// Angezeigter Text der aktuell eingestellten Stufe.
+function habitTitleOn(habit, dateKey) {
+  return habitLevelOn(habit, dateKey) === "minimal" ? habit.minimalTitle.trim() : habit.title;
+}
+// Erledigt? Deckt Alt-Daten (true), Gewichtswerte (Zahl) und die neuen Stufenwerte ab.
+function habitDoneOn(habit, dateKey) {
+  const v = habit.history[dateKey];
+  if (habit.type === "weight") return v !== undefined && v !== null;
+  return !!v;
+}
+// Punktwert des Tages: ideal volle Punkte, minimal die Haelfte, nicht erledigt null.
+// Alt-Eintraege stehen auf true und zaehlen unveraendert voll — kein Datenumbau noetig.
+function habitPointsOn(habit, dateKey) {
+  if (!habitDoneOn(habit, dateKey)) return 0;
+  const full = habit.points ?? 1;
+  return habit.history[dateKey] === "minimal" ? full * HABIT_MINIMAL_FACTOR : full;
+}
+// Punkte fuer die Anzeige: 2 statt 2,0 — aber 0,5 bleibt 0,5.
+function formatPoints(n) {
+  return Number.isInteger(n) ? String(n) : n.toLocaleString("de-DE", { maximumFractionDigits: 1 });
+}
+
+// Der Regler selbst. Ein Knopf mit data-level, damit CSS die Knopfstellung uebernimmt und JS nur
+// den Zustand umschaltet.
+function levelSwitchHtml(habit, dateKey) {
+  if (!habitHasMinimal(habit)) return "";
+  const level = habitLevelOn(habit, dateKey);
+  // Der ganze Block ist der Knopf — Spur, Ecken und Beschriftung schalten alle um. Waere nur die
+  // Pille selbst antippbar, gingen ihre abgerundeten Ecken als Trefferflaeche verloren (gemessen
+  // 9 % tote Flaeche), und das Ziel waere mit 50x28 unnoetig klein statt 50x46.
+  return `
+    <button class="level-switch-wrap" data-level="${level}" data-habit-level="${habit.id}" data-level-date="${dateKey}"
+            role="switch" aria-checked="${level === "minimal"}"
+            aria-label="${habit.title}: ${level === "minimal" ? "Minimalstufe aktiv, auf Ideal stellen" : "Idealstufe aktiv, auf Minimal stellen"}">
+      <span class="level-switch" data-level="${level}"><span class="level-knob"></span></span>
+      <span class="level-switch-label">${level === "minimal" ? "Minimal" : "Ideal"}</span>
+    </button>`;
+}
+
 function computeStreak(habit) {
   let streak = 0;
   let d = new Date();
@@ -1478,6 +1626,45 @@ function escapeHtml(str) {
 // persistiert -- expandedTaskIds lebt nur im Tab-Modul, kein saveData() nötig.
 const expandedTaskIds = new Set();
 
+// ---------- Drei Aufgabenzustaende ----------
+// Bewusst NICHT als ein Statusfeld umgebaut: t.done wird an gut zwei Dutzend Stellen gelesen
+// (Roadmap-Fortschritt, Wochenstatistik, Export, Import). "In Arbeit" liegt deshalb als eigenes
+// Merkmal daneben und gilt nur, solange die Aufgabe nicht erledigt ist. Altbestand bleibt gueltig,
+// keine Migration noetig.
+const TASK_STATES = ["offen", "inArbeit", "erledigt"];
+function taskStatus(t) {
+  if (t.done) return "erledigt";
+  return t.inProgress ? "inArbeit" : "offen";
+}
+function setTaskStatus(t, status) {
+  if (status === "erledigt") {
+    t.done = true;
+    t.completedAt = t.completedAt || new Date().toISOString();
+    delete t.inProgress;
+  } else {
+    t.done = false;
+    t.completedAt = null;
+    if (status === "inArbeit") t.inProgress = true; else delete t.inProgress;
+  }
+}
+// Reihum: offen -> in Arbeit -> erledigt -> offen.
+function cycleTaskStatus(t) {
+  const next = TASK_STATES[(TASK_STATES.indexOf(taskStatus(t)) + 1) % TASK_STATES.length];
+  setTaskStatus(t, next);
+  return next;
+}
+// Halb gefuellter Kreis im selben Messing-Verlauf wie die Erledigt-Kleckse — liest sich als
+// "angefangen", nicht als "erledigt" und nicht als leer.
+function inProgressSvg() {
+  return `<svg width="13" height="13" viewBox="0 0 12 12" style="overflow:visible;">
+    <circle cx="6" cy="6" r="5" fill="none" stroke="url(#goldGradRing)" stroke-width="1.6"/>
+    <path d="M6 1 A5 5 0 0 0 6 11 Z" fill="url(#goldGradRing)"/>
+  </svg>`;
+}
+// Merkt den letzten 100-%-Zustand des ToDo-Rings, um das einmalige Aufflammen vom blossen
+// Neurendern zu unterscheiden. null = in dieser Sitzung noch nicht gesetzt.
+let lastAllDueDone = null;
+
 function renderTaskItem(t) {
   const today = todayStr();
   const overdue = !t.done && t.dueDate && t.dueDate < today;
@@ -1489,6 +1676,7 @@ function renderTaskItem(t) {
   if (t.dueDate) metaParts.push("fällig " + t.dueDate + (t.dueTime ? " " + t.dueTime : ""));
   if (node && !isLernfeld) metaParts.push(node.title);
   const dueToday = t.dueDate === today;
+  const status = taskStatus(t);
   const expanded = expandedTaskIds.has(t.id);
   const titleHtml = t.done
     ? `<div class="item-title paint-done-title">
@@ -1500,14 +1688,16 @@ function renderTaskItem(t) {
   el.className = "task-item" + (expanded ? " expanded" : "");
   el.innerHTML = `
     <div class="atlas-row${t.done ? " done" : ""}${dueToday ? " gold-frame" : ""}" data-task-row="${t.id}">
-      <button class="atlas-check${t.done ? " checked" : ""}" data-task="${t.id}">${t.done ? splatSvg(t.id) : ""}</button>
+      <button class="atlas-check${t.done ? " checked" : ""}${status === "inArbeit" ? " in-progress" : ""}" data-task="${t.id}"
+              aria-label="${status === "offen" ? "Als in Arbeit markieren" : status === "inArbeit" ? "Als erledigt markieren" : "Wieder auf offen setzen"}"
+              >${t.done ? splatSvg(t.id) : (status === "inArbeit" ? inProgressSvg() : "")}</button>
       ${isLernfeld ? `<span style="color:var(--color-accent-400); flex-shrink:0;" title="${escapeHtml(lerntyp.label)}">${lerntyp.icon}</span>` : ""}
       <div style="flex:1; min-width:0;">
         ${titleHtml}
-        <div class="item-meta">${escapeHtml((isLernfeld ? [lerntyp.label, ...metaParts] : metaParts).join(" · "))}</div>
+        <div class="item-meta">${status === "inArbeit" ? '<span class="meta-progress">In Arbeit</span> · ' : ""}${escapeHtml((isLernfeld ? [lerntyp.label, ...metaParts] : metaParts).join(" · "))}</div>
       </div>
       ${!isLernfeld && t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
-      ${overdue ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">ÜBERFÄLLIG</span>' : ""}
+      ${overdue ? '<span class="atlas-chip chip-overdue">ÜBERFÄLLIG</span>' : ""}
       <button class="btn btn-icon btn-ghost" data-del-task="${t.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
     </div>
     ${!isLernfeld && expanded ? `
@@ -1526,6 +1716,10 @@ function renderTaskItem(t) {
 }
 
 function renderTodo() {
+  // Gleicher Fokus-Schutz wie bei renderProjekte: ein offenes ToDo-Detailfeld, in dem gerade
+  // getippt wird, ueberlebt zwischenzeitliche Renders.
+  const activeNotes = document.activeElement;
+  if (activeNotes && activeNotes.matches && activeNotes.matches("[data-task-notes]")) return;
   const wrap = document.getElementById("todoList");
   wrap.innerHTML = "";
 
@@ -1537,11 +1731,23 @@ function renderTodo() {
   const dueOrOverdueAll = todoTasks.filter(t => t.dueDate && t.dueDate <= today);
   const dueOrOverdueDoneCount = dueOrOverdueAll.filter(t => t.done).length;
   const ruleEl = document.getElementById("dayRule");
-  ruleEl.innerHTML = dayBudgetRing(dueOrOverdueAll.length, dueOrOverdueDoneCount);
+  // Zaehlen nur Aufgaben mit Termin, stand hier "0/0", obwohl offene Arbeit da war. Ohne faellige
+  // Aufgaben zeigt der Ring deshalb die Zahl der offenen Aufgaben ohne Termin statt einer Null.
+  const ohneTermin = todoTasks.filter(t => !t.done && !t.dueDate).length;
+  // Nur der echte Wechsel auf "alles erledigt" flammt auf. null = erster Render der Sitzung
+  // (beim Oeffnen der App soll nichts aufblitzen, es hat sich ja nichts geaendert), und jedes
+  // spaetere renderAll() im selben Zustand laesst den Ring in Ruhe.
+  const allDueDoneNow = dueOrOverdueAll.length > 0 && dueOrOverdueDoneCount >= dueOrOverdueAll.length;
+  const celebrate = lastAllDueDone === false && allDueDoneNow;
+  lastAllDueDone = allDueDoneNow;
+  ruleEl.innerHTML = dayBudgetRing(dueOrOverdueAll.length, dueOrOverdueDoneCount, 200, celebrate, ohneTermin);
 
   const openTasks = todoTasks
     .filter(t => !t.done)
     .sort((a, b) => {
+      // Angefangenes zuerst — was schon laeuft, soll man nicht suchen muessen.
+      const ai = a.inProgress ? 0 : 1, bi = b.inProgress ? 0 : 1;
+      if (ai !== bi) return ai - bi;
       const ad = a.dueDate || "9999-99-99", bd = b.dueDate || "9999-99-99";
       if (ad !== bd) return ad.localeCompare(bd);
       return (b.priority || 0) - (a.priority || 0);
@@ -1555,9 +1761,13 @@ function renderTodo() {
   lastMonday.setDate(lastMonday.getDate() - 7);
   const lastMondayKey = localDateKey(lastMonday);
 
-  const doneTasks = todoTasks.filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) >= thisMondayKey);
+  // completedAt ist ein UTC-Zeitstempel; .slice(0,10) daraus ergibt nachts zwischen 00:00 und
+  // 02:00 Ortszeit den Vortag. Eine Montag frueh abgehakte Aufgabe rutschte dadurch sofort ins
+  // Archiv "Letzte Woche". Deshalb ueber den lokalen Datumsschluessel vergleichen.
+  const doneKey = t => localDateKey(new Date(t.completedAt));
+  const doneTasks = todoTasks.filter(t => t.done && t.completedAt && doneKey(t) >= thisMondayKey);
   const lastWeekDoneTasks = todoTasks
-    .filter(t => t.done && t.completedAt && t.completedAt.slice(0, 10) >= lastMondayKey && t.completedAt.slice(0, 10) < thisMondayKey)
+    .filter(t => t.done && t.completedAt && doneKey(t) >= lastMondayKey && doneKey(t) < thisMondayKey)
     .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
 
   if (openTasks.length === 0 && doneTasks.length === 0) {
@@ -1632,20 +1842,22 @@ function renderWeekCircle() {
 
   // Nur die Tagesroutine zählt für den Wochenkreis, weitere Gewohnheiten nicht.
   const scheduled = state.habits.filter(h => h.routineOrder != null && new Date(h.createdAt) <= today && isScheduledToday(h, today));
-  const doneHabits = scheduled.filter(h => {
-    const v = h.history[todayKey];
-    return h.type === "weight" ? (v !== undefined && v !== null) : !!v;
-  });
+  const doneHabits = scheduled.filter(h => habitDoneOn(h, todayKey));
   const done = doneHabits.length;
   const totalPoints = scheduled.reduce((sum, h) => sum + (h.points ?? 1), 0);
-  const earnedPoints = doneHabits.reduce((sum, h) => sum + (h.points ?? 1), 0);
-  const pct = totalPoints ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+  // Minimal erledigte Schritte zaehlen halb — der Ring bleibt damit ehrlich, ohne den Tag
+  // als Totalausfall zu werten.
+  const earnedPoints = doneHabits.reduce((sum, h) => sum + habitPointsOn(h, todayKey), 0);
+  // Ohne faellige Routine-Schritte gibt es nichts zu erfuellen — dann ist "0 %" keine Aussage,
+  // sondern ein falscher Vorwurf. In dem Fall bleibt der Ring leer und zeigt einen Strich.
+  const nichtsGeplant = totalPoints === 0;
+  const pct = nichtsGeplant ? 0 : Math.round((earnedPoints / totalPoints) * 100);
 
-  wrap.title = `${todayKey}: ${scheduled.length ? done + "/" + scheduled.length + " Routine-Schritte (" + earnedPoints + "/" + totalPoints + " Punkte)" : "keine Routine-Schritte fällig"}`;
+  wrap.title = `${todayKey}: ${scheduled.length ? done + "/" + scheduled.length + " Routine-Schritte (" + formatPoints(earnedPoints) + "/" + formatPoints(totalPoints) + " Punkte)" : "keine Routine-Schritte fällig"}`;
   wrap.innerHTML = `
     <div style="display:flex; justify-content:center; margin-bottom:30px;">
       <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
-        ${goldRingHtml(pct, 200, todayIdx, 34)}
+        ${nichtsGeplant ? goldRingHtml(0, 200, todayIdx, 34).replace(">0%<", ">–<") : goldRingHtml(pct, 200, todayIdx, 34)}
         <span style="font-size:11px; font-family:var(--font-heading); color:var(--color-accent-300);">${WEEKDAY_LABELS[todayIdx]}</span>
       </div>
     </div>
@@ -1975,10 +2187,17 @@ function renderRoutineChain() {
     const weightInputHtml = h.type === "weight"
       ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:72px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
       : "";
+    // Der Titel zeigt die Stufe, auf der der Regler gerade steht ("6 Uhr aufstehen" vs. "7 Uhr
+    // aufstehen") — so ist ohne zweite Zeile klar, was heute gilt.
+    const shownTitle = habitTitleOn(h, today);
     const titleHtml = quickAddVisible
-      ? `<div class="item-title" data-edit-habit="${h.id}" style="cursor:pointer; text-decoration:underline dotted;">${escapeHtml(h.title)}</div>`
-      : `<div class="item-title">${escapeHtml(h.title)}</div>`;
-    const pointsHtml = `<div class="item-meta">${h.points ?? 1} Punkt${(h.points ?? 1) === 1 ? "" : "e"}</div>`;
+      ? `<div class="item-title" data-edit-habit="${h.id}" style="cursor:pointer; text-decoration:underline dotted;">${escapeHtml(shownTitle)}</div>`
+      : `<div class="item-title">${escapeHtml(shownTitle)}</div>`;
+    const fullPoints = h.points ?? 1;
+    const levelPoints = habitLevelOn(h, today) === "minimal" ? fullPoints * HABIT_MINIMAL_FACTOR : fullPoints;
+    const streak = computeStreak(h);
+    const pointsHtml = `<div class="item-meta">${streak > 0 ? `Serie: ${streak} · ` : ""}${formatPoints(levelPoints)} Punkt${levelPoints === 1 ? "" : "e"}${
+      habitHasMinimal(h) && levelPoints !== fullPoints ? ` <span style="color:var(--color-neutral-600);">statt ${formatPoints(fullPoints)}</span>` : ""}</div>`;
 
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
@@ -1992,6 +2211,7 @@ function renderRoutineChain() {
         ${noteHtml}
       </div>
       ${weightInputHtml}
+      ${levelSwitchHtml(h, today)}
       ${quickAddVisible ? `<button class="btn btn-icon btn-ghost" data-del-habit="${h.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>` : ""}
       ${dragHandleHtml(h.id)}
     `;
@@ -2032,22 +2252,24 @@ function renderOtherHabits() {
     habitWrap.innerHTML = '<div class="empty-hint">Keine weiteren Gewohnheiten heute fällig.</div>';
   }
   dueHabits.forEach(h => {
-    const doneToday = !!h.history[today];
+    const doneToday = habitDoneOn(h, today);
     const streak = computeStreak(h);
     const priority = isPriority(h.nodeId);
+    const shownTitle = habitTitleOn(h, today);
     const titleHtml = quickAddVisible
-      ? `<div class="item-title" data-edit-habit="${h.id}" style="cursor:pointer; text-decoration:underline dotted;">${escapeHtml(h.title)}</div>`
-      : `<div class="item-title">${escapeHtml(h.title)}</div>`;
+      ? `<div class="item-title" data-edit-habit="${h.id}" style="cursor:pointer; text-decoration:underline dotted;">${escapeHtml(shownTitle)}</div>`
+      : `<div class="item-title">${escapeHtml(shownTitle)}</div>`;
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
     el.innerHTML = `
       <button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}">${doneToday ? splatSvg(h.id) : ""}</button>
       <div style="flex:1; min-width:0;">
         ${titleHtml}
-        <div class="item-meta">${frequencyLabel(h)} · Serie: ${streak} · ${h.points ?? 1} Punkt${(h.points ?? 1) === 1 ? "" : "e"}</div>
+        <div class="item-meta">${frequencyLabel(h)} · Serie: ${streak}</div>
       </div>
       ${priority ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">Priorität</span>' : ""}
-      <button class="btn btn-icon btn-ghost" data-del-habit="${h.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+      ${levelSwitchHtml(h, today)}
+      ${quickAddVisible ? `<button class="btn btn-icon btn-ghost" data-del-habit="${h.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>` : ""}
     `;
     habitWrap.appendChild(el);
   });
@@ -2285,8 +2507,10 @@ function renderMoreStats() {
   const rate60 = taskCompletionRateInWindow(60);
   const devCount7 = state.deviations.filter(d => d.date >= todayStr(-7)).length;
   const devCount30 = state.deviations.filter(d => d.date >= todayStr(-30)).length;
+  // "fulfilled" tragen nur noch Bitten (ein abgeschlossener Dank bekommt "thanked"), und "offen"
+  // heisst offen — die als nicht mehr relevant abgelegten Anliegen zaehlten hier frueher mit.
   const prayerFulfilled = state.prayers.filter(p => p.status === "fulfilled").length;
-  const prayerOpen = state.prayers.filter(p => p.status !== "fulfilled").length;
+  const prayerOpen = state.prayers.filter(p => p.status === "open").length;
 
   const boxes = [
     { num: rate7 !== null ? Math.round(rate7 * 100) + "%" : "–", label: "Aufgaben erledigt", sub: "letzte 7 Tage" },
@@ -2352,9 +2576,12 @@ const HEATMAP_GOLD = "#d4af37";
 
 function dayCompletionPct(dateObj) {
   const key = localDateKey(dateObj);
-  const scheduled = state.habits.filter(h => localDateKey(new Date(h.createdAt)) <= key && isScheduledToday(h, dateObj));
+  // Dieselbe Grundmenge wie der Wochenkreis (renderWeekCircle): nur die Tagesroutine. Vorher fehlte
+  // der routineOrder-Filter, wodurch derselbe Tag auf "Heute" 100 % und in der Heatmap 50 % sein
+  // konnte — zwei Nenner fuer dieselbe Frage.
+  const scheduled = state.habits.filter(h => h.routineOrder != null && localDateKey(new Date(h.createdAt)) <= key && isScheduledToday(h, dateObj));
   const totalPoints = scheduled.reduce((sum, h) => sum + (h.points ?? 1), 0);
-  const earnedPoints = scheduled.filter(h => h.history[key]).reduce((sum, h) => sum + (h.points ?? 1), 0);
+  const earnedPoints = scheduled.reduce((sum, h) => sum + habitPointsOn(h, key), 0);
   return totalPoints ? Math.round((earnedPoints / totalPoints) * 100) : null;
 }
 
@@ -2537,8 +2764,23 @@ document.addEventListener("click", e => {
 // Morgens einmal daran erinnern, was GESTERN liegen geblieben ist -- damit es nicht zweimal
 // hintereinander passiert. Bewusst nicht erst nach dem zweiten Versaeumnis (zu spaet, der Rueckfall
 // ist dann schon da) und hoechstens einmal pro Tag, egal wie oft die App geoeffnet wird.
+//
+// Gewuenschtes Verhalten: genau einmal pro Tag, beim ERSTEN Oeffnen der App an diesem Tag.
+//
+// Der Tag beginnt dabei um DAY_START_HOUR, nicht um Mitternacht. Grund: renderAll() laeuft bei jedem
+// visibilitychange, und sobald das Kalenderdatum umspringt, ist der naechste App-Blick der erste des
+// neuen Tages -- ohne diesen Riegel feuerte die Erinnerung mitten in der Nacht (real gemeldet: 00:04).
+// Ein Blick auf die App um kurz nach Mitternacht zaehlt also noch zum Vortag.
+// Andere Grenze gewuenscht? Nur diese eine Zahl aendern.
+const DAY_START_HOUR = 6;   // vor 06:00 gilt der Tag noch nicht als begonnen
+
 function checkMissedRoutineStreaks() {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  // Nacht: kommentarlos aussteigen -- WICHTIG: ohne lastMissReminderDate zu setzen, sonst waere der
+  // Tag durch einen naechtlichen App-Blick "verbraucht" und die Erinnerung kaeme gar nicht mehr.
+  if (new Date().getHours() < DAY_START_HOUR) return;
+
   const today = todayStr();
   if (state.lastMissReminderDate === today) return;   // heute schon erinnert
 
@@ -2585,7 +2827,61 @@ function applyAutoDoneHabits() {
   if (changed) saveData();
 }
 
+// ---------- Freitext-Autospeicherung ----------
+// Notizfelder (Projekte, ToDo-Details, Wochenreflexion) hingen frueher allein am "change"-Event.
+// Bei einer <textarea> feuert das erst beim Verlassen des Feldes — kam vorher ein renderAll()
+// dazwischen (z. B. beim Zurueckkehren in die App ueber visibilitychange) oder beendete iOS die
+// PWA im Hintergrund, wurde das DOM-Element ersetzt, ohne dass "change" je gefeuert hatte: der
+// getippte Text war weg. Jetzt landet jeder Tastendruck sofort im State; nur der localStorage-
+// Schreibvorgang wird entprellt und beim Verstecken/Verlassen der Seite hart durchgeschrieben.
+let pendingSaveTimer = null;
+function saveDataDebounced(ms = 400) {
+  if (pendingSaveTimer) clearTimeout(pendingSaveTimer);
+  pendingSaveTimer = setTimeout(() => { pendingSaveTimer = null; saveData(); }, ms);
+}
+// Schreibt sofort und verwirft einen noch offenen Entprell-Timer — der letzte sichere Moment,
+// bevor das DOM neu aufgebaut wird oder die Seite verschwindet.
+function flushPendingSave() {
+  if (pendingSaveTimer) { clearTimeout(pendingSaveTimer); pendingSaveTimer = null; }
+  saveData();
+}
+
+// Uebernimmt den aktuellen Feldwert in den State. trimmed=true nur beim endgueltigen Commit
+// (Fokusverlust) — waehrend des Tippens wuerde ein Trim das getippte Leerzeichen wegschlucken.
+function commitFreeTextField(el, trimmed = false) {
+  if (!el || !el.matches) return false;
+  if (el.matches("[data-project-notes]")) {
+    const project = state.projects.find(p => p.id === el.dataset.projectNotes);
+    if (!project) return false;
+    project.notes = trimmed ? el.value.trim() : el.value;
+    return true;
+  }
+  if (el.matches("[data-task-notes]")) {
+    const task = state.tasks.find(t => t.id === el.dataset.taskNotes);
+    if (!task) return false;
+    task.notes = trimmed ? el.value.trim() : el.value;
+    return true;
+  }
+  if (el.matches("#reflectionText")) {
+    state.weeklyReflection[el.dataset.weekKey || weekStartKey()] = el.value;
+    return true;
+  }
+  return false;
+}
+
+// Rettet den Inhalt des gerade fokussierten Notizfeldes, bevor irgendetwas das DOM neu aufbaut
+// oder die Seite verschwindet.
+function commitActiveFreeText(trimmed = false) {
+  return commitFreeTextField(document.activeElement, trimmed);
+}
+
+document.addEventListener("input", e => {
+  if (commitFreeTextField(e.target)) saveDataDebounced();
+});
+
 function renderAll() {
+  // Nie ueber ungespeicherten Tippstand hinweg neu rendern.
+  commitActiveFreeText();
   applyAutoDoneHabits();
   renderWeekCircle();
   renderDeviationLog();
@@ -2601,8 +2897,58 @@ function renderAll() {
   renderPrayers();
   renderWeekStats();
   updateNotifPermissionUI();
+  // Muss NACH den Listen laufen: die Sichtbarkeit der Hinzufuegen-Knoepfe haengt davon ab, ob eine
+  // Liste gerade leer ist — vorher wurde sie nur beim Tabwechsel und beim Plus-Knopf ausgewertet.
+  updateHeaderPlusButton();
   checkMissedRoutineStreaks();
 }
+
+// ---------- Loeschen mit Rueckgaengig ----------
+// Bis hierher war jedes Loeschen sofort und endgueltig — kein confirm(), kein Undo, und das X sass
+// direkt in der Zeile. Ein Bestaetigungsdialog waere die schlechtere Antwort (man klickt ihn nach
+// zwei Tagen blind weg); ein kurzes Zeitfenster zum Zuruecknehmen heilt den Fehltipp wirklich.
+let undoTimer = null;
+let undoAction = null;
+const UNDO_MS = 7000;
+
+function hideUndoBar() {
+  const bar = document.getElementById("undoBar");
+  if (bar) bar.hidden = true;
+  if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+  undoAction = null;
+}
+// text = was geloescht wurde, restore = stellt es an derselben Stelle wieder her
+function offerUndo(text, restore) {
+  const bar = document.getElementById("undoBar");
+  if (!bar) { restore = null; return; }
+  undoAction = restore;
+  document.getElementById("undoText").textContent = text;
+  bar.hidden = false;
+  bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = "";
+  if (undoTimer) clearTimeout(undoTimer);
+  undoTimer = setTimeout(hideUndoBar, UNDO_MS);
+}
+// Loescht einen Eintrag aus einer State-Liste und bietet ihn zum Zurueckholen an — inklusive
+// seiner urspruenglichen Position, damit eine per Hand sortierte Liste nicht durcheinandergeraet.
+function deleteWithUndo(listName, id, label) {
+  const liste = state[listName];
+  const idx = liste.findIndex(x => x.id === id);
+  if (idx === -1) return;
+  const [entfernt] = liste.splice(idx, 1);
+  saveData();
+  renderAll();
+  offerUndo(`„${label}" gelöscht`, () => {
+    state[listName].splice(Math.min(idx, state[listName].length), 0, entfernt);
+    saveData();
+    renderAll();
+  });
+}
+
+document.getElementById("undoBtn")?.addEventListener("click", () => {
+  const fn = undoAction;
+  hideUndoBar();
+  if (fn) fn();
+});
 
 // ---------- Event delegation ----------
 document.addEventListener("change", e => {
@@ -2617,26 +2963,15 @@ document.addEventListener("change", e => {
     renderAll();
     if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
   }
-  if (e.target.matches("#reflectionText")) {
-    const key = e.target.dataset.weekKey || weekStartKey();
-    state.weeklyReflection[key] = e.target.value;
-    saveData();
-  }
-  if (e.target.matches("[data-task-notes]")) {
-    const task = state.tasks.find(t => t.id === e.target.dataset.taskNotes);
-    if (task) { task.notes = e.target.value.trim(); saveData(); }
-  }
-  if (e.target.matches("[data-project-notes]")) {
-    const project = state.projects.find(p => p.id === e.target.dataset.projectNotes);
-    if (project) { project.notes = e.target.value; saveData(); }
-  }
+  // Endgueltiger Commit beim Verlassen des Feldes (waehrend des Tippens laeuft die
+  // Autospeicherung ueber den "input"-Listener, siehe commitFreeTextField).
+  if (commitFreeTextField(e.target, true)) flushPendingSave();
 });
 
 function toggleTaskDone(id) {
   const task = state.tasks.find(t => t.id === id);
   if (!task) return;
-  task.done = !task.done;
-  task.completedAt = task.done ? new Date().toISOString() : null;
+  setTaskStatus(task, task.done ? "offen" : "erledigt");
   saveData();
   renderAll();
 }
@@ -2644,33 +2979,79 @@ function toggleTaskDone(id) {
 // Einzelklick auf die ToDo-Zeile klappt die Details auf; Doppelklick hakt ab. Da jeder Doppelklick
 // mit zwei einzelnen "click"-Events beginnt, wird der Einzelklick kurz verzögert ausgeführt und
 // verworfen, falls in der Zwischenzeit ein "dblclick" auf derselben Zeile eintrifft.
-let pendingTaskRowClicks = {};
-const TASK_ROW_CLICK_DELAY = 280;
+// Frueher wartete jeder Einzelklick 280 ms auf einen moeglichen Doppelklick — bei jedem Tippen auf
+// eine Zeile, ohne jede Rueckmeldung in der Zwischenzeit. Das war der Hauptgrund, warum sich die
+// Liste traege anfuehlte. Jetzt klappt die Zeile sofort auf; trifft danach doch ein Doppelklick
+// ein, wird das Aufklappen zurueckgenommen und stattdessen abgehakt.
+let lastExpandedByClick = null;
 
 document.addEventListener("dblclick", e => {
+  // Gewohnheits-Zeilen (Tagesroutine und weitere Gewohnheiten) lassen sich per Doppeltipp auf die
+  // ganze Zeile abhaken — das kleine Kaestchen bleibt, ist aber nicht mehr der einzige Weg.
+  // Ausgenommen: Regler, Loeschen, Ziehgriff, der Titel im Bearbeiten-Modus und Gewichts-Zeilen
+  // (die tragen ihren Wert ueber das Zahlenfeld ein, nicht ueber ein Haekchen).
+  const habitRow = e.target.closest("[data-habit-id], .atlas-row");
+  const habitBtn = habitRow && habitRow.querySelector("[data-habit]");
+  if (habitBtn && !e.target.closest("[data-habit-level]") && !e.target.closest("[data-del-habit]")
+      && !e.target.closest("[data-edit-habit]") && !e.target.closest(".routine-drag-handle")
+      && !e.target.closest("input")) {
+    const habit = state.habits.find(h => h.id === habitBtn.dataset.habit);
+    if (habit && habit.type !== "weight") {
+      const key = habitBtn.dataset.date || todayStr();
+      if (habit.history[key]) delete habit.history[key];
+      else { habit.history[key] = habitLevelOn(habit, key); habit.missNotified = false; }
+      saveData();
+      renderAll();
+      if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
+      return;
+    }
+  }
   const taskRow = e.target.closest("[data-task-row]");
   if (!taskRow || e.target.closest("[data-del-task]") || e.target.closest("[data-task]")) return;
   const id = taskRow.dataset.taskRow;
-  if (pendingTaskRowClicks[id]) { clearTimeout(pendingTaskRowClicks[id]); delete pendingTaskRowClicks[id]; }
+  // Das Aufklappen des ersten Klicks zuruecknehmen, damit der Doppelklick nur abhakt.
+  if (lastExpandedByClick && lastExpandedByClick.id === id) {
+    if (lastExpandedByClick.warOffen) expandedTaskIds.add(id); else expandedTaskIds.delete(id);
+    lastExpandedByClick = null;
+  }
   toggleTaskDone(id);
 });
 
 document.addEventListener("click", e => {
   const taskCheck = e.target.closest("[data-task]");
   if (taskCheck) {
-    toggleTaskDone(taskCheck.dataset.task);
+    // Tipp aufs Kaestchen geht reihum: offen -> in Arbeit -> erledigt -> offen.
+    // Der Doppeltipp auf die Zeile bleibt die Abkuerzung direkt zu "erledigt".
+    const task = state.tasks.find(t => t.id === taskCheck.dataset.task);
+    if (task) { cycleTaskStatus(task); saveData(); renderAll(); }
     return;
   }
   const taskRow = e.target.closest("[data-task-row]");
   if (taskRow && !e.target.closest("[data-del-task]")) {
     const id = taskRow.dataset.taskRow;
-    if (pendingTaskRowClicks[id]) clearTimeout(pendingTaskRowClicks[id]);
-    pendingTaskRowClicks[id] = setTimeout(() => {
-      delete pendingTaskRowClicks[id];
-      if (expandedTaskIds.has(id)) expandedTaskIds.delete(id);
-      else expandedTaskIds.add(id);
+    const warOffen = expandedTaskIds.has(id);
+    if (warOffen) expandedTaskIds.delete(id); else expandedTaskIds.add(id);
+    lastExpandedByClick = { id, warOffen };
+    renderTodo();   // nur die Liste, nicht die ganze App
+    return;
+  }
+  // Regler zuerst: er liegt in derselben Zeile wie der Abhaken-Knopf, und closest() wuerde ihn
+  // sonst als Klick auf die Gewohnheit werten.
+  const levelBtn = e.target.closest("[data-habit-level]");
+  if (levelBtn) {
+    const habit = state.habits.find(h => h.id === levelBtn.dataset.habitLevel);
+    const key = levelBtn.dataset.levelDate || todayStr();
+    if (habit) {
+      habit.levelByDate = habit.levelByDate || {};
+      const neu = habitLevelOn(habit, key) === "minimal" ? "ideal" : "minimal";
+      if (neu === "ideal") delete habit.levelByDate[key]; else habit.levelByDate[key] = "minimal";
+      // Schon abgehakt? Dann den festgehaltenen Wert mitziehen, sonst stuenden Regler und
+      // gespeicherte Stufe auseinander.
+      if (habit.type !== "weight" && habit.history[key]) habit.history[key] = neu;
+      saveData();
       renderAll();
-    }, TASK_ROW_CLICK_DELAY);
+      if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
+    }
     return;
   }
   const habitCheck = e.target.closest("[data-habit]");
@@ -2678,7 +3059,8 @@ document.addEventListener("click", e => {
     const habit = state.habits.find(h => h.id === habitCheck.dataset.habit);
     const key = habitCheck.dataset.date || todayStr();
     if (habit.history[key]) delete habit.history[key];
-    else { habit.history[key] = true; habit.missNotified = false; }
+    // Abgehakt wird immer auf der Stufe, auf der der Regler gerade steht.
+    else { habit.history[key] = habitLevelOn(habit, key); habit.missNotified = false; }
     saveData();
     renderAll();
     if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
@@ -2690,13 +3072,15 @@ document.addEventListener("click", e => {
     if (habit) openHabitModal(false, habit);
     return;
   }
-  if (e.target.matches("[data-del-task]")) {
-    state.tasks = state.tasks.filter(t => t.id !== e.target.dataset.delTask);
-    saveData(); renderAll();
+  const delTaskEl = e.target.closest("[data-del-task]");
+  if (delTaskEl) {
+    const t = state.tasks.find(x => x.id === delTaskEl.dataset.delTask);
+    if (t) deleteWithUndo("tasks", t.id, t.title);
   }
-  if (e.target.matches("[data-del-habit]")) {
-    state.habits = state.habits.filter(h => h.id !== e.target.dataset.delHabit);
-    saveData(); renderAll();
+  const delHabitEl = e.target.closest("[data-del-habit]");
+  if (delHabitEl) {
+    const h = state.habits.find(x => x.id === delHabitEl.dataset.delHabit);
+    if (h) deleteWithUndo("habits", h.id, h.title);
   }
   const openRootBtn = e.target.closest("[data-open-roadmap-root]");
   if (openRootBtn) {
@@ -2729,17 +3113,21 @@ document.addEventListener("click", e => {
     }
     renderGoalBrowser();
   }
-  if (e.target.matches("[data-del-shift]")) {
-    state.workShifts = state.workShifts.filter(s => s.id !== e.target.dataset.delShift);
-    saveData(); renderAll();
+  const delShiftEl = e.target.closest("[data-del-shift]");
+  if (delShiftEl) {
+    const w = state.workShifts.find(x => x.id === delShiftEl.dataset.delShift);
+    if (w) deleteWithUndo("workShifts", w.id, w.title || "Schicht");
   }
-  if (e.target.matches("[data-del-subject]")) {
-    state.subjects = state.subjects.filter(s => s.id !== e.target.dataset.delSubject);
-    saveData(); renderAll();
+  const delSubjectEl = e.target.closest("[data-del-subject]");
+  if (delSubjectEl) {
+    const f = state.subjects.find(x => x.id === delSubjectEl.dataset.delSubject);
+    if (f) deleteWithUndo("subjects", f.id, f.title);
   }
-  if (e.target.matches("[data-del-exam]")) {
-    state.exams = state.exams.filter(x => x.id !== e.target.dataset.delExam);
-    saveData(); renderAll();
+  const delExamEl = e.target.closest("[data-del-exam]");
+  if (delExamEl) {
+    const ex = state.exams.find(x => x.id === delExamEl.dataset.delExam);
+    const fach = ex && state.subjects.find(f => f.id === ex.subjectId);
+    if (ex) deleteWithUndo("exams", ex.id, (fach ? fach.title + " " : "Klassenarbeit ") + ex.date);
   }
   const delIncomeBtn = e.target.closest("[data-del-income]");
   if (delIncomeBtn) {
@@ -2761,6 +3149,8 @@ document.addEventListener("click", e => {
   }
   const delProjectBtn = e.target.closest("[data-del-project]");
   if (delProjectBtn) {
+    const pr = state.projects.find(x => x.id === delProjectBtn.dataset.delProject);
+    if (pr) { deleteWithUndo("projects", pr.id, pr.title); return; }
     state.projects = state.projects.filter(p => p.id !== delProjectBtn.dataset.delProject);
     saveData(); renderAll();
     return;
@@ -2808,13 +3198,14 @@ document.addEventListener("click", e => {
     if (goal) openSavingsGoalModal(goal);
     return;
   }
-  if (e.target.matches("[data-del-deviation]")) {
-    state.deviations = state.deviations.filter(d => d.id !== e.target.dataset.delDeviation);
-    saveData(); renderAll();
+  const delDeviationEl = e.target.closest("[data-del-deviation]");
+  if (delDeviationEl) {
+    const d = state.deviations.find(x => x.id === delDeviationEl.dataset.delDeviation);
+    if (d) deleteWithUndo("deviations", d.id, d.text);
   }
-  const fulfilledBtn = e.target.closest("[data-prayer-fulfilled]");
+  const fulfilledBtn = e.target.closest("[data-prayer-close]");
   if (fulfilledBtn) {
-    openPrayerFulfillModal(fulfilledBtn.dataset.prayerFulfilled);
+    openPrayerCloseModal(fulfilledBtn.dataset.prayerClose);
   }
   const irrelevantBtn = e.target.closest("[data-prayer-irrelevant]");
   if (irrelevantBtn) {
@@ -3343,10 +3734,19 @@ document.getElementById("addExpenseBtn").addEventListener("click", () => openExp
 document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal());
 document.getElementById("addSavingsGoalBtn").addEventListener("click", () => openSavingsGoalModal());
 document.getElementById("addIncomeSourceBtn").addEventListener("click", () => openIncomeSourceModal());
-document.getElementById("addDeviationBtn").addEventListener("click", () => {
+function abweichungEintragen() {
   const input = document.getElementById("deviationInput");
+  if (!input.value.trim()) {
+    // Vorher wurde das Feld auch bei leerer Eingabe kommentarlos geleert und nichts gespeichert.
+    markiereFehlendesFeld(input, "Schreib kurz auf, was anders lief.");
+    return;
+  }
   addDeviation(input.value);
   input.value = "";
+}
+document.getElementById("addDeviationBtn").addEventListener("click", abweichungEintragen);
+document.getElementById("deviationInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); abweichungEintragen(); }
 });
 document.getElementById("enableNotifBtn").addEventListener("click", () => {
   if (!("Notification" in window)) return;
@@ -3461,8 +3861,10 @@ function openTaskModal(defaultNodeId, source = "todo") {
     body.querySelector("#mTaskTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mTaskTitle").value.trim();
-      if (!title) return;
+      const titelFeld = body.querySelector("#mTaskTitle");
+      const title = titelFeld.value.trim();
+      // Vorher: stilles return — der Knopf tat scheinbar nichts. Jetzt sagt das Feld, was fehlt.
+      if (!title) { markiereFehlendesFeld(titelFeld, "Ohne Titel lässt sich die Aufgabe nicht speichern."); return; }
       const dueDate = body.querySelector("#mTaskDate").value || null;
       const dueTime = body.querySelector("#mTaskTime").value || null;
       if (isLernfeld) {
@@ -3493,6 +3895,11 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
     <div class="field">
       <label>Titel</label>
       <input type="text" id="mHabitTitle" placeholder="z.B. 30 Min lesen" value="${isEdit ? escapeHtml(editHabit.title) : ""}">
+    </div>
+    <div class="field">
+      <label>Minimalversion (optional)</label>
+      <input type="text" id="mHabitMinimalTitle" placeholder="z.B. 10 Min lesen" value="${isEdit ? escapeHtml(editHabit.minimalTitle || "") : ""}">
+      <p class="hint" style="margin-top:4px;">Die niedrigere Latte für schwierige Tage. Ist sie gesetzt, erscheint in der Zeile ein Regler — links ideal, rechts minimal. Minimal zählt die Hälfte der Punkte, die Serie reißt nicht ab. Leer lassen = kein Regler.</p>
     </div>
     <div class="checkbox-row">
       <input type="checkbox" id="mHabitRoutine" ${(isEdit ? editHabit.routineOrder != null : forceRoutine) ? "checked" : ""}>
@@ -3561,8 +3968,9 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
       weeklyField.style.display = freqSelect.value === "weekly-on" ? "" : "none";
     });
     body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mHabitTitle").value.trim();
-      if (!title) return;
+      const titelFeld = body.querySelector("#mHabitTitle");
+      const title = titelFeld.value.trim();
+      if (!title) { markiereFehlendesFeld(titelFeld, "Ohne Titel lässt sich die Gewohnheit nicht speichern."); return; }
       const nodeId = catSelect.value || null;
       const frequency = freqSelect.value;
       const extra = {};
@@ -3573,9 +3981,14 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
       }
       const isRoutine = body.querySelector("#mHabitRoutine").checked;
       const points = parseInt(body.querySelector("#mHabitPoints").value, 10) || 1;
+      const minimalTitle = body.querySelector("#mHabitMinimalTitle").value.trim();
       const autoDone = body.querySelector("#mHabitAutoDone").checked;
       if (isEdit) {
         editHabit.title = title;
+        // Minimalstufe entfernt? Dann auch die gesetzten Reglerstellungen aufraeumen, sonst blieben
+        // Tage auf "minimal" stehen, fuer die es gar keine Minimalstufe mehr gibt.
+        if (minimalTitle) editHabit.minimalTitle = minimalTitle;
+        else { delete editHabit.minimalTitle; editHabit.levelByDate = {}; }
         editHabit.nodeId = nodeId;
         editHabit.frequency = frequency;
         delete editHabit.intervalDays; delete editHabit.weekday; delete editHabit.everyNWeeks;
@@ -3589,7 +4002,7 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
         }
       } else {
         const routineOrder = isRoutine ? state.habits.reduce((max, h) => Math.max(max, h.routineOrder ?? -1), -1) + 1 : null;
-        state.habits.push({ id: uid(), title, nodeId, history: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check", points, ...(autoDone ? { autoDone: true } : {}) });
+        state.habits.push({ id: uid(), title, nodeId, history: {}, levelByDate: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check", points, ...(minimalTitle ? { minimalTitle } : {}), ...(autoDone ? { autoDone: true } : {}) });
       }
       saveData();
       closeModal();
@@ -3678,7 +4091,8 @@ function openExamModal() {
     </div>
     <div class="field">
       <label>Datum</label>
-      <input type="date" id="mExamDate" value="${todayStr()}">
+      <input type="date" id="mExamDate" value="${todayStr()}" min="${todayStr()}">
+      <p class="hint" style="margin-top:4px;">Nur kommende Termine — vergangene werden nicht aufbewahrt.</p>
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
@@ -3688,8 +4102,11 @@ function openExamModal() {
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     body.querySelector("#mSave").addEventListener("click", () => {
       const subjectId = body.querySelector("#mExamSubject").value;
-      const date = body.querySelector("#mExamDate").value;
-      if (!subjectId || !date) return;
+      const datumsFeld = body.querySelector("#mExamDate");
+      const date = datumsFeld.value;
+      if (!date) { markiereFehlendesFeld(datumsFeld, "Ohne Datum gibt es nichts herunterzuzählen."); return; }
+      if (date < todayStr()) { markiereFehlendesFeld(datumsFeld, "Der Termin liegt in der Vergangenheit."); return; }
+      if (!subjectId) return;
       state.exams.push({ id: uid(), subjectId, date });
       saveData();
       closeModal();
@@ -3702,25 +4119,31 @@ function examCountdownLabel(dateKey) {
   const daysUntil = Math.round((dateFromKey(dateKey) - dateFromKey(todayStr())) / 86400000);
   if (daysUntil === 0) return "heute";
   if (daysUntil === 1) return "morgen";
+  if (daysUntil === 7) return "in 1 Woche";
   if (daysUntil > 1) return `in ${daysUntil} Tagen`;
-  return `vor ${Math.abs(daysUntil)} Tag${Math.abs(daysUntil) === 1 ? "" : "en"}`;
+  return "vorbei";   // kann nur zwischen Mitternacht und dem naechsten App-Start auftreten
 }
 
 function renderPlanning() {
   const examsWrap = document.getElementById("examsList");
   if (examsWrap) {
-    const sorted = state.exams.slice().sort((a, b) => a.date.localeCompare(b.date));
+    // Naechster Termin oben, je weiter weg desto weiter unten. Vergangene tauchen hier nicht mehr
+    // auf — sie werden beim Start entfernt, dieser Filter faengt nur den Tageswechsel bei
+    // geoeffneter App ab.
+    const heuteKey = todayStr();
+    const sorted = state.exams.filter(e => e.date >= heuteKey).sort((a, b) => a.date.localeCompare(b.date));
     examsWrap.innerHTML = sorted.length
       ? sorted.map(e => {
           const subject = state.subjects.find(s => s.id === e.subjectId);
           const daysUntil = Math.round((dateFromKey(e.date) - dateFromKey(todayStr())) / 86400000);
+          const naechste = e === sorted[0];
           return `
             <div class="atlas-row">
               <div style="flex:1; min-width:0;">
-                <div class="item-title">${subject ? escapeHtml(subject.title) : "Unbekanntes Fach"}</div>
+                <div class="item-title">${subject ? escapeHtml(subject.title) : "Fach gelöscht"}</div>
                 <div class="item-meta">${e.date}</div>
               </div>
-              <span class="atlas-chip" style="background:${daysUntil <= 0 ? "var(--color-accent-900)" : "var(--color-neutral-800)"}; color:${daysUntil <= 0 ? "var(--color-accent-300)" : "var(--color-neutral-300)"};">${examCountdownLabel(e.date)}</span>
+              <span class="atlas-chip${naechste ? " chip-next-exam" : ""}"${naechste ? "" : ' style="background:var(--color-neutral-800); color:var(--color-neutral-300);"'}>${examCountdownLabel(e.date)}</span>
               <button class="btn btn-icon btn-ghost" data-del-exam="${e.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
             </div>
           `;
@@ -4089,6 +4512,10 @@ function openIncomeSourceModal(editSource = null) {
 function renderProjekte() {
   const wrap = document.getElementById("projectsList");
   if (!wrap) return;
+  // Nicht neu aufbauen, waehrend in einem Notizfeld getippt wird — das wuerde Fokus, Cursor-
+  // Position und (auf iOS) die eingeblendete Tastatur wegreissen. Der Text selbst ist ueber die
+  // Freitext-Autospeicherung ohnehin schon im State.
+  if (wrap.contains(document.activeElement) && document.activeElement.matches("[data-project-notes]")) return;
   wrap.innerHTML = state.projects.length
     ? state.projects.map(p => `
         <div class="card elev-sm project-card">
@@ -4286,7 +4713,7 @@ function prayerRowHtml(p) {
       <div style="flex:1; min-width:0;">
         <div class="item-title">${escapeHtml(p.title)}</div>
       </div>
-      <button class="btn btn-icon btn-ghost" data-prayer-fulfilled="${p.id}" title="Erfüllt" style="width:26px; height:26px;">${CHECK_ICON}</button>
+      <button class="btn btn-icon btn-ghost" data-prayer-close="${p.id}" title="${(p.type || "bitte") === "dank" ? "Gedankt" : "Erfüllt"}" style="width:26px; height:26px;">${CHECK_ICON}</button>
       <button class="btn btn-icon btn-ghost" data-prayer-irrelevant="${p.id}" title="Nicht mehr relevant" style="width:26px; height:26px;">${CROSS_ICON}</button>
     </div>
   `;
@@ -4303,23 +4730,32 @@ function renderPrayers() {
   const dankWrap = document.getElementById("prayerListDank");
   dankWrap.innerHTML = dank.length ? dank.map(prayerRowHtml).join("") : '<div class="empty-hint">Kein Dank eingetragen.</div>';
 
-  const archiveWrap = document.getElementById("prayerArchive");
-  const fulfilled = state.prayers
-    .filter(p => p.status === "fulfilled")
-    .sort((a, b) => (b.fulfilledAt || "").localeCompare(a.fulfilledAt || ""));
-  archiveWrap.innerHTML = fulfilled.length
-    ? fulfilled.map(p => `
+  // Erhoerungen (abgeschlossene Bitten) und ausgesprochener Dank teilen sich die Bauform, aber
+  // nicht die Liste — inhaltlich sind das zwei verschiedene Dinge.
+  const archiveEntryHtml = (p, dateKey, textKey) => `
         <div class="prayer-archive-entry">
-          <div class="item-meta">${(p.fulfilledAt || "").slice(0, 10)}</div>
+          <div class="item-meta">${(p[dateKey] || "").slice(0, 10)}</div>
           <div class="item-title">${escapeHtml(p.title)}</div>
-          ${p.fulfillmentText ? `<div class="small-text">${escapeHtml(p.fulfillmentText)}</div>` : ""}
+          ${p[textKey] ? `<div class="small-text">${escapeHtml(p[textKey])}</div>` : ""}
           ${(p.attachments || []).map(a => a.type.startsWith("image/")
             ? `<img class="prayer-attachment-img" src="${a.dataUrl}" alt="${escapeHtml(a.name)}">`
             : `<a class="prayer-attachment-file" href="${a.dataUrl}" download="${escapeHtml(a.name)}">${escapeHtml(a.name)}</a>`
           ).join("")}
-        </div>
-      `).join("")
-    : '<div class="empty-hint">Noch keine Erhörungen festgehalten.</div>';
+        </div>`;
+  const renderPrayerArchive = (elId, status, dateKey, textKey, leerText) => {
+    const wrap = document.getElementById(elId);
+    if (!wrap) return;
+    const items = state.prayers
+      .filter(p => p.status === status)
+      .sort((a, b) => (b[dateKey] || "").localeCompare(a[dateKey] || ""));
+    wrap.innerHTML = items.length
+      ? items.map(p => archiveEntryHtml(p, dateKey, textKey)).join("")
+      : `<div class="empty-hint">${leerText}</div>`;
+  };
+  renderPrayerArchive("prayerArchive", "fulfilled", "fulfilledAt", "fulfillmentText",
+    "Noch keine Erhörungen festgehalten.");
+  renderPrayerArchive("prayerThanksArchive", "thanked", "thankedAt", "thanksText",
+    "Noch keinen Dank abgelegt.");
 
   const irrelevantWrap = document.getElementById("prayerIrrelevantList");
   const irrelevant = state.prayers
@@ -4347,14 +4783,17 @@ function savePrayerFromInline() {
   renderAll();
 }
 
-function openPrayerFulfillModal(prayerId) {
+// Schliesst ein Anliegen ab — bei einer Bitte als Erhoerung, bei einem Dank als ausgesprochener
+// Dank. Beide halten Text und Anhang fest, aber in getrennten Feldern und getrennten Archiven.
+function openPrayerCloseModal(prayerId) {
   const prayer = state.prayers.find(p => p.id === prayerId);
   if (!prayer) return;
+  const istDank = (prayer.type || "bitte") === "dank";
   openModal(`
-    <h3>Erfüllt: ${escapeHtml(prayer.title)}</h3>
+    <h3>${istDank ? "Gedankt" : "Erfüllt"}: ${escapeHtml(prayer.title)}</h3>
     <div class="field">
-      <label>Wie wurde es erfüllt?</label>
-      <textarea id="mPrayerText" class="reflection-textarea" placeholder="Was ist passiert?"></textarea>
+      <label>${istDank ? "Wofür bist du dankbar?" : "Wie wurde es erfüllt?"}</label>
+      <textarea id="mPrayerText" class="reflection-textarea" placeholder="${istDank ? "Was hat Gott getan?" : "Was ist passiert?"}"></textarea>
     </div>
     <div class="field">
       <label>Anhang (Bild/Datei, optional)</label>
@@ -4370,9 +4809,15 @@ function openPrayerFulfillModal(prayerId) {
       const text = body.querySelector("#mPrayerText").value.trim();
       const files = Array.from(body.querySelector("#mPrayerFiles").files || []);
       const attachments = await Promise.all(files.map(readFileAsAttachment));
-      prayer.status = "fulfilled";
-      prayer.fulfilledAt = new Date().toISOString();
-      prayer.fulfillmentText = text;
+      if (istDank) {
+        prayer.status = "thanked";
+        prayer.thankedAt = new Date().toISOString();
+        prayer.thanksText = text;
+      } else {
+        prayer.status = "fulfilled";
+        prayer.fulfilledAt = new Date().toISOString();
+        prayer.fulfillmentText = text;
+      }
       prayer.attachments = attachments;
       saveData();
       closeModal();
@@ -4442,7 +4887,7 @@ function exportWeekReview() {
     .slice()
     .sort((a, b) => (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99"))
     .forEach(t => {
-      md += `  - [${t.done ? "x" : " "}] ${t.title}${t.dueDate ? " (fällig " + t.dueDate + ")" : ""}\n`;
+      md += `  - [${t.done ? "x" : (t.inProgress ? "~" : " ")}] ${t.title}${t.inProgress ? " (in Arbeit)" : ""}${t.dueDate ? " (fällig " + t.dueDate + ")" : ""}\n`;
     });
 
   md += `\n## Zielbereiche\n`;
@@ -4482,7 +4927,16 @@ function exportWeekReview() {
 
 // ---------- Init ----------
 renderAll();
-document.addEventListener("visibilitychange", () => { if (!document.hidden) renderAll(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    // iOS kann die PWA im Hintergrund jederzeit beenden — hier ist der letzte sichere Moment.
+    commitActiveFreeText(); flushPendingSave();
+  } else {
+    renderAll();
+  }
+});
+window.addEventListener("pagehide", () => { commitActiveFreeText(); flushPendingSave(); });
+window.addEventListener("blur", () => { commitActiveFreeText(); flushPendingSave(); });
 
 // Ladebildschirm: läuft bei jedem App-Start als feste 3-Sekunden-Sequenz durch (unabhängig davon,
 // wie schnell der eigentliche Render aus localStorage steht) und blendet danach aus.
@@ -4490,7 +4944,11 @@ const splashEl = document.getElementById("splashScreen");
 if (splashEl) {
   setTimeout(() => {
     splashEl.classList.add("splash-hidden");
-    splashEl.addEventListener("transitionend", () => splashEl.remove(), { once: true });
+    // transitionend allein reicht nicht: laeuft der Uebergang nicht an (Tab im Hintergrund,
+    // unterbrochene Animation), bliebe der Ladebildschirm fuer immer im DOM stehen.
+    const wegRaeumen = () => splashEl.remove();
+    splashEl.addEventListener("transitionend", wegRaeumen, { once: true });
+    setTimeout(wegRaeumen, 1200);
   }, 3000);
 }
 

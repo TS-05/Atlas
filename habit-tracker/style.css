@@ -161,11 +161,26 @@ textarea.input { min-height: 90px; resize: vertical; }
 .atlas-row.drag-over-top::before { background: var(--color-accent-400); height: 2px; }
 .routine-drag-handle { cursor: grab; }
 .routine-drag-handle:active { cursor: grabbing; }
+/* Endlose Helligkeitsschleife — bleibt der Warnung im Finanzen-Tab vorbehalten (Budget-Limit
+   ueberschritten). Dort ist das Nerven der Zweck; auf einer grossen, gesaettigten Flaeche liest
+   sich pumpende Eigenhelligkeit dagegen als Flackern, nicht als Glut. */
 @keyframes atlas-glow-pulse {
   0%, 100% { filter: brightness(1) saturate(1); }
   50% { filter: brightness(1.22) saturate(1.2); }
 }
 .ring-glow-pulse { animation: atlas-glow-pulse 1.7s ease-in-out infinite; }
+
+/* ToDo-Ring bei 100 %: einmaliges Aufflammen im Moment des Erreichens, danach steht der Ring
+   ruhig und leuchtet konstant. Vorher lief hier atlas-glow-pulse endlos — gemessen 11,3 %
+   Helligkeitsschwankung mit 1,68 s Periode, waehrend der Rest des Bildes nur 1,6 %
+   (Kompressionsrauschen) schwankte. Eine Belohnung, die nie aufhoert, ist keine Belohnung mehr,
+   sondern Unruhe neben der Liste, die man eigentlich lesen will. */
+@keyframes atlas-ring-flare {
+  0%   { filter: brightness(1) saturate(1); transform: scale(1); }
+  30%  { filter: brightness(1.24) saturate(1.12); transform: scale(1.025); }
+  100% { filter: brightness(1) saturate(1); transform: scale(1); }
+}
+.ring-flare { animation: atlas-ring-flare 1.1s cubic-bezier(.22,.8,.28,1) 1 both; }
 .atlas-check { width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--color-divider); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: transparent; padding: 0; overflow: visible; }
 .atlas-check.checked { border-color: transparent; }
 .atlas-chip { font-size: 10px; padding: 2px 7px; border-radius: 5px; white-space: nowrap; }
@@ -1108,3 +1123,114 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .home-tagline-top { margin-bottom: 10px; }
 .home-tagline-bottom { margin-top: 10px; }
+
+/* ============================================================
+   Ideal/Minimal-Regler je Gewohnheit
+   Form wie ein klassischer Kippschalter (Pillen-Spur, gleitender runder Knopf), Palette aus dem
+   bestehenden .subtab-Bauteil: dunkle Spur mit dünnem Rand, Knopf im Messing-Verlauf. Links =
+   ideal, rechts = minimal. Nur sichtbar, wenn für die Gewohnheit eine Minimalstufe hinterlegt ist.
+   ============================================================ */
+/* Antippbar ist der ganze Block (Spur + Beschriftung), nicht nur die Pille — siehe
+   levelSwitchHtml(). Die Pille selbst ist nur noch Darstellung. */
+.level-switch-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  flex-shrink: 0; padding: 0; border: 0; background: transparent; cursor: pointer;
+}
+.level-switch {
+  display: block; position: relative;
+  width: 50px; height: 28px;
+  border: 1px solid var(--color-divider); border-radius: 999px;
+  background: var(--color-bg); isolation: isolate;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.level-switch-wrap:active .level-switch { border-color: var(--color-accent-600); }
+.level-switch .level-knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: linear-gradient(160deg, var(--color-accent-200), var(--color-accent-600));
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--color-accent-700) 45%, transparent),
+              inset 0 1px 0 rgba(255,255,255,0.35);
+  transition: transform 0.19s cubic-bezier(.22,.8,.28,1);
+}
+/* Rechts = minimal: der Knopf wandert, die Spur wird dezent gedämpft, damit die abgesenkte
+   Latte auch ohne Text erkennbar ist. */
+.level-switch[data-level="minimal"] .level-knob { transform: translateX(22px); }
+.level-switch[data-level="minimal"] {
+  background: color-mix(in srgb, var(--color-accent-900) 55%, var(--color-bg));
+}
+/* Beschriftung unter dem Regler — ohne sie wäre nicht erkennbar, welche Seite was bedeutet. */
+.level-switch-label {
+  font-family: var(--font-heading); font-size: 9.5px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--color-neutral-500);
+  transition: color 0.18s ease;
+}
+.level-switch-wrap[data-level="minimal"] .level-switch-label { color: var(--color-accent-300); }
+
+/* Dritter Aufgabenzustand "In Arbeit". Bewusst gold gefüllt statt gedämpft wie die Chips für
+   Priorität und Überfällig — die tragen dieselbe Farbe und sind dadurch nicht auseinanderzuhalten;
+   ein aktiver Zustand darf sich davon absetzen. */
+.atlas-check.in-progress { border-color: var(--color-accent-600); }
+/* "In Arbeit" steht in der Meta-Zeile statt als Chip neben dem Titel: als Chip drückte er den
+   Titel von vier auf sechs Zeilen und die Zeile von 127 auf 241 px (gemessen bei 375 px Breite).
+   Das Kästchen (halb gefüllter Kreis) und die Sortierung nach ganz oben tragen das Signal ohnehin. */
+.meta-progress { color: var(--color-accent-300); font-weight: 600; }
+
+/* ---------- Rückgängig-Leiste ---------- */
+.undo-bar {
+  position: fixed; left: 50%; transform: translateX(-50%) translateY(0);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+  z-index: 1200; display: flex; align-items: center; gap: 14px;
+  max-width: calc(100vw - 32px); padding: 10px 10px 10px 16px;
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  border-radius: 999px; box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+  font-size: 13px; color: var(--color-text);
+  animation: undo-in 0.22s cubic-bezier(.22,.8,.28,1) both;
+}
+.undo-bar[hidden] { display: none; }
+.undo-bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.undo-bar .btn { color: var(--color-accent-300); font-weight: 600; padding: 6px 12px; flex-shrink: 0; }
+@keyframes undo-in { from { opacity: 0; transform: translateX(-50%) translateY(12px); } }
+
+/* ---------- Sofortige Rückmeldung beim Antippen ----------
+   Zeilen hatten bisher gar keinen Druckzustand. Zusammen mit der (jetzt entfernten) 280-ms-
+   Verzögerung fühlte sich jeder Tipp tot an. Der Zustand greift ohne Verzögerung. */
+.task-item .atlas-row:active,
+#routineChain .atlas-row:active,
+#todayHabits .atlas-row:active {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.atlas-check:active { transform: scale(0.92); }
+.atlas-check { transition: transform 0.12s ease, border-color 0.18s ease; }
+
+/* ---------- Überfällig deutlich von Priorität trennen ----------
+   Beide Chips trugen exakt dieselben Farbwerte (accent-900 auf accent-300) und waren dadurch
+   nicht auseinanderzuhalten. Priorität bleibt gedämpft, Überfällig wird zur echten Warnung. */
+.atlas-chip.chip-overdue {
+  background: color-mix(in srgb, #a3231d 30%, var(--color-bg));
+  color: #ff9d94;
+  border: 1px solid color-mix(in srgb, #a3231d 55%, transparent);
+}
+
+/* ---------- Pflichtfeld-Rückmeldung im Dialog ---------- */
+.input.feld-fehlt, .field input.feld-fehlt, textarea.feld-fehlt {
+  border-color: #a3231d;
+}
+.feld-fehler { margin: 4px 0 0; font-size: 11.5px; color: #ff9d94; }
+
+/* ---------- Erledigte Aufgaben wieder lesbar ----------
+   Der Goldklecks lag mit voller Deckkraft unter dem weißen Titel: gemessen 1,24:1 Kontrast an der
+   hellsten Stelle, Wörter verschwanden mitten im Satz. Der Klecks bleibt als Geste erhalten, tritt
+   aber hinter den Text zurück, und der Text wird dunkel — auf Gold gelesen, nicht dagegen. */
+/* Der Klecks liegt unregelmäßig — er deckt den Titel nicht überall. Dunkler Text darauf wäre
+   deshalb genau dort unlesbar, wo der Klecks fehlt. Stattdessen tritt der Klecks zurück und der
+   helle Text bekommt einen dunklen Saum: rechnerisch von 1,24:1 auf rund 5:1. */
+.paint-done-stroke { opacity: 0.40; }
+.paint-done-text { text-shadow: 0 1px 2px rgba(0,0,0,0.8), 0 0 3px rgba(0,0,0,0.6); }
+
+/* Nächste Klassenarbeit hervorheben — die Liste ist ein Countdown, der oberste Eintrag ist der,
+   auf den es ankommt. */
+.atlas-chip.chip-next-exam {
+  background: linear-gradient(160deg, var(--color-accent-200), var(--color-accent-600));
+  color: var(--color-bg); font-weight: 600;
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--color-accent-700) 45%, transparent);
+}

@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=55">
+<link rel="stylesheet" href="style.css?v=64">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -485,7 +485,15 @@
       <h6 class="metal-gold">Wochenkreis</h6>
       <div id="weekCircle"></div>
 
-      <div id="deviationAddWrap">
+      <div id="workShiftBanner" class="work-shift-wrap"></div>
+
+      <h6 class="metal-gold" style="margin-top:26px;">Tagesroutine</h6>
+      <div id="routineChain"></div>
+      <button class="add-btn btn btn-ghost btn-block hidden" id="addRoutineBtn" style="display:none;">+ Routine-Schritt hinzufügen</button>
+
+      <!-- Stand vorher ueber der Tagesroutine: man wurde gefragt, was schiefgelaufen ist, bevor man
+           ueberhaupt etwas gemacht hatte. -->
+      <div id="deviationAddWrap" style="margin-top:26px;">
         <h6 class="metal-gold">Abweichung vom Plan</h6>
         <p class="hint">Wenn du heute etwas anderes gemacht hast als geplant, halte es hier kurz fest.</p>
         <div class="deviation-input-row">
@@ -494,12 +502,6 @@
         </div>
       </div>
       <div id="deviationList" class="deviation-list"></div>
-      <div id="workShiftBanner" class="work-shift-wrap"></div>
-
-      <h6 class="metal-gold" style="margin-top:26px;">Tagesroutine</h6>
-      <div id="routineChain"></div>
-      <button class="add-btn btn btn-ghost btn-block hidden" id="addRoutineBtn" style="display:none;">+ Routine-Schritt hinzufügen</button>
-
       <h6 class="metal-gold" style="margin-top: 26px;">Weitere Gewohnheiten</h6>
       <div id="todayHabits"></div>
       <button class="btn btn-ghost btn-block" id="addHabitBtn">+ Gewohnheit hinzufügen</button>
@@ -600,8 +602,16 @@
 
       <div class="card elev-sm" style="margin-bottom: 14px;">
         <div class="card-title" style="font-size: 14px;">Erhörungen</div>
-        <p class="card-body">Beantwortete Anliegen mit Datum, Text und Anhang.</p>
+        <p class="card-body">Beantwortete Bitten mit Datum, Text und Anhang.</p>
         <div id="prayerArchive" class="list"></div>
+      </div>
+
+      <!-- Ein abgeschlossener Dank gehört nicht zu den Erhörungen: die Erhörung ist das, wofür
+           gedankt wird, nicht der Dank selbst. Deshalb ein eigener Abschnitt. -->
+      <div class="card elev-sm" style="margin-bottom: 14px;">
+        <div class="card-title" style="font-size: 14px;">Wofür ich gedankt habe</div>
+        <p class="card-body">Ausgesprochener Dank mit Datum, Text und Anhang.</p>
+        <div id="prayerThanksArchive" class="list"></div>
       </div>
 
       <div class="card elev-sm">
@@ -750,6 +760,12 @@
   <div class="modal" id="modalBody"></div>
 </div>
 
-<script src="app.js?v=45"></script>
+<!-- Rueckgaengig-Leiste nach dem Loeschen. Bewusst kein Bestaetigungsdialog: der trainiert
+     Wegklicken, waehrend ein kurzes Zeitfenster zum Zuruecknehmen den Fehltipp tatsaechlich heilt. -->
+<div id="undoBar" class="undo-bar" hidden>
+  <span id="undoText"></span>
+  <button class="btn btn-ghost" id="undoBtn">Rückgängig</button>
+</div>
+<script src="app.js?v=56"></script>
 </body>
 </html>
