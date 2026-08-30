@@ -1126,7 +1126,9 @@ function dayBudgetRing(dueCount, doneCount, size = 200, celebrate = false, ohneT
 // erreichenIstGut = true bei Sparzielen: dort ist das Ueberschreiten das Ziel, nicht der Alarm.
 // Vorher lief hier fuer beide Faelle derselbe rote Gluehzustand samt Dauerpuls — ein uebererfuelltes
 // Sparziel sah damit aus wie ein gerissenes Budget.
-function budgetRingHtml(spent, limit, size = 40, maskIdx = 0, erreichenIstGut = false) {
+// feiern = true nur im Moment des Uebergangs auf "Ziel erreicht" (siehe renderFinanceGoals):
+// dann leuchtet der Ring einmal auf und ein Lichtsaum laeuft nach aussen. Danach steht er ruhig.
+function budgetRingHtml(spent, limit, size = 40, maskIdx = 0, erreichenIstGut = false, feiern = false) {
   const t = limit > 0 ? spent / limit : 0;
   const pct = Math.round(t * 100);
   const erreicht = limit > 0 && spent >= limit;
@@ -1141,8 +1143,9 @@ function budgetRingHtml(spent, limit, size = 40, maskIdx = 0, erreichenIstGut = 
     : zielErreicht
     ? `drop-shadow(0 0 6px ${FORGE_COLOR}) drop-shadow(0 0 14px ${FORGE_HALO})`
     : `drop-shadow(0 0 4px color-mix(in srgb, ${baseColor} 70%, transparent)) drop-shadow(0 0 11px color-mix(in srgb, ${baseColor} 32%, transparent))`;
+  const ringKlasse = overLimit ? "ring-glow-pulse" : (zielErreicht && feiern ? "goal-reached-flare" : "");
   return `
-    <div class="${overLimit ? "ring-glow-pulse" : ""}" style="position:relative; width:${size}px; height:${size}px; flex-shrink:0;">
+    <div class="${ringKlasse}" style="position:relative; width:${size}px; height:${size}px; flex-shrink:0;">
       <div style="position:absolute; inset:0;
         background:rgba(255,255,255,0.16);
         -webkit-mask-image:url('${maskUrl}'); -webkit-mask-size:100% 100%; -webkit-mask-repeat:no-repeat; -webkit-mask-position:center;
@@ -1240,6 +1243,7 @@ let bereicheSearchQuery = "";
 // childNodes, categoryTasksForNode, das bestehende data-task-Toggle) — es wird keine neue
 // Datenstruktur eingeführt und ToDo/Tagesroutine/Gebete bleiben davon komplett unberührt.
 let roadmapView = "dashboard"; // "dashboard" | "category" | "path"
+let roadmapEditMode = false;   // blendet Anlegen/Bearbeiten/Loeschen im Zielbaum ein
 let roadmapRootId = null;
 let roadmapPathId = null;
 Object.values(QUICK_ADD_BTN_IDS).flat().forEach(id => {
@@ -1253,14 +1257,30 @@ const HEADER_ICON_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 14 14" fi
 
 // ---------- Lernfeldaufgaben: Aufgabentypen mit Icon (statt Klein/Groß, für source="category") ----------
 // Aufwandsstufen für Aufgaben (task.size): sechs Stufen mit grobem Zeitrahmen statt nur klein/groß.
+// minutes = Mittelwert der jeweiligen Zeitspanne. Damit laesst sich der Aufwand erledigter
+// Aufgaben aufsummieren ("wie viel Zeit ist da hineingeflossen"). Das bleibt eine Schaetzung aus
+// der gewaehlten Stufe, keine gemessene Zeit — die Analyse benennt das auch so.
+// Stufe 5/6 rechnen mit Arbeitstagen zu 8 Stunden, nicht mit Kalendertagen.
 const EFFORT_LEVELS = [
-  { level: 1, label: "Erster Gedanke", time: "1–5 Min." },
-  { level: 2, label: "Kurzaufgabe", time: "5–30 Min." },
-  { level: 3, label: "Mittlere Aufgabe", time: "30 Min. – 2 Std." },
-  { level: 4, label: "Halbtagsaufgabe", time: "2–6 Std." },
-  { level: 5, label: "Größere Aufgabe", time: "halber – 1 Tag" },
-  { level: 6, label: "Große Aufgabe", time: "1 – 1,5 Wochen" }
+  { level: 1, label: "Erster Gedanke", time: "1–5 Min.", minutes: 3 },
+  { level: 2, label: "Kurzaufgabe", time: "5–30 Min.", minutes: 18 },
+  { level: 3, label: "Mittlere Aufgabe", time: "30 Min. – 2 Std.", minutes: 75 },
+  { level: 4, label: "Halbtagsaufgabe", time: "2–6 Std.", minutes: 240 },
+  { level: 5, label: "Größere Aufgabe", time: "halber – 1 Tag", minutes: 360 },
+  { level: 6, label: "Große Aufgabe", time: "1 – 1,5 Wochen", minutes: 3000 }
 ];
+// Stunden lesbar machen: 45 Min., 3,5 Std., 2 Tage (zu 8 Std.).
+function formatAufwand(minuten) {
+  if (!minuten) return "0 Min.";
+  if (minuten < 60) return Math.round(minuten) + " Min.";
+  const std = minuten / 60;
+  if (std < 16) return (Math.round(std * 10) / 10).toLocaleString("de-DE") + " Std.";
+  const tage = std / 8;
+  return (Math.round(tage * 10) / 10).toLocaleString("de-DE") + " Arbeitstage";
+}
+function taskMinutes(t) {
+  return effortLevelInfo(t.size).minutes;
+}
 function effortLevelInfo(size) {
   const n = typeof size === "number" ? size : (size === "gross" ? 4 : 1);
   return EFFORT_LEVELS.find(e => e.level === n) || EFFORT_LEVELS[0];
@@ -1353,6 +1373,13 @@ document.getElementById("headerPlusBtn").addEventListener("click", () => {
     openProjectModal();
   }
 });
+document.getElementById("roadmapEditToggle").addEventListener("click", () => {
+  roadmapEditMode = !roadmapEditMode;
+  document.getElementById("roadmapEditToggle").classList.toggle("aktiv", roadmapEditMode);
+  document.getElementById("roadmapEditToggle").textContent = roadmapEditMode ? "Fertig" : "Bearbeiten";
+  renderGoalBrowser();
+});
+
 document.getElementById("bereicheSearchInput").addEventListener("input", e => {
   bereicheSearchQuery = e.target.value;
   renderGoalBrowser();
@@ -1447,8 +1474,14 @@ function isPriority(nodeId) {
   }
   return false;
 }
+// Liefert null, wenn unter diesem Knoten nichts geplant ist — keine Aufgaben, keine Gewohnheiten,
+// und kein Unterknoten, der selbst etwas enthält. Vorher kam in dem Fall 0 % heraus, was zwei Dinge
+// verwechselte: "nichts vorgenommen" und "vorgenommen, nichts geschafft". Weil leere Kinder in den
+// Elternschnitt einflossen, zog blosses Gerüst den Fortschritt nach unten — ein Bereich mit einem
+// fertigen und drei leeren Unterbereichen stand auf 25 % statt 100 %. In Tims Daten betrifft das
+// rund 59 % aller Knoten.
 function nodeProgress(node, seen = new Set()) {
-  if (seen.has(node.id)) return 0;
+  if (seen.has(node.id)) return null;
   seen.add(node.id);
   const tasks = categoryTasksForNode(node.id);
   const habits = habitsForNode(node.id);
@@ -1460,11 +1493,24 @@ function nodeProgress(node, seen = new Set()) {
     parts.push(rates.reduce((a, b) => a + b, 0) / rates.length);
   }
   if (children.length) {
-    const progresses = children.map(c => nodeProgress(c, seen));
-    parts.push(progresses.reduce((a, b) => a + b, 0) / progresses.length);
+    const gefuellteKinder = children.map(c => nodeProgress(c, seen)).filter(v => v !== null);
+    if (gefuellteKinder.length) {
+      parts.push(gefuellteKinder.reduce((a, b) => a + b, 0) / gefuellteKinder.length);
+    }
   }
-  if (parts.length === 0) return 0;
+  if (parts.length === 0) return null;
   return parts.reduce((a, b) => a + b, 0) / parts.length;
+}
+// Prozentwert fuer die Anzeige; null wird zu einem Strich statt zu einer Null.
+function nodeProgressPct(node) {
+  const v = nodeProgress(node);
+  return v === null ? null : Math.round(v * 100);
+}
+// Ist ein Knoten fertig? Leere Knoten sind es ausdruecklich NICHT — sonst waere jedes ungefuellte
+// Geruest automatisch "erledigt", der genau umgekehrte Fehler.
+function nodeIstFertig(node) {
+  const p = nodeProgressPct(node);
+  return p !== null && p >= 100;
 }
 function nodePath(nodeId) {
   const path = [];
@@ -2202,8 +2248,9 @@ function renderRoutineChain() {
       : `<div class="item-title">${escapeHtml(shownTitle)}</div>`;
     const fullPoints = h.points ?? 1;
     const levelPoints = habitLevelOn(h, today) === "minimal" ? fullPoints * HABIT_MINIMAL_FACTOR : fullPoints;
-    const streak = computeStreak(h);
-    const pointsHtml = `<div class="item-meta">${streak > 0 ? `Serie: ${streak} · ` : ""}${formatPoints(levelPoints)} Punkt${levelPoints === 1 ? "" : "e"}${
+    // Bewusst ohne Serie: die gehoert in die Auswertung, nicht zwischen die Punkte, die man
+    // gerade abhakt — dort ist sie Druck statt Information.
+    const pointsHtml = `<div class="item-meta">${formatPoints(levelPoints)} Punkt${levelPoints === 1 ? "" : "e"}${
       habitHasMinimal(h) && levelPoints !== fullPoints ? ` <span style="color:var(--color-neutral-600);">statt ${formatPoints(fullPoints)}</span>` : ""}</div>`;
 
     const el = document.createElement("div");
@@ -2260,7 +2307,6 @@ function renderOtherHabits() {
   }
   dueHabits.forEach(h => {
     const doneToday = habitDoneOn(h, today);
-    const streak = computeStreak(h);
     const priority = isPriority(h.nodeId);
     const shownTitle = habitTitleOn(h, today);
     const titleHtml = quickAddVisible
@@ -2272,7 +2318,7 @@ function renderOtherHabits() {
       <button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}">${doneToday ? splatSvg(h.id) : ""}</button>
       <div style="flex:1; min-width:0;">
         ${titleHtml}
-        <div class="item-meta">${frequencyLabel(h)} · Serie: ${streak}</div>
+        <div class="item-meta">${frequencyLabel(h)}</div>
       </div>
       ${priority ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">Priorität</span>' : ""}
       ${levelSwitchHtml(h, today)}
@@ -2291,6 +2337,131 @@ function subtreeMatchesQuery(node, q, seen = new Set()) {
 }
 
 // ---------- Roadmap: Dashboard (Ebene 1) -> Kategorie (Ebene 2) -> Pfad (Ebene 3) ----------
+
+// ---------- Zielknoten anlegen und bearbeiten ----------
+// Ein Dialog fuer beides. parentId wird beim Anlegen vorgegeben (die Ebene, auf der man gerade
+// steht); beim Bearbeiten laesst sich der uebergeordnete Bereich wechseln, wodurch ein Thema
+// verschoben werden kann, ohne es neu anzulegen.
+function nodeParentOptions(exclude) {
+  // Ein Knoten darf nicht unter sich selbst oder einen eigenen Nachfahren haengen — das
+  // erzeugte einen Zyklus, den die Fortschrittsrechnung zwar abfaengt, der aber den Teilbaum
+  // aus der Ansicht verschwinden liesse.
+  const gesperrt = new Set();
+  const sperre = id => { gesperrt.add(id); childNodes(id).forEach(c => sperre(c.id)); };
+  if (exclude) sperre(exclude);
+  const zeilen = [];
+  const lauf = (parentId, tiefe) => {
+    childNodes(parentId).forEach(n => {
+      if (gesperrt.has(n.id)) return;
+      zeilen.push({ id: n.id, label: "\u00a0".repeat(tiefe * 3) + n.title });
+      lauf(n.id, tiefe + 1);
+    });
+  };
+  lauf(null, 0);
+  return zeilen;
+}
+
+function openNodeModal(node, parentId) {
+  const isEdit = !!node;
+  const aktuellerParent = isEdit ? (node.parentId || "") : (parentId || "");
+  const optionen = nodeParentOptions(isEdit ? node.id : null);
+  openModal(`
+    <h3>${isEdit ? "Punkt bearbeiten" : "Neuer Punkt in der Roadmap"}</h3>
+    <div class="field">
+      <label>Titel</label>
+      <input type="text" id="mNodeTitle" placeholder="z.B. Gebet (Formen, Praxis)" value="${isEdit ? escapeHtml(node.title) : ""}">
+    </div>
+    <div class="field">
+      <label>Übergeordnet</label>
+      <select id="mNodeParent">
+        <option value="">\u2013 eigener Zielbereich \u2013</option>
+        ${optionen.map(o => `<option value="${o.id}"${o.id === aktuellerParent ? " selected" : ""}>${escapeHtml(o.label)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="checkbox-row" style="margin-bottom:12px;">
+      <input type="checkbox" id="mNodePriority" ${isEdit && node.priority ? "checked" : ""}>
+      <label for="mNodePriority">Priorität</label>
+    </div>
+    <div class="modal-actions">
+      ${isEdit ? `<button class="btn btn-ghost" id="mDelete" style="color:var(--color-accent-300); margin-right:auto;">Löschen</button>` : ""}
+      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mSave">Speichern</button>
+    </div>
+  `, body => {
+    body.querySelector("#mNodeTitle").focus();
+    body.querySelector("#mCancel").addEventListener("click", closeModal);
+    if (isEdit) body.querySelector("#mDelete").addEventListener("click", () => { closeModal(); loescheNodeMitUndo(node); });
+    body.querySelector("#mSave").addEventListener("click", () => {
+      const feld = body.querySelector("#mNodeTitle");
+      const titel = feld.value.trim();
+      if (!titel) { markiereFehlendesFeld(feld, "Ohne Titel l\u00e4sst sich der Punkt nicht speichern."); return; }
+      const neuerParent = body.querySelector("#mNodeParent").value || null;
+      const prio = body.querySelector("#mNodePriority").checked;
+      if (isEdit) {
+        node.title = titel;
+        node.parentId = neuerParent;
+        node.priority = prio;
+      } else {
+        state.goalNodes.push({ id: uid(), parentId: neuerParent, title: titel, priority: prio });
+      }
+      saveData(); closeModal(); renderAll();
+    });
+  });
+}
+
+// Loescht einen Knoten samt aller Nachfahren. Aufgaben, die direkt im Baum angelegt wurden
+// (source "category"), gehoeren zum Knoten und gehen mit; ToDo-Aufgaben und Gewohnheiten, die
+// nur darauf verweisen, werden NICHT geloescht, sondern nur losgeloest — sie gehoeren dem
+// Nutzer, nicht der Gliederung. Alles zusammen ist ueber die Leiste zurueckholbar.
+function loescheNodeMitUndo(node) {
+  const betroffen = [];
+  const sammle = id => { betroffen.push(id); childNodes(id).forEach(c => sammle(c.id)); };
+  sammle(node.id);
+  const idSet = new Set(betroffen);
+
+  const knotenVorher = state.goalNodes.map((n, i) => ({ n, i })).filter(({ n }) => idSet.has(n.id));
+  const aufgabenVorher = state.tasks.map((t, i) => ({ t, i }))
+    .filter(({ t }) => idSet.has(t.nodeId) && t.source === "category");
+  // Die urspruengliche Zuordnung mitschreiben, sonst blieben diese Eintraege nach einem
+  // Rueckgaengig fuer immer losgeloest.
+  const losgeloesteAufgaben = state.tasks.filter(t => idSet.has(t.nodeId) && t.source !== "category")
+    .map(t => ({ t, nodeId: t.nodeId }));
+  const losgeloesteHabits = state.habits.filter(x => idSet.has(x.nodeId))
+    .map(x => ({ x, nodeId: x.nodeId }));
+
+  state.goalNodes = state.goalNodes.filter(n => !idSet.has(n.id));
+  state.tasks = state.tasks.filter(t => !(idSet.has(t.nodeId) && t.source === "category"));
+  losgeloesteAufgaben.forEach(({ t }) => { t.nodeId = null; });
+  losgeloesteHabits.forEach(({ x }) => { x.nodeId = null; });
+
+  // Nach dem Loeschen darf die Ansicht nicht auf einem verschwundenen Knoten stehen bleiben.
+  if (idSet.has(roadmapPathId)) { roadmapPathId = null; roadmapView = roadmapRootId && !idSet.has(roadmapRootId) ? "category" : "dashboard"; }
+  if (idSet.has(roadmapRootId)) { roadmapRootId = null; roadmapView = "dashboard"; }
+  saveData(); renderAll();
+
+  const teile = [];
+  if (betroffen.length > 1) teile.push(`${betroffen.length} Punkten`);
+  if (aufgabenVorher.length) teile.push(`${aufgabenVorher.length} Aufgabe${aufgabenVorher.length === 1 ? "" : "n"}`);
+  const zusatz = teile.length ? ` \u2014 mit ${teile.join(" und ")}` : "";
+  offerUndo(`\u201e${node.title}" gel\u00f6scht${zusatz}`, () => {
+    knotenVorher.forEach(({ n, i }) => state.goalNodes.splice(Math.min(i, state.goalNodes.length), 0, n));
+    aufgabenVorher.forEach(({ t, i }) => state.tasks.splice(Math.min(i, state.tasks.length), 0, t));
+    losgeloesteAufgaben.forEach(({ t, nodeId }) => { t.nodeId = nodeId; });
+    losgeloesteHabits.forEach(({ x, nodeId }) => { x.nodeId = nodeId; });
+    saveData(); renderAll();
+  });
+}
+
+// Kleiner Stift-Griff, der nur im Bearbeiten-Modus erscheint.
+const NODE_EDIT_ICON = '<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M9.5 2.2l2.3 2.3-7 7-3 0.7 0.7-3 7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+function nodeEditBtnHtml(nodeId) {
+  if (!roadmapEditMode) return "";
+  return `<button class="btn btn-icon btn-ghost roadmap-edit-btn" data-edit-node="${nodeId}" aria-label="Bearbeiten">${NODE_EDIT_ICON}</button>`;
+}
+function nodeAddBtnHtml(parentId, text) {
+  if (!roadmapEditMode) return "";
+  return `<button class="btn btn-ghost btn-block roadmap-add-btn" data-add-node="${parentId || ""}">+ ${text}</button>`;
+}
 
 function renderGoalBrowser() {
   const wrap = document.getElementById("goalTree");
@@ -2341,17 +2512,27 @@ function renderRoadmapDashboard() {
   }
   wrap.className = "roadmap-folder-grid";
   roots.forEach((node, i) => {
-    const pct = Math.round(nodeProgress(node) * 100);
+    const pct = nodeProgressPct(node);
     const card = document.createElement("button");
     card.className = "roadmap-folder-card";
     card.dataset.openRoadmapRoot = node.id;
+    // Ohne Inhalt zeigt der Ring einen Strich statt einer Null — sonst sieht unbeplantes
+    // Geruest aus wie versaeumte Arbeit.
+    const ringHtml = pct === null
+      ? goldRingHtml(0, 88, i).replace(">0%<", ">\u2013<")
+      : goldRingHtml(pct, 88, i);
     card.innerHTML = `
+      ${nodeEditBtnHtml(node.id)}
       <div class="roadmap-folder-name">${escapeHtml(node.title)}</div>
-      <div style="display:flex; justify-content:center;">${goldRingHtml(pct, 88, i)}</div>
+      <div style="display:flex; justify-content:center;">${ringHtml}</div>
     `;
     wrap.appendChild(card);
   });
-  return wrap;
+  const huelle = document.createElement("div");
+  huelle.appendChild(wrap);
+  // Neue Zielbereiche haengen direkt unter der Wurzel (parentId null).
+  huelle.insertAdjacentHTML("beforeend", nodeAddBtnHtml("", "Zielbereich hinzuf\u00fcgen"));
+  return huelle;
 }
 
 // Deterministischer, aber individueller Maskenindex je Knoten (dieselbe Tinten-Maske-Technik wie
@@ -2363,19 +2544,19 @@ function maskIndexForId(id) {
 }
 
 function roadmapCardHtml(p) {
-  const pct = Math.round(nodeProgress(p) * 100);
+  const pct = nodeProgressPct(p);
   const children = childNodes(p.id);
   const tasks = categoryTasksForNode(p.id);
   const stepCount = children.length || tasks.length;
   const doneCount = children.length
-    ? children.filter(c => Math.round(nodeProgress(c) * 100) >= 100).length
+    ? children.filter(nodeIstFertig).length
     : tasks.filter(t => t.done).length;
   return `
     <button class="roadmap-card" data-open-roadmap-path="${p.id}">
-      ${goldRingHtml(pct, 34, maskIndexForId(p.id))}
+      ${pct === null ? goldRingHtml(0, 34, maskIndexForId(p.id)).replace(">0%<", ">\u2013<") : goldRingHtml(pct, 34, maskIndexForId(p.id))}
       <div class="roadmap-card-body">
-        <div class="roadmap-card-title">${escapeHtml(p.title)}</div>
-        <div class="roadmap-card-meta">${doneCount} / ${stepCount} Etappen</div>
+        <div class="roadmap-card-title">${escapeHtml(p.title)}${nodeEditBtnHtml(p.id)}</div>
+        <div class="roadmap-card-meta">${stepCount ? `${doneCount} / ${stepCount} Etappen` : "noch nichts geplant"}</div>
       </div>
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="flex-shrink:0; color:var(--color-neutral-500);"><path d="M7.5 4.5L13 10L7.5 15.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
@@ -2393,14 +2574,22 @@ function renderRoadmapCategory(rootId) {
         const projects = childNodes(theme.id);
         const targets = projects.length ? projects : [theme];
         return `
-          <h6 class="metal-gold" style="margin:22px 0 8px;">${escapeHtml(theme.title)}</h6>
+          <div class="roadmap-theme-head">
+            <h6 class="metal-gold" style="margin:22px 0 8px;">${escapeHtml(theme.title)}</h6>
+            ${nodeEditBtnHtml(theme.id)}
+          </div>
           <div class="roadmap-card-list">${targets.map(roadmapCardHtml).join("")}</div>
+          ${nodeAddBtnHtml(theme.id, "Punkt in \u201e" + escapeHtml(theme.title) + "\u201c")}
         `;
       }).join("")
     : '<div class="empty-hint">Noch keine Unterkategorien.</div>';
   wrap.innerHTML = `
-    <div class="roadmap-crumb"><button data-roadmap-crumb-home>Roadmap</button> <span>&rsaquo;</span> <b>${escapeHtml(root.title)}</b></div>
+    <div class="roadmap-crumb">
+      <button data-roadmap-crumb-home>Roadmap</button> <span>&rsaquo;</span> <b>${escapeHtml(root.title)}</b>
+      ${nodeEditBtnHtml(root.id)}
+    </div>
     ${sectionsHtml}
+    ${nodeAddBtnHtml(rootId, "Thema hinzuf\u00fcgen")}
   `;
   return wrap;
 }
@@ -2411,7 +2600,7 @@ function renderRoadmapPath(nodeId) {
   const children = childNodes(nodeId);
   const tasks = categoryTasksForNode(nodeId);
   const steps = children.length
-    ? children.map(c => ({ id: c.id, title: c.title, kind: "node", done: Math.round(nodeProgress(c) * 100) >= 100 }))
+    ? children.map(c => ({ id: c.id, title: c.title, kind: "node", done: nodeIstFertig(c) }))
     : tasks.map(t => ({ id: t.id, title: t.title, kind: "task", done: t.done }));
 
   let currentIdx = steps.findIndex(s => !s.done);
@@ -2432,6 +2621,7 @@ function renderRoadmapPath(nodeId) {
       <div class="roadmap-progress-label">${doneCount} / ${steps.length} Schritte</div>
     </div>
     <div class="roadmap-path" id="roadmapPathSteps"></div>
+    ${nodeAddBtnHtml(nodeId, "Schritt hinzuf\u00fcgen")}
   `;
   const stepsWrap = wrap.querySelector("#roadmapPathSteps");
   if (steps.length === 0) {
@@ -2454,6 +2644,7 @@ function renderRoadmapPath(nodeId) {
         </div>
         <div class="roadmap-step-body">
           <div class="roadmap-step-title${status === "done" ? " paint-done-title" : ""}" ${s.kind === "node" ? `data-open-roadmap-path="${s.id}"` : ""}>${stepTitleInner}</div>
+          ${s.kind === "node" ? nodeEditBtnHtml(s.id) : ""}
           ${startBtnHtml}
         </div>
       `;
@@ -2491,6 +2682,8 @@ function renderWeekStats() {
     completed.length ? `${onTime} von ${completed.length} erledigten Aufgaben pünktlich (${pct}%)` : "Noch keine erledigten Aufgaben mit Termin.";
 
   renderActivityHeatmap();
+  renderTaskAnalysis();
+  renderHabitStreaks();
   renderAreaLoad();
   renderMoreStats();
   renderFinanceAnalysis();
@@ -2503,6 +2696,83 @@ function taskCompletionRateInWindow(days) {
   const relevant = state.tasks.filter(t => t.createdAt && t.createdAt.slice(0, 10) >= cutoff);
   if (relevant.length === 0) return null;
   return relevant.filter(t => t.done).length / relevant.length;
+}
+
+// ---------- Analyse: erledigte Aufgaben ----------
+// Zeigt getrennt nach Zeitraum, WAS erledigt wurde, WIE VIEL Zeit dahinter steckt (geschaetzt
+// aus der Aufwandsstufe, nicht gemessen) und OB es puenktlich war. Gewohnheiten kommen hier
+// bewusst nicht vor — die haben ihren eigenen Abschnitt mit der Serie.
+function renderTaskAnalysis() {
+  const wrap = document.getElementById("taskAnalysis");
+  if (!wrap) return;
+  const todos = state.tasks.filter(t => (t.source || "todo") !== "category");
+  const erledigt = todos.filter(t => t.done && t.completedAt);
+
+  const imFenster = (t, tage) => localDateKey(new Date(t.completedAt)) >= todayStr(-tage);
+  const bloecke = [
+    { titel: "Diese Woche", liste: erledigt.filter(t => localDateKey(new Date(t.completedAt)) >= localDateKey(mondayOfWeek(new Date()))) },
+    { titel: "Letzte 30 Tage", liste: erledigt.filter(t => imFenster(t, 30)) },
+    { titel: "Insgesamt", liste: erledigt }
+  ];
+  const kacheln = bloecke.map(b => {
+    const minuten = b.liste.reduce((sum, t) => sum + taskMinutes(t), 0);
+    const puenktlich = b.liste.filter(isOnTime).length;
+    const quote = b.liste.length ? Math.round(puenktlich / b.liste.length * 100) : null;
+    return `<div class="stat-box">
+        <div class="stat-num">${b.liste.length}</div>
+        <div class="stat-label">${b.titel}</div>
+        <div class="stat-sub">${formatAufwand(minuten)}${quote === null ? "" : ` \u00b7 ${quote}% p\u00fcnktlich`}</div>
+      </div>`;
+  }).join("");
+
+  // Wohin die Zeit geflossen ist — nach Aufwandsstufe, damit sichtbar wird, ob viele kleine
+  // oder wenige grosse Aufgaben den Zeitraum gefuellt haben.
+  const letzte30 = erledigt.filter(t => imFenster(t, 30));
+  const jeStufe = EFFORT_LEVELS.map(e => {
+    const passend = letzte30.filter(t => effortLevelInfo(t.size).level === e.level);
+    return { e, anzahl: passend.length, minuten: passend.reduce((sum, t) => sum + taskMinutes(t), 0) };
+  }).filter(x => x.anzahl > 0);
+  const maxMin = Math.max(1, ...jeStufe.map(x => x.minuten));
+  const verteilung = jeStufe.length
+    ? `<div class="panel-card" style="margin-top:12px;">
+         <div class="text-muted" style="font-size:11.5px; margin-bottom:8px;">Aufwand der letzten 30 Tage nach Stufe \u00b7 gesch\u00e4tzt aus der gew\u00e4hlten Aufwandsstufe</div>
+         ${jeStufe.map(x => `
+           <div class="aufwand-zeile">
+             <span class="aufwand-name">${escapeHtml(x.e.label)}</span>
+             <span class="aufwand-balken"><i style="width:${Math.round(x.minuten / maxMin * 100)}%"></i></span>
+             <span class="aufwand-wert">${x.anzahl}\u00d7 \u00b7 ${formatAufwand(x.minuten)}</span>
+           </div>`).join("")}
+       </div>`
+    : "";
+
+  const offen = todos.filter(t => !t.done);
+  const offeneMinuten = offen.reduce((sum, t) => sum + taskMinutes(t), 0);
+  const ausblick = offen.length
+    ? `<p class="text-muted" style="font-size:12.5px; margin:12px 0 0;">Noch offen: <b>${offen.length}</b> ${offen.length === 1 ? "Aufgabe" : "Aufgaben"}, gesch\u00e4tzt <b>${formatAufwand(offeneMinuten)}</b> Arbeit.</p>`
+    : "";
+
+  wrap.innerHTML = erledigt.length || offen.length
+    ? `<div class="stats-grid">${kacheln}</div>${verteilung}${ausblick}`
+    : `<div class="empty-hint">Noch keine Aufgaben erledigt.</div>`;
+}
+
+// ---------- Analyse: Gewohnheiten und ihre Serien ----------
+// Die Serie stand vorher in der Heute-Ansicht zwischen den abzuhakenden Punkten. Dort ist sie
+// Druck; hier ist sie Information — mit der Quote der letzten 30 Tage als Bezugsgroesse.
+function renderHabitStreaks() {
+  const wrap = document.getElementById("habitStreakList");
+  if (!wrap) return;
+  const zeilen = state.habits
+    .map(h => ({ h, streak: computeStreak(h), quote: habitCompletionRate(h, 30) }))
+    .sort((x, y) => y.streak - x.streak || y.quote - x.quote);
+  wrap.innerHTML = zeilen.length
+    ? zeilen.map(({ h, streak, quote }) => `
+        <div class="streak-zeile">
+          <span class="streak-name">${escapeHtml(h.title)}${h.routineOrder != null ? "" : ` <span class="streak-nebenrolle">weitere</span>`}</span>
+          <span class="streak-quote">${Math.round(quote * 100)}%</span>
+          <span class="streak-wert${streak > 0 ? " aktiv" : ""}">${streak > 0 ? streak + (streak === 1 ? " Tag" : " Tage") : "\u2013"}</span>
+        </div>`).join("")
+    : `<div class="empty-hint">Noch keine Gewohnheiten angelegt.</div>`;
 }
 
 function renderMoreStats() {
@@ -3104,6 +3374,21 @@ document.addEventListener("click", e => {
     const h = state.habits.find(x => x.id === delHabitEl.dataset.delHabit);
     if (h) deleteWithUndo("habits", h.id, h.title);
   }
+  // Bearbeiten und Hinzufuegen zuerst: die Stifte liegen in denselben Karten, die sonst
+  // navigieren wuerden.
+  const editNodeBtn = e.target.closest("[data-edit-node]");
+  if (editNodeBtn) {
+    e.stopPropagation();
+    const n = nodeById(editNodeBtn.dataset.editNode);
+    if (n) openNodeModal(n, null);
+    return;
+  }
+  const addNodeBtn = e.target.closest("[data-add-node]");
+  if (addNodeBtn) {
+    e.stopPropagation();
+    openNodeModal(null, addNodeBtn.dataset.addNode || null);
+    return;
+  }
   const openRootBtn = e.target.closest("[data-open-roadmap-root]");
   if (openRootBtn) {
     roadmapRootId = openRootBtn.dataset.openRoadmapRoot;
@@ -3167,6 +3452,12 @@ document.addEventListener("click", e => {
   if (delAccountBtn) {
     const a = state.financeAccounts.find(x => x.id === delAccountBtn.dataset.delAccount);
     if (a) deleteWithUndo("financeAccounts", a.id, a.title);
+    return;
+  }
+  const editProjectEl = e.target.closest("[data-edit-project]");
+  if (editProjectEl) {
+    const pr = state.projects.find(x => x.id === editProjectEl.dataset.editProject);
+    if (pr) openProjectModal(pr);
     return;
   }
   const delProjectBtn = e.target.closest("[data-del-project]");
@@ -3397,25 +3688,80 @@ function gymTrendHtml(current, lastWeight) {
 let gymRest = null;          // { endsAt, total, label }
 let gymRestInterval = null;
 
+// ---------- Signal am Pausenende ----------
+// Vorher war die Vibration das einzige Signal — und die Vibration-API kennt iOS Safari nicht.
+// Auf dem iPhone lief die Pause damit vollkommen lautlos aus, also genau das, wofuer der Timer da
+// ist, passierte nicht. Jetzt zusaetzlich ein kurzer Ton ueber die Web-Audio-API. Der
+// AudioContext wird beim Antippen des Pause-Knopfes erzeugt bzw. fortgesetzt — iOS laesst Ton
+// nur aus einer echten Nutzergeste heraus zu, und der Knopfdruck ist eine.
+// Feste Satzpause, unabhaengig von der Blockpause des Supersatzes (die bleibt, wie sie war,
+// und hat ihre eigene, kuerzere Dauer aus dem Trainingsplan).
+const GYM_SATZ_PAUSE = 180;
+
+let gymAudioCtx = null;
+function gymAudioAufwecken() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!gymAudioCtx) gymAudioCtx = new Ctx();
+    if (gymAudioCtx.state === "suspended") gymAudioCtx.resume();
+  } catch (e) { /* ohne Ton weiterarbeiten, der Timer bleibt sichtbar */ }
+}
+function gymPiep() {
+  if (!gymAudioCtx || gymAudioCtx.state !== "running") return;
+  // Zwei kurze Toene statt eines langen — im Studio mit Musik im Ohr besser herauszuhoeren.
+  [0, 0.28].forEach(versatz => {
+    const t = gymAudioCtx.currentTime + versatz;
+    const osz = gymAudioCtx.createOscillator();
+    const lautstaerke = gymAudioCtx.createGain();
+    osz.type = "sine";
+    osz.frequency.setValueAtTime(880, t);
+    lautstaerke.gain.setValueAtTime(0.0001, t);
+    lautstaerke.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+    lautstaerke.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    osz.connect(lautstaerke).connect(gymAudioCtx.destination);
+    osz.start(t);
+    osz.stop(t + 0.24);
+  });
+}
+
 function gymStartRest(seconds, label) {
+  gymAudioAufwecken();
   gymRest = { endsAt: Date.now() + seconds * 1000, total: seconds, label };
+  // endsAt ist ein absoluter Zeitpunkt, deshalb ueberlebt die Pause ein Neuladen der App —
+  // vorher war sie nach jedem Neustart weg, mitten im Satz.
+  state.gymRest = gymRest;
+  saveData();
   if (gymRestInterval) clearInterval(gymRestInterval);
   gymRestInterval = setInterval(gymRestTick, 250);
   gymRenderHeader();
 }
 function gymStopRest() {
   gymRest = null;
+  delete state.gymRest;
+  saveData();
   if (gymRestInterval) { clearInterval(gymRestInterval); gymRestInterval = null; }
   gymRenderHeader();
 }
 function gymRestTick() {
   if (!gymRest) { gymStopRest(); return; }
   if (Date.now() >= gymRest.endsAt) {
+    gymPiep();
     if (navigator.vibrate) navigator.vibrate([180, 90, 180]);
     gymStopRest();
     return;
   }
   gymRenderHeader();
+}
+// Beim Start der App eine noch laufende Pause fortsetzen. Ist sie waehrenddessen abgelaufen,
+// wird sie kommentarlos verworfen statt verspaetet zu piepen.
+function gymPauseFortsetzen() {
+  const gespeichert = state.gymRest;
+  if (!gespeichert || !gespeichert.endsAt) return;
+  if (Date.now() >= gespeichert.endsAt) { delete state.gymRest; saveData(); return; }
+  gymRest = gespeichert;
+  if (gymRestInterval) clearInterval(gymRestInterval);
+  gymRestInterval = setInterval(gymRestTick, 250);
 }
 function gymRestLeft() {
   if (!gymRest) return 0;
@@ -3514,6 +3860,7 @@ function gymExerciseHtml(ex, session, today) {
     <div class="gym-grid" style="grid-template-columns:repeat(${setCount},1fr);">
       ${headCells.join("")}${lastCells.join("")}${inputCells.join("")}
     </div>
+    <button class="gym-satz-pause" data-gym-satz-pause="${escapeHtml(ex.n)}">3 Min. Pause</button>
   </div>`;
 }
 
@@ -3558,6 +3905,8 @@ function renderGym() {
 document.addEventListener("click", e => {
   const dayBtn = e.target.closest("[data-gym-day]");
   if (dayBtn) { gymSelectedDay = dayBtn.dataset.gymDay; gymStopRest(); renderGym(); return; }
+  const satzPauseBtn = e.target.closest("[data-gym-satz-pause]");
+  if (satzPauseBtn) { gymStartRest(GYM_SATZ_PAUSE, satzPauseBtn.dataset.gymSatzPause); return; }
   const restBtn = e.target.closest("[data-gym-rest]");
   if (restBtn) { gymStartRest(parseInt(restBtn.dataset.gymRest, 10), restBtn.dataset.gymRestLabel || "Pause"); return; }
   if (e.target.closest("[data-gym-rest-stop]")) gymStopRest();
@@ -3576,9 +3925,19 @@ document.addEventListener("input", e => {
   session.entries[exercise] = session.entries[exercise] || [];
   session.entries[exercise][idx] = session.entries[exercise][idx] || {};
   const val = el.value === "" ? null : parseFloat(el.value);
-  if (wEl) session.entries[exercise][idx].weight = (val != null && !isNaN(val)) ? val : null;
-  else session.entries[exercise][idx].reps = (val != null && !isNaN(val)) ? val : null;
+  // Zustand VOR der Eingabe merken, um den Uebergang "unvollstaendig -> vollstaendig" zu erkennen.
+  const satz = session.entries[exercise][idx];
+  const warVollstaendig = satz.weight != null && satz.reps != null;
+  if (wEl) satz.weight = (val != null && !isNaN(val)) ? val : null;
+  else satz.reps = (val != null && !isNaN(val)) ? val : null;
+  const istVollstaendig = satz.weight != null && satz.reps != null;
   saveData();
+  // Der Satz ist gerade fertig geworden: Pause laeuft von selbst an, damit man mitten im Training
+  // nicht daran denken muss. Beim blossen Nachbessern eines schon vollstaendigen Satzes passiert
+  // nichts. Laeuft bereits eine Pause, wird sie nicht ueberschrieben.
+  if (!warVollstaendig && istVollstaendig && !gymRest) {
+    gymStartRest(GYM_SATZ_PAUSE, `${exercise} \u00b7 Satz ${idx + 1}`);
+  }
   // Bewusst kein volles renderGym(): das wuerde den Fokus aus dem Feld reissen, in das gerade
   // getippt wird. Nur Trendpfeil, Erledigt-Zustand und Kopfzeile auffrischen.
   gymRefreshLive(el, exercise, idx, session);
@@ -3748,12 +4107,16 @@ document.getElementById("addTaskBtn").addEventListener("click", () => openTaskMo
 document.getElementById("addHabitBtn").addEventListener("click", () => openHabitModal());
 document.getElementById("addExamBtn").addEventListener("click", () => openExamModal());
 document.getElementById("addAccountBtn").addEventListener("click", () => openAccountModal());
-function openProjectModal() {
+// editProject gesetzt = umbenennen. Vorher liessen sich Projekte nur anlegen und loeschen —
+// ein Tippfehler im Titel war nur ueber Loeschen und Neuanlegen zu beheben, wobei die Notizen
+// verloren gingen.
+function openProjectModal(editProject = null) {
+  const isEdit = !!editProject;
   openModal(`
-    <h3>Projekt hinzufügen</h3>
+    <h3>${isEdit ? "Projekt umbenennen" : "Projekt hinzufügen"}</h3>
     <div class="field">
       <label>Titel</label>
-      <input type="text" id="mProjectTitle" placeholder="z.B. Seminararbeit, Buch schreiben">
+      <input type="text" id="mProjectTitle" placeholder="z.B. Seminararbeit, Buch schreiben" value="${isEdit ? escapeHtml(editProject.title) : ""}">
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
@@ -3763,9 +4126,11 @@ function openProjectModal() {
     body.querySelector("#mProjectTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mProjectTitle").value.trim();
-      if (!title) return;
-      state.projects.push({ id: uid(), title, notes: "" });
+      const feld = body.querySelector("#mProjectTitle");
+      const title = feld.value.trim();
+      if (!title) { markiereFehlendesFeld(feld, "Ohne Titel lässt sich das Projekt nicht speichern."); return; }
+      if (isEdit) editProject.title = title;
+      else state.projects.push({ id: uid(), title, notes: "" });
       saveData(); closeModal(); renderAll();
     });
   });
@@ -3871,10 +4236,10 @@ function openTaskModal(defaultNodeId, source = "todo") {
     </div>
     ${isLernfeld ? "" : `
     <div class="field">
-      <label>Aufwandsstufe</label>
-      <select id="mTaskSize">
-        ${EFFORT_LEVELS.map(e => `<option value="${e.level}">${e.level} · ${escapeHtml(e.label)} (${escapeHtml(e.time)})</option>`).join("")}
-      </select>
+      <label>Geschätzter Aufwand</label>
+      <input type="range" class="aufwand-regler" id="mTaskSize" min="1" max="${EFFORT_LEVELS.length}" step="1" value="2">
+      <div class="aufwand-skala"><span>5 Min.</span><span>Wochen</span></div>
+      <div class="aufwand-anzeige" id="mTaskSizeLabel"></div>
     </div>
     <div class="field">
       <label>Priorität (0 = keine, 5 = höchste)</label>
@@ -3901,6 +4266,17 @@ function openTaskModal(defaultNodeId, source = "todo") {
   `, body => {
     body.querySelector("#mTaskTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
+    // Ohne mitlaufende Beschriftung waere der Regler eine Zahl ohne Bedeutung.
+    const groesseRegler = body.querySelector("#mTaskSize");
+    const groesseLabel = body.querySelector("#mTaskSizeLabel");
+    if (groesseRegler && groesseLabel) {
+      const zeigeStufe = () => {
+        const info = effortLevelInfo(parseInt(groesseRegler.value, 10));
+        groesseLabel.innerHTML = `<b>${escapeHtml(info.label)}</b> \u00b7 ${escapeHtml(info.time)}`;
+      };
+      groesseRegler.addEventListener("input", zeigeStufe);
+      zeigeStufe();
+    }
     body.querySelector("#mSave").addEventListener("click", () => {
       const titelFeld = body.querySelector("#mTaskTitle");
       const title = titelFeld.value.trim();
@@ -4107,8 +4483,9 @@ function openSubjectModal() {
     body.querySelector("#mSubjectTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mSubjectTitle").value.trim();
-      if (!title) return;
+      const feld = body.querySelector("#mSubjectTitle");
+      const title = feld.value.trim();
+      if (!title) { markiereFehlendesFeld(feld, "Ohne Namen lässt sich das Fach nicht speichern."); return; }
       state.subjects.push({ id: uid(), title });
       saveData();
       closeModal();
@@ -4297,6 +4674,10 @@ function financeExpenseDayLabel(dateKey) {
   if (dateKey === todayStr(-1)) return "Gestern";
   return dateFromKey(dateKey).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
 }
+
+// Merkt je Sparziel, ob es beim letzten Rendern schon erreicht war — sonst wuerde die
+// Erreicht-Animation bei jedem renderAll() erneut abspielen.
+const zielErreichtZuvor = {};
 
 function renderFinance() {
   const heroEl = document.getElementById("financeMonthHero");
@@ -4512,7 +4893,15 @@ function renderFinanceAnalysis() {
 
   const ringsWrap = document.getElementById("financeGoalsRings");
   ringsWrap.innerHTML = state.savingsGoals.length
-    ? state.savingsGoals.map((g, i) => `<div class="finance-ring-item">${budgetRingHtml(g.current || 0, g.target || 0, 56, i, true)}<div class="r-title">${escapeHtml(g.title)}</div></div>`).join("")
+    ? state.savingsGoals.map((g, i) => {
+        // Nur der echte Wechsel auf "erreicht" loest die Animation aus. null = erster Render
+        // der Sitzung, damit beim Oeffnen der App nichts grundlos aufblitzt.
+        const erreicht = (g.target || 0) > 0 && (g.current || 0) >= g.target;
+        const vorher = zielErreichtZuvor[g.id];
+        const feiern = vorher === false && erreicht;
+        zielErreichtZuvor[g.id] = erreicht;
+        return `<div class="finance-ring-item">${budgetRingHtml(g.current || 0, g.target || 0, 56, i, true, feiern)}<div class="r-title">${escapeHtml(g.title)}</div></div>`;
+      }).join("")
     : '<div class="empty-hint">Noch keine Sparziele.</div>';
 }
 
@@ -4541,8 +4930,9 @@ function openIncomeSourceModal(editSource = null) {
       saveData(); closeModal(); renderAll();
     });
     body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mIncomeTitle").value.trim();
-      if (!title) return;
+      const feld = body.querySelector("#mIncomeTitle");
+      const title = feld.value.trim();
+      if (!title) { markiereFehlendesFeld(feld, "Ohne Bezeichnung lässt sich die Einkommensquelle nicht speichern."); return; }
       const amount = parseFloat(body.querySelector("#mIncomeAmount").value) || 0;
       if (isEdit) { editSource.title = title; editSource.amount = amount; }
       else state.financeIncomeSources.push({ id: uid(), title, amount });
@@ -4562,7 +4952,7 @@ function renderProjekte() {
     ? state.projects.map(p => `
         <div class="card elev-sm project-card">
           <div class="project-card-head">
-            <div class="item-title">${escapeHtml(p.title)}</div>
+            <div class="item-title" data-edit-project="${p.id}" style="cursor:pointer;">${escapeHtml(p.title)}</div>
             <button class="btn btn-icon btn-ghost" data-del-project="${p.id}" aria-label="Löschen">${DEL_ICON}</button>
           </div>
           <textarea class="input project-notes" data-project-notes="${p.id}" placeholder="Notizen, Gedanken, Zwischenstand …">${escapeHtml(p.notes || "")}</textarea>
@@ -4600,8 +4990,9 @@ function openAccountModal(editAccount = null) {
       saveData(); closeModal(); renderAll();
     });
     body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mAccountTitle").value.trim();
-      if (!title) return;
+      const feld = body.querySelector("#mAccountTitle");
+      const title = feld.value.trim();
+      if (!title) { markiereFehlendesFeld(feld, "Ohne Bezeichnung lässt sich das Konto nicht speichern."); return; }
       const balance = parseFloat(body.querySelector("#mAccountBalance").value) || 0;
       const isEmergencyFund = body.querySelector("#mAccountEmergency").checked;
       if (isEdit) { editAccount.title = title; editAccount.balance = balance; editAccount.isEmergencyFund = isEmergencyFund; }
@@ -4637,8 +5028,9 @@ function openCategoryModal(editCategory = null) {
       saveData(); closeModal(); renderAll();
     });
     body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mCategoryTitle").value.trim();
-      if (!title) return;
+      const feld = body.querySelector("#mCategoryTitle");
+      const title = feld.value.trim();
+      if (!title) { markiereFehlendesFeld(feld, "Ohne Bezeichnung lässt sich die Kategorie nicht speichern."); return; }
       const limit = parseFloat(body.querySelector("#mCategoryLimit").value) || 0;
       if (isEdit) { editCategory.title = title; editCategory.limit = limit; }
       else state.financeCategories.push({ id: uid(), title, limit });
@@ -4683,7 +5075,11 @@ function openExpenseModal() {
       const amount = parseFloat(body.querySelector("#mExpenseAmount").value);
       const date = body.querySelector("#mExpenseDate").value;
       const note = body.querySelector("#mExpenseNote").value.trim() || null;
-      if (!categoryId || !amount || amount <= 0 || !date) return;
+      // Betrag ist das Feld, das man am ehesten leer lässt — deshalb wird genau das benannt.
+      const betragFeld = body.querySelector("#mExpenseAmount");
+      if (!amount || amount <= 0) { markiereFehlendesFeld(betragFeld, "Trag einen Betrag größer als null ein."); return; }
+      if (!date) { markiereFehlendesFeld(body.querySelector("#mExpenseDate"), "Ohne Datum lässt sich die Ausgabe nicht einordnen."); return; }
+      if (!categoryId) return;
       state.financeExpenses.push({ id: uid(), categoryId, amount, date, note });
       saveData(); closeModal(); renderAll();
     });
@@ -4723,8 +5119,9 @@ function openSavingsGoalModal(editGoal = null) {
       saveData(); closeModal(); renderAll();
     });
     body.querySelector("#mSave").addEventListener("click", () => {
-      const title = body.querySelector("#mGoalTitle").value.trim();
-      if (!title) return;
+      const titelFeld = body.querySelector("#mGoalTitle");
+      const title = titelFeld.value.trim();
+      if (!title) { markiereFehlendesFeld(titelFeld, "Ohne Titel lässt sich das Sparziel nicht speichern."); return; }
       const zielFeld = body.querySelector("#mGoalTarget");
       const target = parseFloat(zielFeld.value) || 0;
       // Ohne Zielbetrag gaebe es nichts zu erreichen — der Ring stuende dauerhaft auf 0 %.
@@ -4819,7 +5216,7 @@ function renderPrayers() {
 function savePrayerFromInline() {
   const input = document.getElementById("prayerInput");
   const title = input.value.trim();
-  if (!title) return;
+  if (!title) { markiereFehlendesFeld(input, "Schreib kurz auf, worum es geht."); return; }
   state.prayers.push({ id: uid(), title, type: prayerAddType, createdAt: new Date().toISOString(), status: "open", deferredCount: 0 });
   saveData();
   input.value = "";
@@ -4954,7 +5351,8 @@ function exportWeekReview() {
       gesehen.add(node.id);
       const einzug = "  ".repeat(tiefe);
       const prio = node.priority ? " (Priorität)" : "";
-      md += `${einzug}- **${node.title}**${prio}: ${Math.round(nodeProgress(node) * 100)}%\n`;
+      const nPct = nodeProgressPct(node);
+      md += `${einzug}- **${node.title}**${prio}: ${nPct === null ? "noch nichts geplant" : nPct + "%"}\n`;
       categoryTasksForNode(node.id).forEach(t => {
         md += `${einzug}  - [${t.done ? "x" : (t.inProgress ? "~" : " ")}] ${t.title}\n`;
       });
@@ -5130,6 +5528,7 @@ function exportWeekReview() {
 }
 
 // ---------- Init ----------
+gymPauseFortsetzen();
 renderAll();
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {

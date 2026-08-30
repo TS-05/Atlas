@@ -1234,3 +1234,125 @@ textarea.input { min-height: 90px; resize: vertical; }
   color: var(--color-bg); font-weight: 600;
   box-shadow: 0 1px 6px color-mix(in srgb, var(--color-accent-700) 45%, transparent);
 }
+
+/* ============================================================
+   Aufwands-Schieberegler (ToDo-Dialog)
+   Eine Linie von "5 Min." bis "Wochen" statt einer Auswahlliste — der Weg des Daumens bildet
+   den Aufwand ab, statt ihn aus sechs Zeilen aussuchen zu lassen.
+   ============================================================ */
+.aufwand-regler {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 26px; background: transparent; cursor: pointer; margin: 2px 0 0;
+}
+.aufwand-regler::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 999px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--color-accent-700) 55%, var(--color-bg)),
+    var(--color-accent-500));
+}
+.aufwand-regler::-moz-range-track {
+  height: 4px; border-radius: 999px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--color-accent-700) 55%, var(--color-bg)),
+    var(--color-accent-500));
+}
+.aufwand-regler::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 22px; height: 22px; margin-top: -9px; border-radius: 50%; border: 0;
+  background: linear-gradient(160deg, var(--color-accent-200), var(--color-accent-600));
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--color-accent-700) 45%, transparent),
+              inset 0 1px 0 rgba(255,255,255,0.35);
+  transition: transform 0.12s ease;
+}
+.aufwand-regler::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%; border: 0;
+  background: linear-gradient(160deg, var(--color-accent-200), var(--color-accent-600));
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--color-accent-700) 45%, transparent);
+}
+.aufwand-regler:active::-webkit-slider-thumb { transform: scale(1.12); }
+.aufwand-skala {
+  display: flex; justify-content: space-between;
+  font-size: 10.5px; color: var(--color-neutral-600); margin-top: -2px;
+}
+.aufwand-anzeige {
+  margin-top: 6px; font-size: 12.5px; color: var(--color-neutral-300);
+}
+.aufwand-anzeige b { color: var(--color-accent-300); font-weight: 600; }
+
+/* ============================================================
+   Sparziel erreicht — einmaliges Aufleuchten mit Lichtsaum
+   Beim Erreichen soll spürbar etwas passieren; danach steht der Ring ruhig (kein Dauerpuls,
+   siehe die Begründung bei atlas-ring-flare).
+   ============================================================ */
+@keyframes atlas-goal-reached {
+  0%   { transform: scale(1);    filter: brightness(1) saturate(1); }
+  22%  { transform: scale(1.14); filter: brightness(1.45) saturate(1.2); }
+  45%  { transform: scale(0.97); filter: brightness(1.1) saturate(1.05); }
+  70%  { transform: scale(1.04); filter: brightness(1.18) saturate(1.1); }
+  100% { transform: scale(1);    filter: brightness(1) saturate(1); }
+}
+.goal-reached-flare { animation: atlas-goal-reached 1.5s cubic-bezier(.22,.8,.28,1) 1 both; }
+/* Ein Lichtring, der einmal nach außen läuft — das eigentliche „geschafft“-Signal. */
+.goal-reached-flare::after {
+  content: ''; position: absolute; inset: -6px; border-radius: 50%;
+  border: 2px solid var(--color-accent-300);
+  animation: atlas-goal-ripple 1.5s cubic-bezier(.22,.8,.28,1) 1 both;
+  pointer-events: none;
+}
+@keyframes atlas-goal-ripple {
+  0%   { opacity: 0.9; transform: scale(0.85); }
+  100% { opacity: 0;   transform: scale(1.7); }
+}
+
+/* ---------- Analyse: Aufwandsverteilung und Serien ---------- */
+.aufwand-zeile { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 12px; }
+.aufwand-name { flex: 0 0 118px; color: var(--color-neutral-300); }
+.aufwand-balken { flex: 1; height: 6px; border-radius: 999px; background: var(--color-bg); overflow: hidden; }
+.aufwand-balken i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-accent-700), var(--color-accent-400));
+}
+.aufwand-wert { flex: 0 0 auto; color: var(--color-neutral-500); font-size: 11.5px; white-space: nowrap; }
+
+.streak-zeile { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; }
+.streak-zeile + .streak-zeile { border-top: 1px solid var(--color-divider); }
+.streak-name { flex: 1; min-width: 0; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.streak-nebenrolle { font-size: 10px; color: var(--color-neutral-600); }
+.streak-quote { flex: 0 0 auto; font-size: 11.5px; color: var(--color-neutral-500); }
+.streak-wert {
+  flex: 0 0 auto; min-width: 62px; text-align: right;
+  font-family: var(--font-heading); font-size: 12.5px; color: var(--color-neutral-600);
+}
+.streak-wert.aktiv { color: var(--color-accent-300); font-weight: 600; }
+
+/* ---------- Roadmap: Bearbeiten-Modus ---------- */
+.roadmap-edit-bar { display: flex; justify-content: flex-end; margin: -6px 0 10px; }
+#roadmapEditToggle { font-size: 12.5px; padding: 4px 10px; }
+#roadmapEditToggle.aktiv {
+  color: var(--color-bg); font-weight: 600;
+  background: linear-gradient(160deg, var(--color-accent-200), var(--color-accent-600));
+  border-radius: 999px;
+}
+.roadmap-edit-btn {
+  width: 26px; height: 26px; flex-shrink: 0;
+  color: var(--color-accent-300);
+}
+/* Auf der Bereichskachel schwebt der Stift oben rechts, damit er die Beschriftung nicht verschiebt. */
+.roadmap-folder-card { position: relative; }
+.roadmap-folder-card .roadmap-edit-btn { position: absolute; top: 4px; right: 4px; z-index: 2; }
+.roadmap-theme-head { display: flex; align-items: center; gap: 6px; }
+.roadmap-theme-head h6 { flex: 1; min-width: 0; }
+.roadmap-card-title { display: flex; align-items: center; gap: 6px; }
+.roadmap-add-btn { margin-top: 10px; font-size: 12.5px; }
+.roadmap-step-body .roadmap-edit-btn { margin-left: auto; }
+
+/* 3-Minuten-Satzpause je Übung — bewusst zurückhaltend, damit sie den Supersatz-Blockknopf
+   (der seine eigene, kürzere Pause aus dem Plan startet) nicht verdrängt. */
+.gym-satz-pause {
+  width: 100%; margin-top: 10px; padding: 7px 0;
+  border: 1px solid var(--color-divider); border-radius: 999px;
+  background: transparent; cursor: pointer;
+  font-family: var(--font-heading); font-size: 12px; color: var(--color-neutral-400);
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+.gym-satz-pause:active { color: var(--color-accent-300); border-color: var(--color-accent-600); }

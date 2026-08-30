@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=64">
+<link rel="stylesheet" href="style.css?v=67">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -578,6 +578,12 @@
         <input class="input" id="bereicheSearchInput" placeholder="Bereich oder Thema suchen …">
       </div>
 
+      <!-- Die Roadmap war bis hierher reines Ansehen: der gesamte Zielbaum entstand nur in
+           seedData(). Der Umschalter blendet die Bearbeiten-Griffe ein, damit die Ansicht im
+           Normalzustand aufgeraeumt bleibt. -->
+      <div class="roadmap-edit-bar">
+        <button class="btn btn-ghost" id="roadmapEditToggle">Bearbeiten</button>
+      </div>
       <div id="goalTree" class="goal-tree"></div>
     </section>
 
@@ -671,6 +677,15 @@
           <div class="progress-outer"><div class="progress-inner" id="punctualityFill"></div></div>
           <p class="text-muted" id="punctualityText" style="font-size: 12.5px; margin:0;"></p>
         </div>
+
+        <!-- Aufgaben und Gewohnheiten sind zwei verschiedene Dinge: bei Aufgaben zaehlen
+             Anzahl, Aufwand und Puenktlichkeit, bei Gewohnheiten die Serie. Vorher lief beides
+             vermischt durch dieselben Kacheln. -->
+        <h6 class="metal-gold">Erledigte Aufgaben</h6>
+        <div id="taskAnalysis" style="margin-bottom:30px;"></div>
+
+        <h6 class="metal-gold">Gewohnheiten &amp; Serien</h6>
+        <div id="habitStreakList" class="panel-card" style="margin-bottom:30px;"></div>
 
         <h6 class="metal-gold">Aufgaben je Bereich</h6>
         <div id="areaLoad" class="panel-card" style="margin-bottom:30px;"></div>
@@ -766,6 +781,6 @@
   <span id="undoText"></span>
   <button class="btn btn-ghost" id="undoBtn">Rückgängig</button>
 </div>
-<script src="app.js?v=59"></script>
+<script src="app.js?v=66"></script>
 </body>
 </html>
