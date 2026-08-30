@@ -1593,14 +1593,17 @@ const HABIT_MINIMAL_FACTOR = 0.5;
 function habitHasMinimal(habit) {
   return !!(habit.minimalTitle && habit.minimalTitle.trim());
 }
-// Reglerstellung fuer einen Tag. Ohne Minimalstufe gibt es nichts zu waehlen.
+// Reglerstellung fuer einen Tag. Gilt fuer JEDE Gewohnheit — auch ohne eigenen Minimaltext:
+// "minimal" heisst dann schlicht "heute die kleine Version", zaehlt halbe Punkte und haelt die
+// Serie. Ein hinterlegter Minimaltext aendert zusaetzlich die Beschriftung der Zeile.
 function habitLevelOn(habit, dateKey) {
-  if (!habitHasMinimal(habit)) return "ideal";
   return (habit.levelByDate || {})[dateKey] === "minimal" ? "minimal" : "ideal";
 }
 // Angezeigter Text der aktuell eingestellten Stufe.
 function habitTitleOn(habit, dateKey) {
-  return habitLevelOn(habit, dateKey) === "minimal" ? habit.minimalTitle.trim() : habit.title;
+  return (habitLevelOn(habit, dateKey) === "minimal" && habitHasMinimal(habit))
+    ? habit.minimalTitle.trim()
+    : habit.title;
 }
 // Erledigt? Deckt Alt-Daten (true), Gewichtswerte (Zahl) und die neuen Stufenwerte ab.
 function habitDoneOn(habit, dateKey) {
@@ -1623,7 +1626,11 @@ function formatPoints(n) {
 // Der Regler selbst. Ein Knopf mit data-level, damit CSS die Knopfstellung uebernimmt und JS nur
 // den Zustand umschaltet.
 function levelSwitchHtml(habit, dateKey) {
-  if (!habitHasMinimal(habit)) return "";
+  // Steht in jeder Zeile, ohne Bearbeiten-Modus und ohne Vorbedingung — vorher erschien er nur,
+  // wenn vorher ueber das Plus-Menue ein Minimaltext hinterlegt worden war, wodurch die Funktion
+  // von aussen schlicht nicht zu finden war.
+  // Ausgenommen Gewichts-Gewohnheiten: dort wird ein Messwert eingetragen, keine Stufe erfuellt.
+  if (habit.type === "weight") return "";
   const level = habitLevelOn(habit, dateKey);
   // Der ganze Block ist der Knopf — Spur, Ecken und Beschriftung schalten alle um. Waere nur die
   // Pille selbst antippbar, gingen ihre abgerundeten Ecken als Trefferflaeche verloren (gemessen
@@ -2251,7 +2258,7 @@ function renderRoutineChain() {
     // Bewusst ohne Serie: die gehoert in die Auswertung, nicht zwischen die Punkte, die man
     // gerade abhakt — dort ist sie Druck statt Information.
     const pointsHtml = `<div class="item-meta">${formatPoints(levelPoints)} Punkt${levelPoints === 1 ? "" : "e"}${
-      habitHasMinimal(h) && levelPoints !== fullPoints ? ` <span style="color:var(--color-neutral-600);">statt ${formatPoints(fullPoints)}</span>` : ""}</div>`;
+      levelPoints !== fullPoints ? ` <span style="color:var(--color-neutral-600);">statt ${formatPoints(fullPoints)}</span>` : ""}</div>`;
 
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
@@ -4402,10 +4409,10 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
       const autoDone = body.querySelector("#mHabitAutoDone").checked;
       if (isEdit) {
         editHabit.title = title;
-        // Minimalstufe entfernt? Dann auch die gesetzten Reglerstellungen aufraeumen, sonst blieben
-        // Tage auf "minimal" stehen, fuer die es gar keine Minimalstufe mehr gibt.
+        // Der Minimaltext ist nur die Beschriftung; der Regler steht ohnehin in jeder Zeile.
+        // Deshalb bleiben gesetzte Reglerstellungen erhalten, wenn der Text entfernt wird.
         if (minimalTitle) editHabit.minimalTitle = minimalTitle;
-        else { delete editHabit.minimalTitle; editHabit.levelByDate = {}; }
+        else delete editHabit.minimalTitle;
         editHabit.nodeId = nodeId;
         editHabit.frequency = frequency;
         delete editHabit.intervalDays; delete editHabit.weekday; delete editHabit.everyNWeeks;
