@@ -1123,16 +1123,23 @@ function dayBudgetRing(dueCount, doneCount, size = 200, celebrate = false, ohneT
 // Budget-Ring im selben Stahl-/Glüh-Stil wie dayBudgetRing: normal ein Stahlton-Ring nach
 // Ausgaben-Anteil, bei Überschreitung des Limits geht er in den weißgelb-glühenden Zustand mit
 // orangenem Halo über (statt bei "alles erledigt" hier bei "Limit überschritten").
-function budgetRingHtml(spent, limit, size = 40, maskIdx = 0) {
+// erreichenIstGut = true bei Sparzielen: dort ist das Ueberschreiten das Ziel, nicht der Alarm.
+// Vorher lief hier fuer beide Faelle derselbe rote Gluehzustand samt Dauerpuls — ein uebererfuelltes
+// Sparziel sah damit aus wie ein gerissenes Budget.
+function budgetRingHtml(spent, limit, size = 40, maskIdx = 0, erreichenIstGut = false) {
   const t = limit > 0 ? spent / limit : 0;
   const pct = Math.round(t * 100);
-  const overLimit = limit > 0 && spent > limit;
-  const baseColor = overLimit ? MOLTEN_COLOR : steelColorForProgress(Math.min(0.999, t));
+  const erreicht = limit > 0 && spent >= limit;
+  const overLimit = !erreichenIstGut && limit > 0 && spent > limit;
+  const zielErreicht = erreichenIstGut && erreicht;
+  const baseColor = overLimit ? MOLTEN_COLOR : zielErreicht ? FORGE_COLOR : steelColorForProgress(Math.min(0.999, t));
   const maskUrl = `assets/${RING_MASKS[maskIdx % RING_MASKS.length]}`;
-  const percentMask = conicPercentMask(Math.min(100, pct));
+  const percentMask = conicPercentMask(Math.min(100, pct));   // ueber 100 % bleibt der Ring voll
   const gradient = metallicRingGradient(baseColor);
   const glowFilter = overLimit
     ? `drop-shadow(0 0 6px ${MOLTEN_COLOR}) drop-shadow(0 0 14px ${MOLTEN_HALO})`
+    : zielErreicht
+    ? `drop-shadow(0 0 6px ${FORGE_COLOR}) drop-shadow(0 0 14px ${FORGE_HALO})`
     : `drop-shadow(0 0 4px color-mix(in srgb, ${baseColor} 70%, transparent)) drop-shadow(0 0 11px color-mix(in srgb, ${baseColor} 32%, transparent))`;
   return `
     <div class="${overLimit ? "ring-glow-pulse" : ""}" style="position:relative; width:${size}px; height:${size}px; flex-shrink:0;">
@@ -2922,6 +2929,7 @@ function offerUndo(text, restore) {
   const bar = document.getElementById("undoBar");
   if (!bar) { restore = null; return; }
   undoAction = restore;
+  document.getElementById("undoBtn").hidden = false;
   document.getElementById("undoText").textContent = text;
   bar.hidden = false;
   bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = "";
@@ -2942,6 +2950,20 @@ function deleteWithUndo(listName, id, label) {
     saveData();
     renderAll();
   });
+}
+
+// Reine Bestaetigung ohne Rueckgaengig — der Export löst still einen Download aus, auf dem
+// iPhone sieht man davon je nach Einstellung gar nichts.
+function showToast(text) {
+  const bar = document.getElementById("undoBar");
+  if (!bar) return;
+  undoAction = null;
+  document.getElementById("undoText").textContent = text;
+  document.getElementById("undoBtn").hidden = true;
+  bar.hidden = false;
+  bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = "";
+  if (undoTimer) clearTimeout(undoTimer);
+  undoTimer = setTimeout(hideUndoBar, 4000);
 }
 
 document.getElementById("undoBtn")?.addEventListener("click", () => {
@@ -3131,8 +3153,8 @@ document.addEventListener("click", e => {
   }
   const delIncomeBtn = e.target.closest("[data-del-income]");
   if (delIncomeBtn) {
-    state.financeIncomeSources = state.financeIncomeSources.filter(i => i.id !== delIncomeBtn.dataset.delIncome);
-    saveData(); renderAll();
+    const i = state.financeIncomeSources.find(x => x.id === delIncomeBtn.dataset.delIncome);
+    if (i) deleteWithUndo("financeIncomeSources", i.id, i.title);
     return;
   }
   const editIncomeEl = e.target.closest("[data-edit-income]");
@@ -3143,8 +3165,8 @@ document.addEventListener("click", e => {
   }
   const delAccountBtn = e.target.closest("[data-del-account]");
   if (delAccountBtn) {
-    state.financeAccounts = state.financeAccounts.filter(a => a.id !== delAccountBtn.dataset.delAccount);
-    saveData(); renderAll();
+    const a = state.financeAccounts.find(x => x.id === delAccountBtn.dataset.delAccount);
+    if (a) deleteWithUndo("financeAccounts", a.id, a.title);
     return;
   }
   const delProjectBtn = e.target.closest("[data-del-project]");
@@ -3163,9 +3185,25 @@ document.addEventListener("click", e => {
   }
   const delCategoryBtn = e.target.closest("[data-del-category]");
   if (delCategoryBtn) {
-    state.financeCategories = state.financeCategories.filter(c => c.id !== delCategoryBtn.dataset.delCategory);
-    state.financeExpenses = state.financeExpenses.filter(ex => ex.categoryId !== delCategoryBtn.dataset.delCategory);
+    // Eine Kategorie zu loeschen nahm bisher stillschweigend jede jemals darauf gebuchte Ausgabe
+    // mit — ohne Warnung und ohne Weg zurueck. Jetzt sagt die Leiste, wie viele Buchungen
+    // betroffen sind, und stellt beides gemeinsam wieder her.
+    const id = delCategoryBtn.dataset.delCategory;
+    const katIdx = state.financeCategories.findIndex(c => c.id === id);
+    if (katIdx === -1) return;
+    const [kat] = state.financeCategories.splice(katIdx, 1);
+    const buchungen = state.financeExpenses
+      .map((ex, i) => ({ ex, i }))
+      .filter(({ ex }) => ex.categoryId === id);
+    state.financeExpenses = state.financeExpenses.filter(ex => ex.categoryId !== id);
     saveData(); renderAll();
+    offerUndo(
+      `„${kat.title}" gelöscht${buchungen.length ? ` — mit ${buchungen.length} Buchung${buchungen.length === 1 ? "" : "en"}` : ""}`,
+      () => {
+        state.financeCategories.splice(Math.min(katIdx, state.financeCategories.length), 0, kat);
+        buchungen.forEach(({ ex, i }) => state.financeExpenses.splice(Math.min(i, state.financeExpenses.length), 0, ex));
+        saveData(); renderAll();
+      });
     return;
   }
   const editCategoryEl = e.target.closest("[data-edit-category]");
@@ -3176,14 +3214,17 @@ document.addEventListener("click", e => {
   }
   const delGoalBtn = e.target.closest("[data-del-goal]");
   if (delGoalBtn) {
-    state.savingsGoals = state.savingsGoals.filter(g => g.id !== delGoalBtn.dataset.delGoal);
-    saveData(); renderAll();
+    const g = state.savingsGoals.find(x => x.id === delGoalBtn.dataset.delGoal);
+    if (g) deleteWithUndo("savingsGoals", g.id, g.title);
     return;
   }
   const delExpenseBtn = e.target.closest("[data-del-expense]");
   if (delExpenseBtn) {
-    state.financeExpenses = state.financeExpenses.filter(ex => ex.id !== delExpenseBtn.dataset.delExpense);
-    saveData(); renderAll();
+    const ex = state.financeExpenses.find(x => x.id === delExpenseBtn.dataset.delExpense);
+    if (ex) {
+      const kat = state.financeCategories.find(c => c.id === ex.categoryId);
+      deleteWithUndo("financeExpenses", ex.id, `${formatEuro(ex.amount)}${kat ? " · " + kat.title : ""}`);
+    }
     return;
   }
   const addGoalAmountBtn = e.target.closest("[data-add-goal-amount]");
@@ -4299,7 +4340,8 @@ function renderFinance() {
   // ----- Letzte Ausgaben, nach Tag gruppiert -----
   const expensesWrap = document.getElementById("financeExpensesList");
   const order = new Map(state.financeExpenses.map((e, i) => [e.id, i]));
-  const recent = [...state.financeExpenses]
+  const recent = monthExpenses
+    .slice()
     .sort((a, b) => b.date.localeCompare(a.date) || order.get(b.id) - order.get(a.id))
     .slice(0, 20);
   const byDay = [];
@@ -4327,7 +4369,7 @@ function renderFinance() {
             </div>`;
           }).join("")}
         </div>`).join("")
-    : '<div class="empty-hint">Noch keine Ausgaben erfasst.</div>';
+    : `<div class="empty-hint">Noch keine Ausgaben in ${escapeHtml(financeMonthLabel())}.</div>`;
 
   // ----- Konten -----
   document.getElementById("financeAccountsList").innerHTML = state.financeAccounts.length
@@ -4361,7 +4403,7 @@ function renderFinance() {
         const pct = target ? Math.min(100, Math.round((cur / target) * 100)) : 0;
         return `<div class="fin-goal">
           <div class="fin-goal-top" data-edit-goal="${g.id}">
-            ${budgetRingHtml(cur, target, 40)}
+            ${budgetRingHtml(cur, target, 40, 0, true)}
             <div class="fin-goal-body">
               <div class="item-title">${escapeHtml(g.title)}</div>
               <div class="item-meta">${formatEuro(cur)} von ${formatEuro(target)}${g.dueDate ? " · bis " + dateFromKey(g.dueDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}</div>
@@ -4470,7 +4512,7 @@ function renderFinanceAnalysis() {
 
   const ringsWrap = document.getElementById("financeGoalsRings");
   ringsWrap.innerHTML = state.savingsGoals.length
-    ? state.savingsGoals.map(g => `<div class="finance-ring-item">${budgetRingHtml(g.current || 0, g.target || 0, 56)}<div class="r-title">${escapeHtml(g.title)}</div></div>`).join("")
+    ? state.savingsGoals.map((g, i) => `<div class="finance-ring-item">${budgetRingHtml(g.current || 0, g.target || 0, 56, i, true)}<div class="r-title">${escapeHtml(g.title)}</div></div>`).join("")
     : '<div class="empty-hint">Noch keine Sparziele.</div>';
 }
 
@@ -4658,7 +4700,7 @@ function openSavingsGoalModal(editGoal = null) {
     </div>
     <div class="field">
       <label>Zielbetrag (€)</label>
-      <input type="number" step="0.01" min="0" id="mGoalTarget" value="${isEdit ? (editGoal.target || 0) : ""}">
+      <input type="number" step="0.01" min="0.01" id="mGoalTarget" value="${isEdit ? (editGoal.target || 0) : ""}">
     </div>
     <div class="field">
       <label>Aktuell gespart (€)</label>
@@ -4683,7 +4725,10 @@ function openSavingsGoalModal(editGoal = null) {
     body.querySelector("#mSave").addEventListener("click", () => {
       const title = body.querySelector("#mGoalTitle").value.trim();
       if (!title) return;
-      const target = parseFloat(body.querySelector("#mGoalTarget").value) || 0;
+      const zielFeld = body.querySelector("#mGoalTarget");
+      const target = parseFloat(zielFeld.value) || 0;
+      // Ohne Zielbetrag gaebe es nichts zu erreichen — der Ring stuende dauerhaft auf 0 %.
+      if (target <= 0) { markiereFehlendesFeld(zielFeld, "Ohne Zielbetrag gibt es nichts zu erreichen."); return; }
       const current = parseFloat(body.querySelector("#mGoalCurrent").value) || 0;
       const dueDate = body.querySelector("#mGoalDate").value || null;
       if (isEdit) { editGoal.title = title; editGoal.target = target; editGoal.current = current; editGoal.dueDate = dueDate; }
@@ -4865,24 +4910,34 @@ function exportWeekReview() {
 
   md += `## Gewohnheiten (letzte 7 Tage)\n`;
   state.habits.forEach(h => {
-    let doneCount = 0, scheduledCount = 0;
+    let doneCount = 0, scheduledCount = 0, minimalCount = 0;
     for (let i = 0; i < 7; i++) {
       const d = new Date(start);
       d.setDate(d.getDate() + i);
       if (!isScheduledToday(h, d)) continue;
       scheduledCount++;
-      if (h.history[fmt(d)]) doneCount++;
+      const wert = h.history[fmt(d)];
+      if (wert) { doneCount++; if (wert === "minimal") minimalCount++; }
     }
     const streak = computeStreak(h);
-    md += `- **${h.title}**: ${doneCount}/${scheduledCount} Tage · Serie: ${streak}\n`;
+    // Ohne diesen Zusatz sähe eine Woche auf Minimalstufe aus wie eine ideale.
+    const minimalHinweis = minimalCount ? ` · davon ${minimalCount} auf Minimalstufe` : "";
+    md += `- **${h.title}**: ${doneCount}/${scheduledCount} Tage · Serie: ${streak}${minimalHinweis}\n`;
   });
 
   md += `\n## ToDos\n`;
   const todoTasksAll = state.tasks.filter(t => (t.source || "todo") !== "category");
-  const doneTodos = todoTasksAll.filter(t => t.done);
-  const onTimeCount = doneTodos.filter(isOnTime).length;
-  md += `- Erledigt: ${doneTodos.length}/${todoTasksAll.length}\n`;
-  md += `- Davon pünktlich: ${onTimeCount}/${doneTodos.length || 0}\n`;
+  // Vorher standen hier die Zahlen über alle Aufgaben seit Anlage der App — in einem
+  // *Wochen*rückblick eine irreführende Bezugsgroesse.
+  const inDerWoche = t => t.completedAt && localDateKey(new Date(t.completedAt)) >= fmt(start)
+                                        && localDateKey(new Date(t.completedAt)) <= fmt(end);
+  const wochenErledigt = todoTasksAll.filter(t => t.done && inDerWoche(t));
+  const onTimeCount = wochenErledigt.filter(isOnTime).length;
+  const nochOffen = todoTasksAll.filter(t => !t.done);
+  const inArbeit = nochOffen.filter(t => t.inProgress).length;
+  md += `- Diese Woche erledigt: ${wochenErledigt.length}\n`;
+  md += `- Davon pünktlich: ${onTimeCount}/${wochenErledigt.length || 0}\n`;
+  md += `- Noch offen: ${nochOffen.length}${inArbeit ? ` (davon ${inArbeit} in Arbeit)` : ""}\n`;
   todoTasksAll
     .slice()
     .sort((a, b) => (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99"))
@@ -4890,10 +4945,23 @@ function exportWeekReview() {
       md += `  - [${t.done ? "x" : (t.inProgress ? "~" : " ")}] ${t.title}${t.inProgress ? " (in Arbeit)" : ""}${t.dueDate ? " (fällig " + t.dueDate + ")" : ""}\n`;
     });
 
-  md += `\n## Zielbereiche\n`;
-  childNodes(null).forEach(node => {
-    md += `- **${node.title}**${node.priority ? " (Priorität)" : ""}: ${Math.round(nodeProgress(node) * 100)}%\n`;
-  });
+  md += `\n## Zielbereiche (Roadmap)\n`;
+  // Vorher nur die oberste Ebene ' + MID + ' die eigentliche Struktur (Themen, Pfade, Schritte)
+  // fehlte damit komplett. Jetzt der ganze Baum mit Einrueckung, inklusive der Aufgaben je Knoten.
+  const zielBaum = (parentId, tiefe, gesehen) => {
+    childNodes(parentId).forEach(node => {
+      if (gesehen.has(node.id)) return;
+      gesehen.add(node.id);
+      const einzug = "  ".repeat(tiefe);
+      const prio = node.priority ? " (Priorität)" : "";
+      md += `${einzug}- **${node.title}**${prio}: ${Math.round(nodeProgress(node) * 100)}%\n`;
+      categoryTasksForNode(node.id).forEach(t => {
+        md += `${einzug}  - [${t.done ? "x" : (t.inProgress ? "~" : " ")}] ${t.title}\n`;
+      });
+      zielBaum(node.id, tiefe + 1, gesehen);
+    });
+  };
+  zielBaum(null, 0, new Set());
 
   md += `\n## Langzeit-Auswertung (letzte ${longTermDays} Tage)\n`;
   const longTermHabitStats = state.habits
@@ -4909,6 +4977,140 @@ function exportWeekReview() {
     md += `- Schwierigster Wochentag: **${hardest.day}** (${Math.round(hardest.rate * 100)}% Erledigungsquote)\n`;
   }
 
+  // Vollstaendiger Zustand inklusive Anhangsinhalte — auf Tims ausdruecklichen Wunsch wird
+  // nichts weggelassen. Fotos an erhoerten Gebeten stecken als Base64 im State und koennen die
+  // Datei deutlich vergroessern; die Bestaetigung am Ende nennt deshalb die tatsaechliche Groesse.
+  // ---------- Klassenarbeiten ----------
+  if (state.exams.length) {
+    // ---------- Arbeitsschichten ----------
+  const kommendeSchichten = (state.workShifts || []).filter(w => !w.date || w.date >= fmt(start));
+  if (kommendeSchichten.length) {
+    md += `\n## Arbeitsschichten\n`;
+    kommendeSchichten.slice().sort((x, y) => (x.date || '').localeCompare(y.date || '')).forEach(w => {
+      md += `- ${w.date || "ohne Datum"}${w.from ? " " + w.from : ""}${w.to ? "-" + w.to : ""}${w.title ? " · " + w.title : ""}\n`;
+    });
+  }
+
+  // ---------- Analyse-Kennzahlen ----------
+  md += `\n## Kennzahlen\n`;
+  const alleErledigt = state.tasks.filter(t => t.done && t.completedAt);
+  const alleOnTime = alleErledigt.filter(isOnTime).length;
+  if (alleErledigt.length) {
+    md += `- Pünktlichkeit gesamt: ${alleOnTime}/${alleErledigt.length} (${Math.round(alleOnTime / alleErledigt.length * 100)}%)\n`;
+  }
+  const tagesProzent = dayCompletionPct(new Date());
+  md += `- Tagesroutine heute: ${tagesProzent === null ? "nichts fällig" : tagesProzent + "%"}\n`;
+  const woche7 = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const p = dayCompletionPct(d);
+    woche7.push(`${localDateKey(d)}: ${p === null ? "-" : p + "%"}`);
+  }
+  md += `- Letzte 7 Tage: ${woche7.join(" · ")}\n`;
+  md += `- Gebete: ${state.prayers.filter(x => x.status === "open").length} offen, ${state.prayers.filter(x => x.status === "fulfilled").length} erhört, ${state.prayers.filter(x => x.status === "thanked").length} gedankt\n`;
+  md += `\n## Klassenarbeiten\n`;
+    state.exams.slice().sort((x, y) => x.date.localeCompare(y.date)).forEach(ex => {
+      const fach = state.subjects.find(f => f.id === ex.subjectId);
+      md += `- ${ex.date}: **${fach ? fach.title : "Fach gelöscht"}** (${examCountdownLabel(ex.date)})\n`;
+    });
+  }
+
+  // ---------- Projekte ----------
+  md += `\n## Projekte\n`;
+  if (state.projects.length) {
+    state.projects.forEach(pr => {
+      md += `\n### ${pr.title}\n`;
+      md += (pr.notes && pr.notes.trim()) ? `${pr.notes.trim()}\n` : `_Keine Notizen._\n`;
+    });
+  } else {
+    md += `_Keine Projekte angelegt._\n`;
+  }
+
+  // ---------- Gebete ----------
+  md += `\n## Gebete\n`;
+  const gebetGruppen = [
+    ["Offene Bitten", state.prayers.filter(x => x.status === "open" && (x.type || "bitte") === "bitte"), null, null],
+    ["Offener Dank", state.prayers.filter(x => x.status === "open" && x.type === "dank"), null, null],
+    ["Erhörungen", state.prayers.filter(x => x.status === "fulfilled"), "fulfilledAt", "fulfillmentText"],
+    ["Gedankt", state.prayers.filter(x => x.status === "thanked"), "thankedAt", "thanksText"],
+    ["Nicht mehr relevant", state.prayers.filter(x => x.status === "irrelevant"), "irrelevantAt", null]
+  ];
+  gebetGruppen.forEach(([gTitel, gListe, gDatum, gText]) => {
+    if (!gListe.length) return;
+    md += `\n### ${gTitel}\n`;
+    gListe.forEach(x => {
+      const datum = gDatum && x[gDatum] ? localDateKey(new Date(x[gDatum])) + ": " : "";
+      const zusatz = gText && x[gText] ? ` · ${x[gText]}` : "";
+      const anh = (x.attachments || []).length ? ` [${x.attachments.length} Anhang]` : "";
+      md += `- ${datum}${x.title}${zusatz}${anh}\n`;
+    });
+  });
+  if (!state.prayers.length) md += `_Keine Anliegen eingetragen._\n`;
+
+  // ---------- Finanzen ----------
+  md += `\n## Finanzen\n`;
+  const fmKey = financeMonthKey();
+  const fmAusgaben = state.financeExpenses.filter(x => x.date.slice(0, 7) === fmKey);
+  const fmSumme = fmAusgaben.reduce((sum, x) => sum + x.amount, 0);
+  const fmEinkommen = totalMonthlyIncome();
+  const fmVermoegen = state.financeAccounts.reduce((sum, x) => sum + (x.balance || 0), 0);
+  md += `- Monat: ${financeMonthLabel()}\n`;
+  md += `- Einkommen: ${formatEuro(fmEinkommen)}\n`;
+  md += `- Ausgaben diesen Monat: ${formatEuro(fmSumme)} in ${fmAusgaben.length} Buchungen\n`;
+  // Ausdruecklich benannt: die Quote kennt nur die erfassten Ausgaben, nicht alle tatsaechlichen.
+  if (fmEinkommen > 0) md += `- Sparquote (bezogen auf die erfassten Ausgaben): ${Math.round((fmEinkommen - fmSumme) / fmEinkommen * 100)}%\n`;
+  md += `- Vermögen gesamt: ${formatEuro(fmVermoegen)}\n`;
+  if (state.financeAccounts.length) {
+    md += `\n### Konten\n`;
+    state.financeAccounts.forEach(k => { md += `- ${k.title}${k.isEmergencyFund ? " (Notgroschen)" : ""}: ${formatEuro(k.balance || 0)}\n`; });
+  }
+  if (state.financeCategories.length) {
+    md += `\n### Budget je Kategorie\n`;
+    state.financeCategories.forEach(c => {
+      const aus = fmAusgaben.filter(x => x.categoryId === c.id).reduce((sum, x) => sum + x.amount, 0);
+      md += `- ${c.title}: ${formatEuro(aus)}${c.limit ? " von " + formatEuro(c.limit) : " (kein Limit)"}\n`;
+    });
+  }
+  if (state.savingsGoals.length) {
+    md += `\n### Sparziele\n`;
+    state.savingsGoals.forEach(z => {
+      const proz = z.target ? " (" + Math.round((z.current || 0) / z.target * 100) + "%)" : "";
+      md += `- ${z.title}: ${formatEuro(z.current || 0)} von ${formatEuro(z.target || 0)}${proz}${z.dueDate ? " · bis " + z.dueDate : ""}\n`;
+    });
+  }
+  if (fmAusgaben.length) {
+    md += `\n### Buchungen diesen Monat\n`;
+    fmAusgaben.slice().sort((x, y) => y.date.localeCompare(x.date)).forEach(x => {
+      const c = state.financeCategories.find(k => k.id === x.categoryId);
+      md += `- ${x.date} ${formatEuro(x.amount)} · ${c ? c.title : "ohne Kategorie"}${x.note ? " · " + x.note : ""}\n`;
+    });
+  }
+
+  // ---------- Gym ----------
+  md += `\n## Gym\n`;
+  const einheiten = gymSessions().filter(gymSessionHasData);
+  const letzte30 = einheiten.filter(x => x.date >= fmt(new Date(Date.now() - 30 * 86400000)));
+  md += `- Einheiten gesamt: ${einheiten.length}\n`;
+  md += `- Davon letzte 30 Tage: ${letzte30.length}\n`;
+  if (einheiten.length) {
+    const bestJeUebung = {};
+    einheiten.forEach(sess => Object.entries(sess.entries || {}).forEach(([name, saetze]) => {
+      (saetze || []).forEach(satz => {
+        if (satz && satz.weight && (!bestJeUebung[name] || satz.weight > bestJeUebung[name].weight)) {
+          bestJeUebung[name] = { weight: satz.weight, reps: satz.reps, date: sess.date };
+        }
+      });
+    }));
+    const besten = Object.entries(bestJeUebung).sort((x, y) => y[1].weight - x[1].weight);
+    if (besten.length) {
+      md += `\n### Bestleistungen\n`;
+      besten.forEach(([name, b]) => { md += `- ${name}: ${gymNum(b.weight)} kg · ${b.reps != null ? b.reps : "?"} Wdh. (${b.date})\n`; });
+    }
+    md += `\n### Letzte Einheiten\n`;
+    einheiten.slice().sort((x, y) => y.date.localeCompare(x.date)).slice(0, 8).forEach(sess => {
+      md += `- ${sess.date} (${sess.dayKey}): Top ${gymNum(gymSessionTopWeight(sess))} kg · Volumen ${gymNum(gymSessionVolume(sess))} kg\n`;
+    });
+  }
   md += `\n## Rohdaten (vollständig, als JSON)\n`;
   md += "```json\n" + JSON.stringify(state, null, 2) + "\n```\n";
 
@@ -4923,6 +5125,8 @@ function exportWeekReview() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  const kb = Math.round(md.length / 1024);
+  showToast(`Wochenrückblick gespeichert — ${kb} KB`);
 }
 
 // ---------- Init ----------
