@@ -3105,12 +3105,11 @@ function checkMissedRoutineStreaks() {
     new Date(h.createdAt) <= y);
   if (!missed.length) { state.lastMissReminderDate = today; saveData(); return; }
 
-  const names = missed.map(h => h.title);
-  const list = names.length <= 3
-    ? names.join(", ")
-    : `${names.slice(0, 3).join(", ")} und ${names.length - 3} weitere`;
-  new Notification("Atlas – gestern liegen geblieben", {
-    body: `Gestern hast du ${list} vergessen. Heute wieder dran denken!`,
+  // Genau das, was Tim vorgegeben hat: Titel "Atlas", darunter nur die offenen Namen, durch
+  // Kommas getrennt. Kein "vergessen", kein Ausrufezeichen, kein Zusatzsatz — die Meldung
+  // erinnert, sie kommentiert nicht. Laenge regelt das Betriebssystem selbst durch Abschneiden.
+  new Notification("Atlas", {
+    body: missed.map(h => h.title).join(", "),
     tag: "atlas-miss-" + today   // ersetzt eine evtl. schon sichtbare Meldung statt zu stapeln
   });
   state.lastMissReminderDate = today;
