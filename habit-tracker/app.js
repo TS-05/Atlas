@@ -16,10 +16,10 @@ const STORAGE_KEY = "habit-tracker-data-v2";
         "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;" +
         "padding:24px;box-sizing:border-box;font-family:system-ui,sans-serif;text-align:center;";
       overlay.innerHTML =
-        '<div style="font-size:18px;font-weight:600;">Atlas konnte nicht vollständig laden</div>' +
-        '<div style="font-size:13px;opacity:0.75;max-width:320px;">Deine Daten sind wahrscheinlich noch da. Sichere sie jetzt, bevor du etwas anderes versuchst.</div>' +
-        '<button id="__rescueExportBtn" style="padding:14px 22px;border-radius:10px;border:1.5px solid #c9a94e;background:#2a2318;color:#f1e4c8;font-size:15px;font-weight:600;">Rohdaten jetzt sichern</button>' +
-        '<button id="__rescueReloadBtn" style="padding:10px 18px;border-radius:10px;border:1px solid #666;background:transparent;color:#f1e4c8;font-size:13px;">Neu laden versuchen</button>';
+        '<div style="font-size:var(--text-xl);font-weight:600;">Atlas konnte nicht vollständig laden</div>' +
+        '<div style="font-size:var(--text-sm);opacity:0.75;max-width:320px;">Deine Daten sind wahrscheinlich noch da. Sichere sie jetzt, bevor du etwas anderes versuchst.</div>' +
+        '<button id="__rescueExportBtn" style="padding:14px 22px;border-radius:10px;border:1.5px solid #c9a94e;background:#2a2318;color:#f1e4c8;font-size:var(--text-lg);font-weight:600;">Rohdaten jetzt sichern</button>' +
+        '<button id="__rescueReloadBtn" style="padding:10px 18px;border-radius:10px;border:1px solid #666;background:transparent;color:#f1e4c8;font-size:var(--text-sm);">Neu laden versuchen</button>';
       document.body.appendChild(overlay);
       document.getElementById("__rescueExportBtn").addEventListener("click", () => {
         try {
@@ -1677,7 +1677,7 @@ function levelSwitchHtml(habit, dateKey) {
             role="switch" aria-checked="${level === "minimal"}"
             aria-label="${habit.title}: ${level === "minimal" ? "Minimalstufe aktiv, auf Ideal stellen" : "Idealstufe aktiv, auf Minimal stellen"}">
       <span class="level-switch" data-level="${level}"><span class="level-knob"></span></span>
-      <span class="level-switch-label">${level === "minimal" ? "Minimal" : "Ideal"}</span>
+      <span class="level-switch-label">${level === "minimal" ? "Minimal" : ""}</span>
     </button>`;
 }
 
@@ -1769,9 +1769,20 @@ function renderTaskItem(t) {
   const isLernfeld = t.source === "category" && t.learnType;
   const lerntyp = isLernfeld ? lerntypById(t.learnType) : null;
   const effort = effortLevelInfo(t.size);
-  const metaParts = isLernfeld ? [] : [`${effort.level} · ${effort.label}`];
-  if (t.dueDate) metaParts.push("fällig " + t.dueDate + (t.dueTime ? " " + t.dueTime : ""));
-  if (node && !isLernfeld) metaParts.push(node.title);
+  // Die Aufwandsstufe stand vorher als nackte Zahl vor ihrem eigenen Namen ("2 · Kurzaufgabe") —
+  // die Zahl trägt nichts, was das Wort nicht schon sagt.
+  const metaParts = isLernfeld ? [] : [escapeHtml(effort.label)];
+  if (t.dueDate) {
+    const faellig = "fällig " + formatDatumKurz(t.dueDate) + (t.dueTime ? ", " + t.dueTime : "");
+    // Überfällig färbt das Datum selbst, statt daneben einen zweiten roten Chip zu stellen: der
+    // war das breiteste Element der Zeile und stand bei fast jeder Aufgabe — als Warnung damit
+    // wertlos, und er wiederholte nur, was das Datum schon sagt.
+    metaParts.push(overdue
+      ? `<span class="meta-overdue">${escapeHtml(faellig)} · überfällig</span>`
+      : escapeHtml(faellig));
+  }
+  if (!isLernfeld && t.priority >= 3) metaParts.push(`<span class="meta-prio">Priorität: ${PRIORITAETS_WORT[t.priority]}</span>`);
+  if (node && !isLernfeld) metaParts.push(escapeHtml(node.title));
   const dueToday = t.dueDate === today;
   const status = taskStatus(t);
   const expanded = expandedTaskIds.has(t.id);
@@ -1791,10 +1802,8 @@ function renderTaskItem(t) {
       ${isLernfeld ? `<span style="color:var(--color-accent-400); flex-shrink:0;" title="${escapeHtml(lerntyp.label)}">${lerntyp.icon}</span>` : ""}
       <div style="flex:1; min-width:0;">
         ${titleHtml}
-        <div class="item-meta">${status === "inArbeit" ? '<span class="meta-progress">In Arbeit</span> · ' : ""}${escapeHtml((isLernfeld ? [lerntyp.label, ...metaParts] : metaParts).join(" · "))}</div>
+        <div class="item-meta">${status === "inArbeit" ? '<span class="meta-progress">In Arbeit</span> · ' : ""}${(isLernfeld ? [escapeHtml(lerntyp.label), ...metaParts] : metaParts).join(" · ")}</div>
       </div>
-      ${!isLernfeld && t.priority > 0 ? `<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">P${t.priority}</span>` : ""}
-      ${overdue ? '<span class="atlas-chip chip-overdue">ÜBERFÄLLIG</span>' : ""}
       <button class="btn btn-icon btn-ghost" data-del-task="${t.id}" aria-label="Löschen"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke="var(--color-neutral-500)" stroke-width="1.4" stroke-linecap="round"/></svg></button>
     </div>
     ${!isLernfeld && expanded ? `
@@ -1803,8 +1812,8 @@ function renderTaskItem(t) {
       <textarea data-task-notes="${t.id}" rows="3" placeholder="Details, Kontext, nächste Schritte…">${escapeHtml(t.notes || "")}</textarea>
       <div class="task-expand-meta">
         <span>Aufwand: ${effort.level} · ${escapeHtml(effort.label)} (${escapeHtml(effort.time)})</span>
-        ${t.dueDate ? `<span>Fällig: ${t.dueDate}${t.dueTime ? " · " + t.dueTime : ""}</span>` : ""}
-        ${t.priority > 0 ? `<span>Priorität: ${t.priority}</span>` : ""}
+        ${t.dueDate ? `<span>Fällig: ${formatDatumKurz(t.dueDate)}${t.dueTime ? " · " + t.dueTime : ""}</span>` : ""}
+        ${t.priority > 0 ? `<span>Priorität: ${PRIORITAETS_WORT[t.priority] || t.priority}</span>` : ""}
         ${node ? `<span>Zielbereich: ${escapeHtml(node.title)}</span>` : ""}
       </div>
     </div>` : ""}
@@ -1957,7 +1966,7 @@ function renderWeekCircle() {
     <div style="display:flex; justify-content:center; margin-bottom:30px;">
       <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
         ${nichtsGeplant ? goldRingHtml(0, 200, todayIdx, 34).replace(">0%<", ">–<") : goldRingHtml(pct, 200, todayIdx, 34)}
-        <span style="font-size:11px; font-family:var(--font-heading); color:var(--color-accent-300);">${WEEKDAY_LABELS[todayIdx]}</span>
+        <span style="font-size:var(--text-2xs); font-family:var(--font-heading); color:var(--color-accent-300);">${WEEKDAY_LABELS[todayIdx]}</span>
       </div>
     </div>
   `;
@@ -2001,6 +2010,23 @@ function learningRoutineHabit(habits) {
     return node && node.title === "Schule";
   }) || null;
 }
+
+// Ein Datum, eine Schreibweise. Vorher standen auf dem ToDo-Bildschirm gleichzeitig
+// "Montag, 31. August 2026" (Kopfzeile), "Montag 27.7.2026" (Gruppe) und "fällig 2026-07-21"
+// (Zeile) — die letzte ist Maschinenformat und liest sich auch so. Das Jahr steht nur, wenn es
+// nicht das laufende ist.
+function formatDatumKurz(key) {
+  const d = dateFromKey(key);
+  const gleichesJahr = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString("de-DE", gleichesJahr
+    ? { day: "numeric", month: "long" }
+    : { day: "numeric", month: "long", year: "numeric" });
+}
+
+// "P4" sagt nicht, ob 4 viel oder wenig ist — je nach System ist mal 1 und mal 5 das Dringendste.
+// In der Zeile steht deshalb ein Wort, und nur dort, wo es etwas heißt: niedrige Prioritäten
+// sind der Normalfall und stehen weiterhin in der aufgeklappten Ansicht.
+const PRIORITAETS_WORT = { 3: "Mittel", 4: "Hoch", 5: "Höchste" };
 
 function dateFromKey(key) {
   return new Date(key + "T00:00:00");
@@ -2276,7 +2302,7 @@ function renderRoutineChain() {
         noteHtml = `<div class="routine-step-note">Ganztägig lernen für <strong>${escapeHtml(override.subject.title)}</strong> — Klassenarbeit am ${override.date}</div>`;
       } else {
         const subj = subjectOfDay(now);
-        noteHtml = `<div class="routine-step-note">Heutiges Hauptfach: <strong>${subj ? escapeHtml(subj.title) : "–"}</strong>${quickAddVisible ? ' <button class="btn btn-ghost" style="font-size:11px; padding:0 4px; height:auto;" data-change-subject="1">ändern</button>' : ""}</div>`;
+        noteHtml = `<div class="routine-step-note">Heutiges Hauptfach: <strong>${subj ? escapeHtml(subj.title) : "–"}</strong>${quickAddVisible ? ' <button class="btn btn-ghost" style="font-size:var(--text-2xs); padding:0 4px; height:auto;" data-change-subject="1">ändern</button>' : ""}</div>`;
       }
     }
 
@@ -2296,8 +2322,14 @@ function renderRoutineChain() {
     const levelPoints = habitLevelOn(h, today) === "minimal" ? fullPoints * HABIT_MINIMAL_FACTOR : fullPoints;
     // Bewusst ohne Serie: die gehoert in die Auswertung, nicht zwischen die Punkte, die man
     // gerade abhakt — dort ist sie Druck statt Information.
-    const pointsHtml = `<div class="item-meta">${formatPoints(levelPoints)} Punkt${levelPoints === 1 ? "" : "e"}${
-      levelPoints !== fullPoints ? ` <span style="color:var(--color-neutral-600);">statt ${formatPoints(fullPoints)}</span>` : ""}</div>`;
+    // Die Punktzahl steht nur da, wenn sie etwas sagt: bei genau einem Punkt auf voller Stufe ist
+    // sie in jeder Zeile dieselbe Angabe und damit reine Wiederholung — elfmal "1 Punkt"
+    // untereinander trägt nichts und kostet je eine Zeile Höhe. Abweichungen (mehr Punkte oder
+    // abgesenkte Stufe) stehen weiterhin.
+    const pointsHtml = (levelPoints === 1 && fullPoints === 1)
+      ? ""
+      : `<div class="item-meta">${formatPoints(levelPoints)} Punkt${levelPoints === 1 ? "" : "e"}${
+        levelPoints !== fullPoints ? ` <span style="color:var(--color-text-muted);">statt ${formatPoints(fullPoints)}</span>` : ""}</div>`;
 
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
@@ -2364,7 +2396,14 @@ function renderOtherHabits() {
       <button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" aria-label="${escapeHtml(shownTitle)}: ${doneToday ? "erledigt, zum Zurücknehmen antippen" : "offen, zum Abhaken antippen"}">${doneToday ? splatSvg(h.id) : ""}</button>
       <div style="flex:1; min-width:0;">
         ${titleHtml}
-        <div class="item-meta">${frequencyLabel(h)} · ${formatPoints(habitLevelOn(h, today) === "minimal" ? (h.points ?? 1) * HABIT_MINIMAL_FACTOR : (h.points ?? 1))} Punkt${(habitLevelOn(h, today) === "minimal" ? (h.points ?? 1) * HABIT_MINIMAL_FACTOR : (h.points ?? 1)) === 1 ? "" : "e"}</div>
+        <div class="item-meta">${frequencyLabel(h)}${(() => {
+          // Punktzahl nur bei Abweichung — siehe Tagesroutine: "· 1 Punkt" hinter jeder Zeile ist
+          // dieselbe Angabe elfmal untereinander.
+          const voll = h.points ?? 1;
+          const stufe = habitLevelOn(h, today) === "minimal" ? voll * HABIT_MINIMAL_FACTOR : voll;
+          if (stufe === 1 && voll === 1) return "";
+          return ` · ${formatPoints(stufe)} Punkt${stufe === 1 ? "" : "e"}`;
+        })()}</div>
       </div>
       ${priority ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">Priorität</span>' : ""}
       ${levelSwitchHtml(h, today)}
@@ -2661,7 +2700,7 @@ function renderRoadmapPath(nodeId) {
   ).join(' <span>&rsaquo;</span> ');
   wrap.innerHTML = `
     <div class="roadmap-crumb"><button data-roadmap-crumb-home>Roadmap</button> <span>&rsaquo;</span> ${crumbHtml}</div>
-    <div class="card-title" style="font-size:19px; margin-bottom:8px;">${escapeHtml(node.title)}</div>
+    <div class="card-title" style="font-size:var(--text-xl); margin-bottom:8px;">${escapeHtml(node.title)}</div>
     <div class="roadmap-progress-row">
       <div class="roadmap-progress-outer"><div class="roadmap-progress-inner" style="width:${pct}%"></div></div>
       <div class="roadmap-progress-label">${doneCount} / ${steps.length} Schritte</div>
@@ -2784,7 +2823,7 @@ function renderTaskAnalysis() {
   const maxMin = Math.max(1, ...jeStufe.map(x => x.minuten));
   const verteilung = jeStufe.length
     ? `<div class="panel-card" style="margin-top:12px;">
-         <div class="text-muted" style="font-size:11.5px; margin-bottom:8px;">Aufwand der letzten 30 Tage nach Stufe \u00b7 gesch\u00e4tzt aus der gew\u00e4hlten Aufwandsstufe</div>
+         <div class="text-muted" style="font-size:var(--text-xs); margin-bottom:8px;">Aufwand der letzten 30 Tage nach Stufe \u00b7 gesch\u00e4tzt aus der gew\u00e4hlten Aufwandsstufe</div>
          ${jeStufe.map(x => `
            <div class="aufwand-zeile">
              <span class="aufwand-name">${escapeHtml(x.e.label)}</span>
@@ -2797,7 +2836,7 @@ function renderTaskAnalysis() {
   const offen = todos.filter(t => !t.done);
   const offeneMinuten = offen.reduce((sum, t) => sum + taskMinutes(t), 0);
   const ausblick = offen.length
-    ? `<p class="text-muted" style="font-size:12.5px; margin:12px 0 0;">Noch offen: <b>${offen.length}</b> ${offen.length === 1 ? "Aufgabe" : "Aufgaben"}, gesch\u00e4tzt <b>${formatAufwand(offeneMinuten)}</b> Arbeit.</p>`
+    ? `<p class="text-muted" style="font-size:var(--text-sm); margin:12px 0 0;">Noch offen: <b>${offen.length}</b> ${offen.length === 1 ? "Aufgabe" : "Aufgaben"}, gesch\u00e4tzt <b>${formatAufwand(offeneMinuten)}</b> Arbeit.</p>`
     : "";
 
   wrap.innerHTML = erledigt.length || offen.length
@@ -3021,13 +3060,13 @@ function openDaySheet(dateKey) {
   const levelLabel = pct === null ? "Keine Gewohnheiten an diesem Tag fällig." : `${pct}% der Aufgaben erledigt`;
   openModal(`
     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-      <h2 style="font-size:21px; margin:0;">${weekday}, ${dateLabel}</h2>
+      <h2 style="font-size:var(--text-2xl); margin:0;">${weekday}, ${dateLabel}</h2>
       <button class="btn btn-icon btn-secondary" id="mCloseSheet" aria-label="Schließen">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="var(--color-text)" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
     </div>
-    <div class="metal-gold" style="font-size:15px; font-family:var(--font-heading); margin-top:10px;">${levelLabel}</div>
-    <p class="text-muted" style="font-size:12px; margin:8px 0 12px;">Tippe eine Gewohnheit an, um sie für diesen Tag nachzutragen oder zu korrigieren.</p>
+    <div class="metal-gold" style="font-size:var(--text-lg); font-family:var(--font-heading); margin-top:10px;">${levelLabel}</div>
+    <p class="text-muted" style="font-size:var(--text-xs); margin:8px 0 12px;">Tippe eine Gewohnheit an, um sie für diesen Tag nachzutragen oder zu korrigieren.</p>
     <div style="display:flex; flex-direction:column; gap:8px;">${renderDaySheetHabits(d)}</div>
   `, body => { body.querySelector("#mCloseSheet").addEventListener("click", closeModal); }, "sheet");
 }
@@ -4308,7 +4347,13 @@ function openProjectModal(editProject = null) {
     });
   });
 }
-document.getElementById("addProjectBtn").addEventListener("click", openProjectModal);
+// Der dauerhaft sichtbare "+ Projekt hinzufügen"-Knopf ist weg: auf Projekte loest das Plus in
+// der Kopfzeile dieselbe Aktion aus, und zwei verschieden gestaltete Einstiege 400 px auseinander
+// fuer dieselbe Sache waren einer zu viel. Angelegt wird ueber die Kopfzeile oder, solange noch
+// nichts da ist, ueber den Knopf im Leerzustand (Ereignis-Delegation, weil der neu gerendert wird).
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-leer-projekt]")) openProjectModal();
+});
 document.getElementById("addExpenseBtn").addEventListener("click", () => openExpenseModal());
 document.getElementById("addCategoryBtn").addEventListener("click", () => openCategoryModal());
 document.getElementById("addSavingsGoalBtn").addEventListener("click", () => openSavingsGoalModal());
@@ -4341,7 +4386,7 @@ document.getElementById("importReviewBtn").addEventListener("click", () => openI
 function openImportReviewModal() {
   openModal(`
     <h3>Wochenrückblick importieren</h3>
-    <p class="text-muted" style="font-size:12.5px; margin-bottom:10px;">Kompletten Inhalt einer heruntergeladenen Wochenrückblick-Datei (.md) hier einfügen. Fehlende Aufgaben werden ergänzt — nichts Bestehendes wird verändert oder dupliziert.</p>
+    <p class="text-muted" style="font-size:var(--text-sm); margin-bottom:10px;">Kompletten Inhalt einer heruntergeladenen Wochenrückblick-Datei (.md) hier einfügen. Fehlende Aufgaben werden ergänzt — nichts Bestehendes wird verändert oder dupliziert.</p>
     <div class="field">
       <textarea id="mImportText" class="input" style="min-height:180px;" placeholder="Inhalt der .md-Datei hier einfügen …"></textarea>
     </div>
@@ -4417,11 +4462,11 @@ function openTaskModal(defaultNodeId, source = "todo") {
     <div class="field">
       <label>Priorität (0 = keine, 5 = höchste)</label>
       <select id="mTaskPriority">
-        <option value="0">0 – keine</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
+        <option value="0">keine</option>
+        <option value="1">1 – sehr niedrig</option>
+        <option value="2">2 – niedrig</option>
+        <option value="3">3 – mittel</option>
+        <option value="4">4 – hoch</option>
         <option value="5">5 – höchste</option>
       </select>
     </div>
@@ -4986,7 +5031,7 @@ function renderFinance() {
 function openAddGoalAmountModal(goal) {
   openModal(`
     <h3>Betrag zu "${escapeHtml(goal.title)}" hinzufügen</h3>
-    <p class="text-muted" style="font-size:12.5px; margin-bottom:10px;">Aktuell gespart: ${formatEuro(goal.current || 0)} von ${formatEuro(goal.target || 0)}</p>
+    <p class="text-muted" style="font-size:var(--text-sm); margin-bottom:10px;">Aktuell gespart: ${formatEuro(goal.current || 0)} von ${formatEuro(goal.target || 0)}</p>
     <div class="field">
       <label>Betrag (€)</label>
       <input type="number" step="0.01" id="mGoalAddAmount" placeholder="z.B. 50" autofocus>
@@ -5140,7 +5185,10 @@ function renderProjekte() {
           <textarea class="input project-notes" data-project-notes="${p.id}" placeholder="Notizen, Gedanken, Zwischenstand …">${escapeHtml(p.notes || "")}</textarea>
         </div>
       `).join("")
-    : '<div class="empty-hint">Noch keine Projekte angelegt.</div>';
+    : `<div class="leerzustand">
+        <p class="leerzustand-text">Noch kein Projekt angelegt. Ein Projekt ist ein Feld für ein Vorhaben — Notizen, Gedanken, Zwischenstand.</p>
+        <button class="btn btn-primary" data-leer-projekt="1">Erstes Projekt anlegen</button>
+      </div>`;
 }
 
 function openAccountModal(editAccount = null) {
@@ -5736,7 +5784,18 @@ function globusLaden() {
   if (globusGeladen) return;
   globusGeladen = true;
   const mv = document.getElementById("globeModel");
-  if (mv && mv.dataset.src) mv.setAttribute("src", mv.dataset.src);
+  if (!mv) return;
+  // Reduzierte Bewegung: die Dauerrotation ist der einzige Effekt der App, den CSS nicht
+  // abschalten kann -- model-viewer dreht selbst. Also das Attribut wegnehmen und auf spaetere
+  // Aenderungen der Systemeinstellung hoeren.
+  const ruhig = matchMedia("(prefers-reduced-motion: reduce)");
+  const rotationSetzen = () => {
+    if (ruhig.matches) mv.removeAttribute("auto-rotate");
+    else mv.setAttribute("auto-rotate", "");
+  };
+  rotationSetzen();
+  ruhig.addEventListener("change", rotationSetzen);
+  if (mv.dataset.src) mv.setAttribute("src", mv.dataset.src);
 }
 
 // Ladebildschirm: endet, sobald die Seite wirklich geladen ist -- vorher lief er als feste
