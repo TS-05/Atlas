@@ -5873,14 +5873,21 @@ if (splashEl) {
     if (ring) ring.classList.remove("has-hole");
   }
   function placeAtSlot(slot) {
+    // WICHTIG: die Ruheverankerung aufheben. Die Klasse "at-home" ueberschreibt left/top/bottom
+    // und transform per CSS; bleibt sie stehen, ignoriert die Blase jede --hx/--hy-Angabe und
+    // klebt unten fest, waehrend der Code sie laengst am Ring waehnt.
+    if (ringHandle) ringHandle.classList.remove("at-home");
     const c = centerOf(slot.btn);
     // Dehnung soll entlang der Ringbahn wirken -> Tangente steht senkrecht auf dem Radius.
     setHandlePos(c.x, c.y, slot.angle + 90);
   }
   function placeAtHome() {
+    // Die Position kommt im Ruhezustand aus dem CSS (.ring-handle.at-home); hier nur noch die
+    // Verankerung sicherstellen, damit Scrollen und die iOS-Adressleiste sie nicht verschieben.
+    if (ringHandle) ringHandle.classList.add("at-home");
     if (!homeAnchor) return;
     const c = centerOf(homeAnchor);
-    setHandlePos(c.x, c.y, 90);   // Bewegung nach unten -> Dehnung vertikal
+    setHandlePos(c.x, c.y, 90);   // Rueckfall, falls das CSS nicht greift
   }
 
   // Kuerzester Winkelabstand auf dem Kreis (beruecksichtigt den Sprung bei 360/0 Grad).
@@ -5919,7 +5926,15 @@ if (splashEl) {
     // Im Ruhezustand per CSS unten mittig verankern statt in einmalig berechneten Pixeln:
     // die alten --hx/--hy blieben beim Scrollen und beim Ein-/Ausklappen der iOS-Adressleiste
     // stehen, wodurch die Blase mitten ueber den Inhalt rutschte.
-    ringHandle.classList.add("at-home");
+    // Der Wechsel auf die CSS-Verankerung aendert die transform-Formel. Liesse man das ueber die
+    // 0,42-s-Transition laufen, bliebe die Blase bei jeder Unterbrechung irgendwo auf halbem Weg
+    // stehen — genau das Herumspringen, das aufgefallen ist. Deshalb hart setzen und die
+    // Uebergaenge erst im naechsten Bild wieder zulassen; die fluessige Anmutung tragen weiterhin
+    // is-liquid und is-tap (Deckkraft und Skalierung).
+    ringHandle.classList.add("no-anim", "at-home");
+    const uebergaengeWiederZulassen = () => ringHandle.classList.remove("no-anim");
+    requestAnimationFrame(() => requestAnimationFrame(uebergaengeWiederZulassen));
+    setTimeout(uebergaengeWiederZulassen, 120);   // Netz, falls kein Bild gezeichnet wird
     ringHandle.classList.add("is-liquid", "is-tap");
     clearTimeout(tapTimer); clearTimeout(liquidTimer);
     tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 260);
