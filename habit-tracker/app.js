@@ -313,16 +313,62 @@ function attachSeminararbeitTasks(data, byTitle) {
   mk("Prüfungsgespräch ablegen — Ziel erreicht", verteidigung, false, "2027-01-25");
 }
 
+// Laesst sich der gespeicherte Stand nicht lesen, wurde frueher kommentarlos auf Beispieldaten
+// zurueckgefallen — und der Start schrieb diese sofort ueber den beschaedigten Originaltext.
+// Damit war der einzige Rest, aus dem sich von Hand noch etwas haette retten lassen, endgueltig
+// weg. Jetzt wird der Rohtext unter einem eigenen Schluessel gesichert, der Fehler sichtbar
+// gemeldet, und automatisches Speichern bleibt in dieser Sitzung gesperrt, damit nichts
+// nachtraeglich ueberschrieben wird.
+let ladeFehlerRohtext = null;
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
-    try { return JSON.parse(raw); } catch (e) { /* fall through */ }
+    try { return JSON.parse(raw); } catch (e) {
+      ladeFehlerRohtext = raw;
+      const sicherung = STORAGE_KEY + "-defekt-" + Date.now();
+      try { localStorage.setItem(sicherung, raw); } catch (e2) { /* Platz reicht nicht — dann bleibt nur der Original-Schluessel */ }
+      speichernGesperrt = true;
+      // Erst nach dem Laden der Oberflaeche melden, sonst gibt es noch kein Ziel dafuer.
+      setTimeout(() => {
+        alert("Der gespeicherte Stand konnte nicht gelesen werden.\n\n"
+          + "Er wurde unter \"" + sicherung + "\" gesichert und NICHT ueberschrieben. "
+          + "Atlas zeigt bis zum Neustart nur Beispieldaten und speichert nichts.\n\n"
+          + "Zum Wiederherstellen den letzten Wochenrueckblick importieren oder den gesicherten "
+          + "Eintrag pruefen lassen.");
+      }, 400);
+      return seedData();
+    }
   }
   return seedData();
 }
 
+// Schlaegt das Schreiben fehl (auf iOS bekommt eine PWA rund 5 MB, und Foto-Anhaenge an Gebeten
+// liegen als Base64 im selben Eintrag), lief das frueher als stille Ausnahme ins Leere: die
+// Oberflaeche sah weiter richtig aus, geschrieben wurde ab da nichts mehr, und beim naechsten
+// Start war alles seit dem Fehler verloren. Jetzt wird es sichtbar gemeldet — einmal, damit die
+// Meldung bei jedem Tastendruck nicht zur Dauerbeschallung wird.
+let speicherFehlerGemeldet = false;
+// Wird gesetzt, wenn der Start einen unlesbaren Stand vorgefunden hat: dann darf nichts mehr
+// geschrieben werden, sonst ueberschreiben die Beispieldaten die Sicherung.
+let speichernGesperrt = false;
 function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (speichernGesperrt) return false;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    speicherFehlerGemeldet = false;
+    return true;
+  } catch (e) {
+    if (!speicherFehlerGemeldet) {
+      speicherFehlerGemeldet = true;
+      const voll = e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014);
+      // showToast existiert erst weiter unten; beim allerersten Laden faellt es auf alert zurueck.
+      const text = voll
+        ? "Speicher voll \u2014 nichts wurde gesichert. Exportiere den Wochenr\u00fcckblick und entferne gro\u00dfe Anh\u00e4nge."
+        : "Speichern fehlgeschlagen \u2014 nichts wurde gesichert.";
+      if (typeof showToast === "function") showToast(text); else alert(text);
+    }
+    return false;
+  }
 }
 
 function uid() {
@@ -1202,6 +1248,7 @@ function renderTabIndicator(idx, dropPhase) {
 }
 
 function switchTab(tabName) {
+  hideUndoBar();   // sonst schwebt sie ueber einem Tab, in dem das Geloeschte gar nicht sichtbar war
   const idx = TAB_ORDER.indexOf(tabName);
   tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === tabName));
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
@@ -1350,6 +1397,9 @@ document.getElementById("headerPlusBtn").addEventListener("click", () => {
   } else if (tab === "gebete") {
     quickAddVisible = !quickAddVisible;
     updateHeaderPlusButton();
+    // Ohne Neurendern blieben die Ziehgriffe der Gebetszeilen unsichtbar — sie haengen an
+    // quickAddVisible und entstehen nur beim Rendern. Das Umsortieren war dadurch praktisch tot.
+    renderAll();
     if (quickAddVisible) document.getElementById("prayerInput").focus();
   } else if (tab === "analyse") {
     exportWeekReview();
@@ -3261,13 +3311,37 @@ function deleteWithUndo(listName, id, label) {
 function showToast(text) {
   const bar = document.getElementById("undoBar");
   if (!bar) return;
-  undoAction = null;
+  // Laeuft gerade ein Rueckgaengig-Angebot, darf eine blosse Bestaetigung es nicht verdraengen —
+  // sonst ist die eben geloeschte Aufgabe endgueltig weg, weil zufaellig ein Export lief.
+  if (undoAction) return;
   document.getElementById("undoText").textContent = text;
   document.getElementById("undoBtn").hidden = true;
   bar.hidden = false;
   bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = "";
   if (undoTimer) clearTimeout(undoTimer);
   undoTimer = setTimeout(hideUndoBar, 4000);
+}
+
+// Eine Kategorie zu loeschen nimmt jede jemals darauf gebuchte Ausgabe mit. Frueher geschah das
+// stillschweigend, und der zweite Weg dorthin (Kategorie antippen → Dialog → Loeschen) umging
+// selbst nach dem ersten Fix noch das Rueckgaengig — obwohl dort "Loeschen" und "Speichern"
+// nebeneinander stehen und ein Fehlgriff besonders naheliegt.
+function loescheKategorieMitUndo(id) {
+  const katIdx = state.financeCategories.findIndex(c => c.id === id);
+  if (katIdx === -1) return;
+  const [kat] = state.financeCategories.splice(katIdx, 1);
+  const buchungen = state.financeExpenses
+    .map((ex, i) => ({ ex, i }))
+    .filter(({ ex }) => ex.categoryId === id);
+  state.financeExpenses = state.financeExpenses.filter(ex => ex.categoryId !== id);
+  saveData(); renderAll();
+  offerUndo(
+    `\u201e${kat.title}\u201c gel\u00f6scht${buchungen.length ? ` \u2014 mit ${buchungen.length} Buchung${buchungen.length === 1 ? "" : "en"}` : ""}`,
+    () => {
+      state.financeCategories.splice(Math.min(katIdx, state.financeCategories.length), 0, kat);
+      buchungen.forEach(({ ex, i }) => state.financeExpenses.splice(Math.min(i, state.financeExpenses.length), 0, ex));
+      saveData(); renderAll();
+    });
 }
 
 document.getElementById("undoBtn")?.addEventListener("click", () => {
@@ -3307,9 +3381,8 @@ function toggleTaskDone(id) {
 // verworfen, falls in der Zwischenzeit ein "dblclick" auf derselben Zeile eintrifft.
 // Frueher wartete jeder Einzelklick 280 ms auf einen moeglichen Doppelklick — bei jedem Tippen auf
 // eine Zeile, ohne jede Rueckmeldung in der Zwischenzeit. Das war der Hauptgrund, warum sich die
-// Liste traege anfuehlte. Jetzt klappt die Zeile sofort auf; trifft danach doch ein Doppelklick
-// ein, wird das Aufklappen zurueckgenommen und stattdessen abgehakt.
-let lastExpandedByClick = null;
+// Liste traege anfuehlte. Jetzt klappt die Zeile sofort auf; die beiden Klicks eines Doppelklicks
+// heben sich dabei gegenseitig auf, sodass am Ende nur das Abhaken uebrig bleibt.
 
 document.addEventListener("dblclick", e => {
   // Gewohnheits-Zeilen (Tagesroutine und weitere Gewohnheiten) lassen sich per Doppeltipp auf die
@@ -3335,11 +3408,10 @@ document.addEventListener("dblclick", e => {
   const taskRow = e.target.closest("[data-task-row]");
   if (!taskRow || e.target.closest("[data-del-task]") || e.target.closest("[data-task]")) return;
   const id = taskRow.dataset.taskRow;
-  // Das Aufklappen des ersten Klicks zuruecknehmen, damit der Doppelklick nur abhakt.
-  if (lastExpandedByClick && lastExpandedByClick.id === id) {
-    if (lastExpandedByClick.warOffen) expandedTaskIds.add(id); else expandedTaskIds.delete(id);
-    lastExpandedByClick = null;
-  }
+  // Bewusst KEINE Ruecknahme: ein Doppelklick liefert zwei click-Ereignisse, die den Aufklapp-
+  // Zustand bereits zweimal umschalten und damit von selbst wiederherstellen. Die frueher hier
+  // stehende "Ruecknahme" war ein dritter Umschaltvorgang und kehrte den Zustand jedes Mal um —
+  // beim Abhaken klappte dadurch die Detailansicht auf.
   toggleTaskDone(id);
 });
 
@@ -3355,9 +3427,7 @@ document.addEventListener("click", e => {
   const taskRow = e.target.closest("[data-task-row]");
   if (taskRow && !e.target.closest("[data-del-task]")) {
     const id = taskRow.dataset.taskRow;
-    const warOffen = expandedTaskIds.has(id);
-    if (warOffen) expandedTaskIds.delete(id); else expandedTaskIds.add(id);
-    lastExpandedByClick = { id, warOffen };
+    if (expandedTaskIds.has(id)) expandedTaskIds.delete(id); else expandedTaskIds.add(id);
     renderTodo();   // nur die Liste, nicht die ganze App
     return;
   }
@@ -3383,6 +3453,7 @@ document.addEventListener("click", e => {
   const habitCheck = e.target.closest("[data-habit]");
   if (habitCheck) {
     const habit = state.habits.find(h => h.id === habitCheck.dataset.habit);
+    if (!habit) return;   // veraltetes DOM (z. B. offenes Tagesblatt) darf nicht die App abschiessen
     const key = habitCheck.dataset.date || todayStr();
     if (habit.history[key]) delete habit.history[key];
     // Abgehakt wird immer auf der Stufe, auf der der Regler gerade steht.
@@ -3509,28 +3580,7 @@ document.addEventListener("click", e => {
     return;
   }
   const delCategoryBtn = e.target.closest("[data-del-category]");
-  if (delCategoryBtn) {
-    // Eine Kategorie zu loeschen nahm bisher stillschweigend jede jemals darauf gebuchte Ausgabe
-    // mit — ohne Warnung und ohne Weg zurueck. Jetzt sagt die Leiste, wie viele Buchungen
-    // betroffen sind, und stellt beides gemeinsam wieder her.
-    const id = delCategoryBtn.dataset.delCategory;
-    const katIdx = state.financeCategories.findIndex(c => c.id === id);
-    if (katIdx === -1) return;
-    const [kat] = state.financeCategories.splice(katIdx, 1);
-    const buchungen = state.financeExpenses
-      .map((ex, i) => ({ ex, i }))
-      .filter(({ ex }) => ex.categoryId === id);
-    state.financeExpenses = state.financeExpenses.filter(ex => ex.categoryId !== id);
-    saveData(); renderAll();
-    offerUndo(
-      `„${kat.title}" gelöscht${buchungen.length ? ` — mit ${buchungen.length} Buchung${buchungen.length === 1 ? "" : "en"}` : ""}`,
-      () => {
-        state.financeCategories.splice(Math.min(katIdx, state.financeCategories.length), 0, kat);
-        buchungen.forEach(({ ex, i }) => state.financeExpenses.splice(Math.min(i, state.financeExpenses.length), 0, ex));
-        saveData(); renderAll();
-      });
-    return;
-  }
+  if (delCategoryBtn) { loescheKategorieMitUndo(delCategoryBtn.dataset.delCategory); return; }
   const editCategoryEl = e.target.closest("[data-edit-category]");
   if (editCategoryEl) {
     const category = state.financeCategories.find(c => c.id === editCategoryEl.dataset.editCategory);
@@ -3588,8 +3638,20 @@ document.addEventListener("click", e => {
   const irrelevantBtn = e.target.closest("[data-prayer-irrelevant]");
   if (irrelevantBtn) {
     const prayer = state.prayers.find(p => p.id === irrelevantBtn.dataset.prayerIrrelevant);
-    if (prayer) { prayer.status = "irrelevant"; prayer.irrelevantAt = new Date().toISOString(); }
-    saveData(); renderAll();
+    // Der Knopf sitzt 26 px neben dem Haken; ein Fehlgriff war bisher endgueltig, weil die Liste
+    // "Nicht mehr relevant" keinen Weg zurueck anbot.
+    if (prayer) {
+      prayer.status = "irrelevant";
+      prayer.irrelevantAt = new Date().toISOString();
+      saveData();
+      renderAll();
+      offerUndo(`\u201e${prayer.title}\u201c abgelegt`, () => {
+        prayer.status = "open";
+        delete prayer.irrelevantAt;
+        saveData(); renderAll();
+      });
+    }
+    return;
   }
   const heatmapCell = e.target.closest(".heatmap-cell");
   if (heatmapCell) {
@@ -4038,7 +4100,10 @@ document.addEventListener("input", e => {
   if (wEl) satz.weight = (val != null && !isNaN(val)) ? val : null;
   else satz.reps = (val != null && !isNaN(val)) ? val : null;
   const istVollstaendig = satz.weight != null && satz.reps != null;
-  saveData();
+  // Entprellt statt bei jedem Zeichen: mit Foto-Anhaengen im Zustand bedeutete jeder Tastendruck
+  // mehrere Megabyte Serialisierung, mitten im Training. Verstecken/Verlassen der Seite schreibt
+  // ohnehin hart durch.
+  saveDataDebounced();
   // Der Satz ist gerade fertig geworden: Pause laeuft von selbst an, damit man mitten im Training
   // nicht daran denken muss. Beim blossen Nachbessern eines schon vollstaendigen Satzes passiert
   // nichts. Laeuft bereits eine Pause, wird sie nicht ueberschrieben.
@@ -5043,8 +5108,8 @@ function openIncomeSourceModal(editSource = null) {
     body.querySelector("#mIncomeTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     if (isEdit) body.querySelector("#mDelete").addEventListener("click", () => {
-      state.financeIncomeSources = state.financeIncomeSources.filter(i => i.id !== editSource.id);
-      saveData(); closeModal(); renderAll();
+      closeModal();
+      deleteWithUndo("financeIncomeSources", editSource.id, editSource.title);
     });
     body.querySelector("#mSave").addEventListener("click", () => {
       const feld = body.querySelector("#mIncomeTitle");
@@ -5103,8 +5168,8 @@ function openAccountModal(editAccount = null) {
     body.querySelector("#mAccountTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     if (isEdit) body.querySelector("#mDelete").addEventListener("click", () => {
-      state.financeAccounts = state.financeAccounts.filter(a => a.id !== editAccount.id);
-      saveData(); closeModal(); renderAll();
+      closeModal();
+      deleteWithUndo("financeAccounts", editAccount.id, editAccount.title);
     });
     body.querySelector("#mSave").addEventListener("click", () => {
       const feld = body.querySelector("#mAccountTitle");
@@ -5140,9 +5205,8 @@ function openCategoryModal(editCategory = null) {
     body.querySelector("#mCategoryTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     if (isEdit) body.querySelector("#mDelete").addEventListener("click", () => {
-      state.financeCategories = state.financeCategories.filter(c => c.id !== editCategory.id);
-      state.financeExpenses = state.financeExpenses.filter(e => e.categoryId !== editCategory.id);
-      saveData(); closeModal(); renderAll();
+      closeModal();
+      loescheKategorieMitUndo(editCategory.id);
     });
     body.querySelector("#mSave").addEventListener("click", () => {
       const feld = body.querySelector("#mCategoryTitle");
@@ -5232,8 +5296,8 @@ function openSavingsGoalModal(editGoal = null) {
     body.querySelector("#mGoalTitle").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     if (isEdit) body.querySelector("#mDelete").addEventListener("click", () => {
-      state.savingsGoals = state.savingsGoals.filter(g => g.id !== editGoal.id);
-      saveData(); closeModal(); renderAll();
+      closeModal();
+      deleteWithUndo("savingsGoals", editGoal.id, editGoal.title);
     });
     body.querySelector("#mSave").addEventListener("click", () => {
       const titelFeld = body.querySelector("#mGoalTitle");
@@ -5493,12 +5557,7 @@ function exportWeekReview() {
     md += `- Schwierigster Wochentag: **${hardest.day}** (${Math.round(hardest.rate * 100)}% Erledigungsquote)\n`;
   }
 
-  // Vollstaendiger Zustand inklusive Anhangsinhalte — auf Tims ausdruecklichen Wunsch wird
-  // nichts weggelassen. Fotos an erhoerten Gebeten stecken als Base64 im State und koennen die
-  // Datei deutlich vergroessern; die Bestaetigung am Ende nennt deshalb die tatsaechliche Groesse.
-  // ---------- Klassenarbeiten ----------
-  if (state.exams.length) {
-    // ---------- Arbeitsschichten ----------
+  // ---------- Arbeitsschichten ----------
   const kommendeSchichten = (state.workShifts || []).filter(w => !w.date || w.date >= fmt(start));
   if (kommendeSchichten.length) {
     md += `\n## Arbeitsschichten\n`;
@@ -5508,6 +5567,9 @@ function exportWeekReview() {
   }
 
   // ---------- Analyse-Kennzahlen ----------
+  // Stand bis hierher versehentlich INNERHALB des Klassenarbeiten-Blocks: ohne eingetragene
+  // Klassenarbeit fehlten Kennzahlen UND Arbeitsschichten ersatzlos im Wochenrueckblick, ohne
+  // jeden Hinweis. Beide gehoeren auf die oberste Ebene, die Klassenarbeiten in ihren eigenen Block.
   md += `\n## Kennzahlen\n`;
   const alleErledigt = state.tasks.filter(t => t.done && t.completedAt);
   const alleOnTime = alleErledigt.filter(isOnTime).length;
@@ -5524,7 +5586,10 @@ function exportWeekReview() {
   }
   md += `- Letzte 7 Tage: ${woche7.join(" · ")}\n`;
   md += `- Gebete: ${state.prayers.filter(x => x.status === "open").length} offen, ${state.prayers.filter(x => x.status === "fulfilled").length} erhört, ${state.prayers.filter(x => x.status === "thanked").length} gedankt\n`;
-  md += `\n## Klassenarbeiten\n`;
+
+  // ---------- Klassenarbeiten ----------
+  if (state.exams.length) {
+    md += `\n## Klassenarbeiten\n`;
     state.exams.slice().sort((x, y) => x.date.localeCompare(y.date)).forEach(ex => {
       const fach = state.subjects.find(f => f.id === ex.subjectId);
       md += `- ${ex.date}: **${fach ? fach.title : "Fach gelöscht"}** (${examCountdownLabel(ex.date)})\n`;
@@ -5627,6 +5692,9 @@ function exportWeekReview() {
       md += `- ${sess.date} (${sess.dayKey}): Top ${gymNum(gymSessionTopWeight(sess))} kg · Volumen ${gymNum(gymSessionVolume(sess))} kg\n`;
     });
   }
+  // Vollstaendiger Zustand inklusive Anhangsinhalte — auf ausdruecklichen Wunsch wird nichts
+  // weggelassen. Fotos an erhoerten Gebeten stecken als Base64 im State und koennen die Datei
+  // deutlich vergroessern; die Bestaetigung am Ende nennt deshalb die tatsaechliche Groesse.
   md += `\n## Rohdaten (vollständig, als JSON)\n`;
   md += "```json\n" + JSON.stringify(state, null, 2) + "\n```\n";
 
