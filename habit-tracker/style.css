@@ -1173,7 +1173,25 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* "In Arbeit" steht in der Meta-Zeile statt als Chip neben dem Titel: als Chip drückte er den
    Titel von vier auf sechs Zeilen und die Zeile von 127 auf 241 px (gemessen bei 375 px Breite).
    Das Kästchen (halb gefüllter Kreis) und die Sortierung nach ganz oben tragen das Signal ohnehin. */
-.meta-progress { color: var(--color-accent-300); font-weight: 600; }
+/* "In Arbeit" ruhig, aber unübersehbar: ein langsam atmender Punkt vor dem Titel statt eines
+   Balkens quer durch die Zeile. Der Zustand steht ohnehin ganz oben in der Liste — er muss nicht
+   auch noch schreien. */
+.titel-in-arbeit { position: relative; padding-left: 15px; }
+.titel-in-arbeit::before {
+  content: ''; position: absolute; left: 1px; top: 50%;
+  width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%;
+  background: var(--color-accent-400);
+  animation: in-arbeit-puls 2.6s ease-out infinite;
+}
+@keyframes in-arbeit-puls {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-400) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-accent-400) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-400) 0%, transparent); }
+}
+.meta-progress {
+  color: var(--color-accent-300); font-weight: 600;
+  font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+}
 
 /* ---------- Rückgängig-Leiste ---------- */
 .undo-bar {
@@ -1356,3 +1374,62 @@ textarea.input { min-height: 90px; resize: vertical; }
   transition: color 0.16s ease, border-color 0.16s ease;
 }
 .gym-satz-pause:active { color: var(--color-accent-300); border-color: var(--color-accent-600); }
+
+/* ---------- Home-Blase im Ruhezustand ----------
+   Vorher stand sie in einmalig berechneten Pixelkoordinaten (--hx/--hy aus centerOf(homeAnchor)).
+   Beim Scrollen und beim Ein-/Ausklappen der iOS-Adressleiste wanderte der Anker, die Blase nicht —
+   sie landete mitten über dem Inhalt. Hier bindet sie fest an denselben Punkt wie die Tab-Leiste. */
+.ring-handle.at-home {
+  left: 50%;
+  top: auto;
+  bottom: calc(26px + env(safe-area-inset-bottom));
+  transform: translate(-50%, 0)
+             scale(calc(var(--sy, 1) * var(--grow, 1)), calc(var(--sx, 1) * var(--grow, 1)));
+}
+
+/* ---------- Mehrere Pausen gleichzeitig ---------- */
+.gym-timer-liste { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+/* Läuft eine Pause, wird aus dem Knopf ein Zifferblatt: Rand füllt sich gegen den Uhrzeigersinn. */
+.gym-satz-pause.laeuft, .gym-rest-btn.laeuft {
+  color: var(--color-accent-200);
+  border-color: var(--color-accent-600);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--color-accent-800) 55%, transparent) var(--p, 0%),
+    transparent var(--p, 0%));
+  font-variant-numeric: tabular-nums;
+}
+.gym-satz-pause.laeuft { font-weight: 600; letter-spacing: 0.02em; }
+
+/* ---------- Analyse: Kennzahlen-Karten ----------
+   Vorher sechs gleich aussehende Kacheln, dreimal mit der Beschriftung „Aufgaben erledigt" und nur
+   unterschiedlichem Untertitel — man musste jede lesen, um sie zu unterscheiden. Jetzt drei Karten
+   mit Überschrift und den Werten nebeneinander: eine Überschrift, mehrere Zahlen. */
+.kennzahl-karte {
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md); padding: 12px 14px 13px; margin-bottom: 10px;
+}
+.kennzahl-kopf {
+  font-family: var(--font-heading); font-size: 11px; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--color-neutral-500); margin-bottom: 9px;
+}
+.kennzahl-reihe { display: flex; gap: 6px; }
+.kennzahl-spalte { flex: 1; min-width: 0; text-align: center; }
+.kennzahl-spalte + .kennzahl-spalte { border-left: 1px solid var(--color-divider); }
+.kennzahl-wert {
+  font-family: var(--font-heading); font-size: 21px; line-height: 1.1;
+  color: var(--color-text); font-variant-numeric: tabular-nums;
+}
+.kennzahl-sub { font-size: 11px; color: var(--color-neutral-500); margin-top: 3px; }
+
+/* Kacheln der erledigten Aufgaben: Beschriftung oben, Zahl groß, Details unten getrennt —
+   vorher standen Zeit und Quote in einer Zeile und wurden auf dem Handy umbrochen. */
+.aufgaben-kachel { display: flex; flex-direction: column; gap: 2px; }
+.aufgaben-kachel .stat-label { order: -1; }
+.aufgaben-kachel-fuss {
+  display: flex; flex-direction: column; gap: 1px;
+  font-size: 11px; color: var(--color-neutral-500); margin-top: 4px;
+}
+.aufgaben-quote { color: var(--color-accent-300); }
+
+/* Der Bereichs-Balken zeigt jetzt Erledigtes von Gesamt — das „von N" bleibt gedämpft. */
+.areaload-von { color: var(--color-neutral-600); font-size: 11px; }

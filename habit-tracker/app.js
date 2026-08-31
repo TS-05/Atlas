@@ -1301,28 +1301,12 @@ const LERNTYPEN = [
 ];
 function lerntypById(id) { return LERNTYPEN.find(l => l.id === id) || LERNTYPEN[0]; }
 
-// Ist eine Liste leer, muss ihr Hinzufuegen-Knopf sichtbar bleiben — sonst sagt der Bildschirm nur
-// "hier ist nichts" und bietet keinen Weg, das zu aendern.
-function listeIstLeer(id) {
-  const wrap = document.getElementById(id);
-  return !!wrap && !!wrap.querySelector(".empty-hint");
-}
-const LEER_AUSNAHMEN = {
-  addRoutineBtn: () => listeIstLeer("routineChain"),
-  addHabitBtn:   () => listeIstLeer("todayHabits"),
-  addExamBtn:    () => listeIstLeer("examsList"),
-  addTaskBtn:    () => listeIstLeer("todoList")
-};
-
 function updateHeaderPlusButton() {
   const tab = document.body.dataset.tab;
   const ids = QUICK_ADD_BTN_IDS[tab];
-  if (ids) ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const trotzdemZeigen = LEER_AUSNAHMEN[id] ? LEER_AUSNAHMEN[id]() : false;
-    el.style.display = (quickAddVisible || trotzdemZeigen) ? "" : "none";
-  });
+  // Nur ueber das Plus. Ein dauerhaft sichtbarer Hinzufuegen-Knopf in einem leeren Abschnitt
+  // machte den Bildschirm unruhig, ohne etwas zu erklaeren.
+  if (ids) ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = quickAddVisible ? "" : "none"; });
   const prayerCard = document.getElementById("prayerAddCard");
   if (prayerCard) prayerCard.style.display = (tab === "gebete" && quickAddVisible) ? "flex" : "none";
   const searchCard = document.getElementById("bereicheSearchCard");
@@ -1746,7 +1730,7 @@ function renderTaskItem(t) {
         <span class="paint-done-stroke">${paintStrokeSvgHtml(t.id)}</span>
         <span class="paint-done-text">${escapeHtml(t.title)}</span>
       </div>`
-    : `<div class="item-title">${escapeHtml(t.title)}</div>`;
+    : `<div class="item-title${status === "inArbeit" ? " titel-in-arbeit" : ""}">${escapeHtml(t.title)}</div>`;
   const el = document.createElement("div");
   el.className = "task-item" + (expanded ? " expanded" : "");
   el.innerHTML = `
@@ -2730,10 +2714,13 @@ function renderTaskAnalysis() {
     const minuten = b.liste.reduce((sum, t) => sum + taskMinutes(t), 0);
     const puenktlich = b.liste.filter(isOnTime).length;
     const quote = b.liste.length ? Math.round(puenktlich / b.liste.length * 100) : null;
-    return `<div class="stat-box">
-        <div class="stat-num">${b.liste.length}</div>
+    return `<div class="stat-box aufgaben-kachel">
         <div class="stat-label">${b.titel}</div>
-        <div class="stat-sub">${formatAufwand(minuten)}${quote === null ? "" : ` \u00b7 ${quote}% p\u00fcnktlich`}</div>
+        <div class="stat-num">${b.liste.length}</div>
+        <div class="aufgaben-kachel-fuss">
+          <span>${formatAufwand(minuten)}</span>
+          ${quote === null ? "" : `<span class="aufgaben-quote">${quote}% p\u00fcnktlich</span>`}
+        </div>
       </div>`;
   }).join("");
 
@@ -2801,18 +2788,41 @@ function renderMoreStats() {
   const prayerFulfilled = state.prayers.filter(p => p.status === "fulfilled").length;
   const prayerOpen = state.prayers.filter(p => p.status === "open").length;
 
-  const boxes = [
-    { num: rate7 !== null ? Math.round(rate7 * 100) + "%" : "–", label: "Aufgaben erledigt", sub: "letzte 7 Tage" },
-    { num: rate30 !== null ? Math.round(rate30 * 100) + "%" : "–", label: "Aufgaben erledigt", sub: "letzte 30 Tage" },
-    { num: rate60 !== null ? Math.round(rate60 * 100) + "%" : "–", label: "Aufgaben erledigt", sub: "letzte 60 Tage" },
-    { num: devCount7, label: "Abweichungen", sub: "letzte 7 Tage" },
-    { num: devCount30, label: "Abweichungen", sub: "letzte 30 Tage" },
-    { num: prayerFulfilled, label: "Erhörungen", sub: `${prayerOpen} offen` }
+  // Vorher standen hier sechs gleich aussehende Kacheln, davon dreimal "Aufgaben erledigt" mit
+  // nur unterschiedlichem Untertitel — man musste jede einzeln lesen, um sie zu unterscheiden.
+  // Jetzt: eine Verlaufskachel fuer die Quote, eine fuer Abweichungen, eine fuer Gebete.
+  const quote = v => v !== null ? Math.round(v * 100) + "%" : "\u2013";
+  const verlauf = [
+    { label: "7 Tage", wert: rate7 },
+    { label: "30 Tage", wert: rate30 },
+    { label: "60 Tage", wert: rate60 }
   ];
 
-  wrap.innerHTML = boxes.map(b => `
-    <div class="stat-box minor"><div class="stat-num">${b.num}</div><div class="stat-label">${b.label}</div><div class="stat-sub">${b.sub}</div></div>
-  `).join("");
+  wrap.innerHTML = `
+    <div class="kennzahl-karte">
+      <div class="kennzahl-kopf">Aufgabenquote</div>
+      <div class="kennzahl-reihe">
+        ${verlauf.map(v => `
+          <div class="kennzahl-spalte">
+            <div class="kennzahl-wert">${quote(v.wert)}</div>
+            <div class="kennzahl-sub">${v.label}</div>
+          </div>`).join("")}
+      </div>
+    </div>
+    <div class="kennzahl-karte">
+      <div class="kennzahl-kopf">Abweichungen vom Plan</div>
+      <div class="kennzahl-reihe">
+        <div class="kennzahl-spalte"><div class="kennzahl-wert">${devCount7}</div><div class="kennzahl-sub">7 Tage</div></div>
+        <div class="kennzahl-spalte"><div class="kennzahl-wert">${devCount30}</div><div class="kennzahl-sub">30 Tage</div></div>
+      </div>
+    </div>
+    <div class="kennzahl-karte">
+      <div class="kennzahl-kopf">Gebete</div>
+      <div class="kennzahl-reihe">
+        <div class="kennzahl-spalte"><div class="kennzahl-wert">${prayerFulfilled}</div><div class="kennzahl-sub">Erh\u00f6rungen</div></div>
+        <div class="kennzahl-spalte"><div class="kennzahl-wert">${prayerOpen}</div><div class="kennzahl-sub">offen</div></div>
+      </div>
+    </div>`;
 }
 
 function habitStatsWindow(habit, days) {
@@ -2988,25 +2998,38 @@ let areaLoadShowAll = false;
 function renderAreaLoad() {
   const wrap = document.getElementById("areaLoad");
   if (!wrap) return;
+  // Zaehlt, was ERLEDIGT ist, nicht was eingetragen wurde — eine hohe Zahl soll Fortschritt
+  // bedeuten, nicht blosse Menge an offener Arbeit.
+  const erledigtImTeilbaum = id => {
+    let n = 0;
+    const lauf = (knotenId, gesehen) => {
+      if (gesehen.has(knotenId)) return;
+      gesehen.add(knotenId);
+      n += categoryTasksForNode(knotenId).filter(t => t.done).length;
+      childNodes(knotenId).forEach(c => lauf(c.id, gesehen));
+    };
+    lauf(id, new Set());
+    return n;
+  };
   const roots = childNodes(null)
-    .map(n => ({ node: n, count: countTasksInSubtree(n.id) }))
+    .map(n => ({ node: n, count: erledigtImTeilbaum(n.id), gesamt: countTasksInSubtree(n.id) }))
     .sort((a, b) => b.count - a.count || a.node.title.localeCompare(b.node.title, "de"));
   if (!roots.length) { wrap.innerHTML = '<div class="empty-hint">Noch keine Bereiche angelegt.</div>'; return; }
 
   const max = Math.max(1, ...roots.map(r => r.count));
   const total = roots.reduce((s, r) => s + r.count, 0);
-  const empty = roots.filter(r => r.count === 0);
-  const shown = areaLoadShowAll ? roots : roots.filter(r => r.count > 0);
+  const empty = roots.filter(r => r.gesamt === 0);
+  const shown = areaLoadShowAll ? roots : roots.filter(r => r.gesamt > 0);
 
   const rowHtml = r => `
     <div class="areaload-row">
       <div class="areaload-name">${escapeHtml(r.node.title)}</div>
       <div class="areaload-bar-outer"><div class="areaload-bar-inner" style="width:${r.count ? Math.max(3, Math.round((r.count / max) * 100)) : 0}%"></div></div>
-      <div class="areaload-count">${r.count}</div>
+      <div class="areaload-count">${r.count}<span class="areaload-von"> / ${r.gesamt}</span></div>
     </div>`;
 
   wrap.innerHTML = `
-    <div class="areaload-total">${total} Aufgaben auf ${roots.length} Bereiche${empty.length ? ` · ${empty.length} ohne Aufgaben` : ""}</div>
+    <div class="areaload-total">${total} erledigt von ${roots.reduce((n, r) => n + r.gesamt, 0)} Aufgaben · ${roots.length} Bereiche</div>
     ${(shown.length ? shown : roots).map(rowHtml).join("")}
     ${empty.length ? `<button class="areaload-toggle" data-areaload-toggle>${areaLoadShowAll ? "Leere Bereiche ausblenden" : `Alle ${roots.length} Bereiche zeigen`}</button>` : ""}
   `;
@@ -3549,6 +3572,18 @@ document.addEventListener("click", e => {
   }
   const fulfilledBtn = e.target.closest("[data-prayer-close]");
   if (fulfilledBtn) {
+    const p = state.prayers.find(x => x.id === fulfilledBtn.dataset.prayerClose);
+    // Ein Dank ist mit dem Haken erledigt — da gibt es nichts zu beschreiben. Nur bei einer
+    // erhoerten Bitte lohnt der Dialog, weil man festhalten will, was passiert ist.
+    if (p && (p.type || "bitte") === "dank") {
+      p.status = "thanked";
+      p.thankedAt = new Date().toISOString();
+      saveData(); renderAll();
+      offerUndo(`\u201e${p.title}" abgelegt`, () => {
+        p.status = "open"; delete p.thankedAt; saveData(); renderAll();
+      });
+      return;
+    }
     openPrayerCloseModal(fulfilledBtn.dataset.prayerClose);
   }
   const irrelevantBtn = e.target.closest("[data-prayer-irrelevant]");
@@ -3697,7 +3732,7 @@ function gymTrendHtml(current, lastWeight) {
 // Der Plan schreibt je Block eine Pause vor (60/90/180 Sek.). Die stand bisher nur im Vault.
 // Zustand liegt in einer Variablen, nicht im DOM: renderGym() baut den Kopf neu auf, die
 // laufende Uhr soll das ueberleben.
-let gymRest = null;          // { endsAt, total, label }
+// Laufende Pausen stehen in state.gymRests (siehe gymRests()); es gibt keine Einzelpause mehr.
 let gymRestInterval = null;
 
 // ---------- Signal am Pausenende ----------
@@ -3737,47 +3772,89 @@ function gymPiep() {
   });
 }
 
-function gymStartRest(seconds, label) {
-  gymAudioAufwecken();
-  gymRest = { endsAt: Date.now() + seconds * 1000, total: seconds, label };
-  // endsAt ist ein absoluter Zeitpunkt, deshalb ueberlebt die Pause ein Neuladen der App —
-  // vorher war sie nach jedem Neustart weg, mitten im Satz.
-  state.gymRest = gymRest;
-  saveData();
-  if (gymRestInterval) clearInterval(gymRestInterval);
-  gymRestInterval = setInterval(gymRestTick, 250);
-  gymRenderHeader();
+// Mehrere Pausen laufen gleichzeitig, jede mit eigenem Schluessel: der Uebungsname bei der
+// Satzpause, der Blocktitel bei der Supersatz-Pause. Ein zweiter Start mit demselben Schluessel
+// ersetzt die laufende Pause, statt eine zweite danebenzustellen.
+// Angezeigt wird jede Pause dort, wo sie hingehoert (in ihrer Karte); die Kopfzeile fasst
+// zusaetzlich alle laufenden zusammen.
+function gymRests() {
+  state.gymRests = state.gymRests || [];
+  return state.gymRests;
 }
-function gymStopRest() {
-  gymRest = null;
-  delete state.gymRest;
+function gymRestFor(key) {
+  return gymRests().find(r => r.key === key) || null;
+}
+function gymRestLeftOf(rest) {
+  return rest ? Math.max(0, Math.ceil((rest.endsAt - Date.now()) / 1000)) : 0;
+}
+
+function gymStartRest(seconds, label, key) {
+  gymAudioAufwecken();
+  const schluessel = key || label;
+  const liste = gymRests().filter(r => r.key !== schluessel);
+  liste.push({ key: schluessel, label, total: seconds, endsAt: Date.now() + seconds * 1000 });
+  state.gymRests = liste;
   saveData();
-  if (gymRestInterval) { clearInterval(gymRestInterval); gymRestInterval = null; }
-  gymRenderHeader();
+  gymTickerSicherstellen();
+  gymRenderTimers();
+}
+function gymStopRest(key) {
+  // Ohne Schluessel: alle stoppen (z. B. beim Wechsel des Trainingstags).
+  state.gymRests = key ? gymRests().filter(r => r.key !== key) : [];
+  saveData();
+  gymTickerSicherstellen();
+  gymRenderTimers();
+}
+function gymTickerSicherstellen() {
+  const laufen = gymRests().length > 0;
+  if (laufen && !gymRestInterval) gymRestInterval = setInterval(gymRestTick, 250);
+  if (!laufen && gymRestInterval) { clearInterval(gymRestInterval); gymRestInterval = null; }
 }
 function gymRestTick() {
-  if (!gymRest) { gymStopRest(); return; }
-  if (Date.now() >= gymRest.endsAt) {
+  const jetzt = Date.now();
+  const abgelaufen = gymRests().filter(r => jetzt >= r.endsAt);
+  if (abgelaufen.length) {
     gymPiep();
     if (navigator.vibrate) navigator.vibrate([180, 90, 180]);
-    gymStopRest();
-    return;
+    state.gymRests = gymRests().filter(r => jetzt < r.endsAt);
+    saveData();
+    gymTickerSicherstellen();
   }
+  gymRenderTimers();
+}
+
+// Aktualisiert nur die Zifferblaetter, nicht die ganze Ansicht — sonst wuerde viermal pro
+// Sekunde das Eingabefeld unter dem Daumen neu aufgebaut.
+function gymRenderTimers() {
+  document.querySelectorAll("[data-gym-timer-key]").forEach(el => {
+    const rest = gymRestFor(el.dataset.gymTimerKey);
+    const zeit = el.querySelector(".gym-timer-zeit");
+    if (rest) {
+      el.classList.add("laeuft");
+      if (zeit) zeit.textContent = gymMMSS(gymRestLeftOf(rest));
+      el.style.setProperty("--p", (rest.total ? gymRestLeftOf(rest) / rest.total * 100 : 0) + "%");
+    } else {
+      el.classList.remove("laeuft");
+      if (zeit) zeit.textContent = el.dataset.gymTimerIdle || "";
+      el.style.setProperty("--p", "0%");
+    }
+  });
   gymRenderHeader();
 }
-// Beim Start der App eine noch laufende Pause fortsetzen. Ist sie waehrenddessen abgelaufen,
-// wird sie kommentarlos verworfen statt verspaetet zu piepen.
+
+// Beim Start der App noch laufende Pausen fortsetzen; abgelaufene stillschweigend verwerfen,
+// statt verspaetet zu piepen.
 function gymPauseFortsetzen() {
-  const gespeichert = state.gymRest;
-  if (!gespeichert || !gespeichert.endsAt) return;
-  if (Date.now() >= gespeichert.endsAt) { delete state.gymRest; saveData(); return; }
-  gymRest = gespeichert;
-  if (gymRestInterval) clearInterval(gymRestInterval);
-  gymRestInterval = setInterval(gymRestTick, 250);
-}
-function gymRestLeft() {
-  if (!gymRest) return 0;
-  return Math.max(0, Math.ceil((gymRest.endsAt - Date.now()) / 1000));
+  const jetzt = Date.now();
+  state.gymRests = (state.gymRests || []).filter(r => r && r.endsAt > jetzt);
+  // Altbestand aus der Einzel-Pausen-Zeit uebernehmen.
+  if (state.gymRest && state.gymRest.endsAt > jetzt) {
+    state.gymRests.push({ key: state.gymRest.label, label: state.gymRest.label,
+                          total: state.gymRest.total, endsAt: state.gymRest.endsAt });
+  }
+  delete state.gymRest;
+  saveData();
+  gymTickerSicherstellen();
 }
 function gymMMSS(sec) {
   return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
@@ -3796,12 +3873,17 @@ function gymRenderHeader() {
   const vol = session ? gymSessionVolume(session) : 0;
   const pct = total ? Math.round((done / total) * 100) : 0;
 
-  const left = gymRestLeft();
-  const timerHtml = gymRest
-    ? `<button class="gym-timer running" data-gym-rest-stop>
-         <span class="gym-timer-ring" style="--p:${gymRest.total ? (left / gymRest.total) * 100 : 0}%"></span>
-         <b>${gymMMSS(left)}</b><span>${escapeHtml(gymRest.label)}</span></button>`
-    : `<span class="gym-timer idle">Pause per Block starten</span>`;
+  // Die Kopfzeile fasst alle laufenden Pausen zusammen — zusaetzlich zu der Anzeige in der
+  // jeweiligen Karte, damit man beim Scrollen nicht danach suchen muss.
+  const laufende = gymRests().slice().sort((a, b) => a.endsAt - b.endsAt);
+  const timerHtml = laufende.length
+    ? `<div class="gym-timer-liste">${laufende.map(r => `
+         <button class="gym-timer running" data-gym-rest-stop="${escapeHtml(r.key)}"
+                 style="--p:${r.total ? (gymRestLeftOf(r) / r.total) * 100 : 0}%">
+           <span class="gym-timer-ring"></span>
+           <b>${gymMMSS(gymRestLeftOf(r))}</b><span>${escapeHtml(r.label)}</span>
+         </button>`).join("")}</div>`
+    : `<span class="gym-timer idle">Keine Pause l\u00e4uft</span>`;
 
   el.innerHTML = `
     <div class="gym-header-row">
@@ -3872,7 +3954,10 @@ function gymExerciseHtml(ex, session, today) {
     <div class="gym-grid" style="grid-template-columns:repeat(${setCount},1fr);">
       ${headCells.join("")}${lastCells.join("")}${inputCells.join("")}
     </div>
-    <button class="gym-satz-pause" data-gym-satz-pause="${escapeHtml(ex.n)}">3 Min. Pause</button>
+    <button class="gym-satz-pause" data-gym-satz-pause="${escapeHtml(ex.n)}"
+            data-gym-timer-key="${escapeHtml(ex.n)}" data-gym-timer-idle="3 Min. Pause">
+      <span class="gym-timer-zeit">3 Min. Pause</span>
+    </button>
   </div>`;
 }
 
@@ -3896,9 +3981,10 @@ function renderGym() {
     wrap.innerHTML = day.blocks.map(b => {
       const pair = b.exercises.length > 1;
       const restBtn = b.rest
-        ? `<button class="gym-rest-btn" data-gym-rest="${b.rest}" data-gym-rest-label="${escapeHtml(b.title)}">
+        ? `<button class="gym-rest-btn" data-gym-rest="${b.rest}" data-gym-rest-label="${escapeHtml(b.title)}"
+                   data-gym-timer-key="${escapeHtml(b.title)}" data-gym-timer-idle="${b.rest >= 60 ? gymMMSS(b.rest) : b.rest + "s"}">
              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true"><circle cx="6" cy="6.6" r="4.6" stroke="currentColor" stroke-width="1.3"/><path d="M6 4.4V6.8L7.5 7.6M4.4 1.2h3.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-             ${b.rest >= 60 ? gymMMSS(b.rest) : b.rest + "s"}
+             <span class="gym-timer-zeit">${b.rest >= 60 ? gymMMSS(b.rest) : b.rest + "s"}</span>
            </button>`
         : "";
       return `<section class="gym-block${pair ? " superset" : ""}">
@@ -3916,12 +4002,22 @@ function renderGym() {
 
 document.addEventListener("click", e => {
   const dayBtn = e.target.closest("[data-gym-day]");
-  if (dayBtn) { gymSelectedDay = dayBtn.dataset.gymDay; gymStopRest(); renderGym(); return; }
+  if (dayBtn) { gymSelectedDay = dayBtn.dataset.gymDay; renderGym(); return; }
   const satzPauseBtn = e.target.closest("[data-gym-satz-pause]");
-  if (satzPauseBtn) { gymStartRest(GYM_SATZ_PAUSE, satzPauseBtn.dataset.gymSatzPause); return; }
+  if (satzPauseBtn) {
+    const k = satzPauseBtn.dataset.gymSatzPause;
+    // Laeuft die Pause dieser Uebung schon, beendet ein Tipp sie — sonst startet er sie.
+    if (gymRestFor(k)) gymStopRest(k); else gymStartRest(GYM_SATZ_PAUSE, k, k);
+    return;
+  }
   const restBtn = e.target.closest("[data-gym-rest]");
-  if (restBtn) { gymStartRest(parseInt(restBtn.dataset.gymRest, 10), restBtn.dataset.gymRestLabel || "Pause"); return; }
-  if (e.target.closest("[data-gym-rest-stop]")) gymStopRest();
+  if (restBtn) {
+    const k = restBtn.dataset.gymRestLabel || "Pause";
+    if (gymRestFor(k)) gymStopRest(k); else gymStartRest(parseInt(restBtn.dataset.gymRest, 10), k, k);
+    return;
+  }
+  const stopBtn = e.target.closest("[data-gym-rest-stop]");
+  if (stopBtn) { gymStopRest(stopBtn.dataset.gymRestStop || null); return; }
 });
 
 // Werte direkt beim Tippen sichern -- kein separater Speichern-Knopf, nichts geht verloren.
@@ -3947,8 +4043,9 @@ document.addEventListener("input", e => {
   // Der Satz ist gerade fertig geworden: Pause laeuft von selbst an, damit man mitten im Training
   // nicht daran denken muss. Beim blossen Nachbessern eines schon vollstaendigen Satzes passiert
   // nichts. Laeuft bereits eine Pause, wird sie nicht ueberschrieben.
-  if (!warVollstaendig && istVollstaendig && !gymRest) {
-    gymStartRest(GYM_SATZ_PAUSE, `${exercise} \u00b7 Satz ${idx + 1}`);
+  // Je Uebung eine eigene Pause: dass anderswo schon eine laeuft, darf diese hier nicht verhindern.
+  if (!warVollstaendig && istVollstaendig && !gymRestFor(exercise)) {
+    gymStartRest(GYM_SATZ_PAUSE, `${exercise} \u00b7 Satz ${idx + 1}`, exercise);
   }
   // Bewusst kein volles renderGym(): das wuerde den Fokus aus dem Feld reissen, in das gerade
   // getippt wird. Nur Trendpfeil, Erledigt-Zustand und Kopfzeile auffrischen.
@@ -5251,6 +5348,7 @@ function savePrayerFromInline() {
 function openPrayerCloseModal(prayerId) {
   const prayer = state.prayers.find(p => p.id === prayerId);
   if (!prayer) return;
+  // Wird nur noch fuer Bitten geoeffnet (siehe Handler); die Verzweigung bleibt als Absicherung.
   const istDank = (prayer.type || "bitte") === "dank";
   openModal(`
     <h3>${istDank ? "Gedankt" : "Erfüllt"}: ${escapeHtml(prayer.title)}</h3>
@@ -5725,7 +5823,7 @@ if (splashEl) {
 
   function moveHandleTo(slot) {
     if (!ringHandle) return;
-    ringHandle.classList.remove("no-anim", "is-invisible");
+    ringHandle.classList.remove("no-anim", "is-invisible", "at-home");
     // Antippen = Finger in Fluessigkeit: kurz gleichmaessig aufquellen, dann zurueckfallen.
     ringHandle.classList.add("is-liquid", "is-tap", "is-lensing");
     ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
@@ -5751,8 +5849,11 @@ if (splashEl) {
     ringHandle.classList.remove("is-lensing");
     ringHandle.classList.add("has-icon");
     handleMode = "home";
+    // Im Ruhezustand per CSS unten mittig verankern statt in einmalig berechneten Pixeln:
+    // die alten --hx/--hy blieben beim Scrollen und beim Ein-/Ausklappen der iOS-Adressleiste
+    // stehen, wodurch die Blase mitten ueber den Inhalt rutschte.
+    ringHandle.classList.add("at-home");
     ringHandle.classList.add("is-liquid", "is-tap");
-    placeAtHome();
     clearTimeout(tapTimer); clearTimeout(liquidTimer);
     tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 260);
     liquidTimer = setTimeout(() => { ringHandle.classList.remove("is-liquid", "is-lensing"); clearRingHole(); }, 560);
