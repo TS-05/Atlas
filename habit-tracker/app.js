@@ -1597,6 +1597,7 @@ function habitHasMinimal(habit) {
 // "minimal" heisst dann schlicht "heute die kleine Version", zaehlt halbe Punkte und haelt die
 // Serie. Ein hinterlegter Minimaltext aendert zusaetzlich die Beschriftung der Zeile.
 function habitLevelOn(habit, dateKey) {
+  if (habit.noMinimal) return "ideal";
   return (habit.levelByDate || {})[dateKey] === "minimal" ? "minimal" : "ideal";
 }
 // Angezeigter Text der aktuell eingestellten Stufe.
@@ -1629,8 +1630,10 @@ function levelSwitchHtml(habit, dateKey) {
   // Steht in jeder Zeile, ohne Bearbeiten-Modus und ohne Vorbedingung — vorher erschien er nur,
   // wenn vorher ueber das Plus-Menue ein Minimaltext hinterlegt worden war, wodurch die Funktion
   // von aussen schlicht nicht zu finden war.
-  // Ausgenommen Gewichts-Gewohnheiten: dort wird ein Messwert eingetragen, keine Stufe erfuellt.
-  if (habit.type === "weight") return "";
+  // Ausgenommen Gewichts-Gewohnheiten (dort wird ein Messwert eingetragen, keine Stufe erfuellt)
+  // und Gewohnheiten, die im Dialog ausdruecklich als "ganz oder gar nicht" markiert wurden —
+  // bei "Blumen giessen" gibt es keine halbe Version.
+  if (habit.type === "weight" || habit.noMinimal) return "";
   const level = habitLevelOn(habit, dateKey);
   // Der ganze Block ist der Knopf — Spur, Ecken und Beschriftung schalten alle um. Waere nur die
   // Pille selbst antippbar, gingen ihre abgerundeten Ecken als Trefferflaeche verloren (gemessen
@@ -1900,8 +1903,10 @@ function renderWeekCircle() {
   const todayKey = todayStr();
   const todayIdx = (today.getDay() + 6) % 7; // Mo=0 ... So=6
 
-  // Nur die Tagesroutine zählt für den Wochenkreis, weitere Gewohnheiten nicht.
-  const scheduled = state.habits.filter(h => h.routineOrder != null && new Date(h.createdAt) <= today && isScheduledToday(h, today));
+  // Alle heute faelligen Gewohnheiten zaehlen — auch die unter "Weitere Gewohnheiten". Vorher
+  // war der Ring auf die Tagesroutine beschraenkt, wodurch eine erledigte weitere Gewohnheit
+  // (z. B. Blumen giessen) sichtbar nichts bewirkte, obwohl sie Punkte trug.
+  const scheduled = state.habits.filter(h => new Date(h.createdAt) <= today && isScheduledToday(h, today));
   const doneHabits = scheduled.filter(h => habitDoneOn(h, todayKey));
   const done = doneHabits.length;
   const totalPoints = scheduled.reduce((sum, h) => sum + (h.points ?? 1), 0);
@@ -1913,7 +1918,7 @@ function renderWeekCircle() {
   const nichtsGeplant = totalPoints === 0;
   const pct = nichtsGeplant ? 0 : Math.round((earnedPoints / totalPoints) * 100);
 
-  wrap.title = `${todayKey}: ${scheduled.length ? done + "/" + scheduled.length + " Routine-Schritte (" + formatPoints(earnedPoints) + "/" + formatPoints(totalPoints) + " Punkte)" : "keine Routine-Schritte fällig"}`;
+  wrap.title = `${todayKey}: ${scheduled.length ? done + "/" + scheduled.length + " Gewohnheiten (" + formatPoints(earnedPoints) + "/" + formatPoints(totalPoints) + " Punkte)" : "heute nichts fällig"}`;
   wrap.innerHTML = `
     <div style="display:flex; justify-content:center; margin-bottom:30px;">
       <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
@@ -2325,7 +2330,7 @@ function renderOtherHabits() {
       <button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}">${doneToday ? splatSvg(h.id) : ""}</button>
       <div style="flex:1; min-width:0;">
         ${titleHtml}
-        <div class="item-meta">${frequencyLabel(h)}</div>
+        <div class="item-meta">${frequencyLabel(h)} · ${formatPoints(habitLevelOn(h, today) === "minimal" ? (h.points ?? 1) * HABIT_MINIMAL_FACTOR : (h.points ?? 1))} Punkt${(habitLevelOn(h, today) === "minimal" ? (h.points ?? 1) * HABIT_MINIMAL_FACTOR : (h.points ?? 1)) === 1 ? "" : "e"}</div>
       </div>
       ${priority ? '<span class="atlas-chip" style="background:var(--color-accent-900); color:var(--color-accent-300);">Priorität</span>' : ""}
       ${levelSwitchHtml(h, today)}
@@ -2860,10 +2865,10 @@ const HEATMAP_GOLD = "#d4af37";
 
 function dayCompletionPct(dateObj) {
   const key = localDateKey(dateObj);
-  // Dieselbe Grundmenge wie der Wochenkreis (renderWeekCircle): nur die Tagesroutine. Vorher fehlte
-  // der routineOrder-Filter, wodurch derselbe Tag auf "Heute" 100 % und in der Heatmap 50 % sein
-  // konnte — zwei Nenner fuer dieselbe Frage.
-  const scheduled = state.habits.filter(h => h.routineOrder != null && localDateKey(new Date(h.createdAt)) <= key && isScheduledToday(h, dateObj));
+  // Dieselbe Grundmenge wie der Wochenkreis (renderWeekCircle): alle faelligen Gewohnheiten.
+  // Die beiden muessen zusammenbleiben, sonst zeigt derselbe Tag auf "Heute" und in der Heatmap
+  // zwei verschiedene Werte — genau das war vorher der Fall.
+  const scheduled = state.habits.filter(h => localDateKey(new Date(h.createdAt)) <= key && isScheduledToday(h, dateObj));
   const totalPoints = scheduled.reduce((sum, h) => sum + (h.points ?? 1), 0);
   const earnedPoints = scheduled.reduce((sum, h) => sum + habitPointsOn(h, key), 0);
   return totalPoints ? Math.round((earnedPoints / totalPoints) * 100) : null;
@@ -4323,7 +4328,11 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
     <div class="field">
       <label>Minimalversion (optional)</label>
       <input type="text" id="mHabitMinimalTitle" placeholder="z.B. 10 Min lesen" value="${isEdit ? escapeHtml(editHabit.minimalTitle || "") : ""}">
-      <p class="hint" style="margin-top:4px;">Die niedrigere Latte für schwierige Tage. Ist sie gesetzt, erscheint in der Zeile ein Regler — links ideal, rechts minimal. Minimal zählt die Hälfte der Punkte, die Serie reißt nicht ab. Leer lassen = kein Regler.</p>
+      <p class="hint" style="margin-top:4px;">Optionale Beschriftung für die niedrigere Latte, z. B. „10 Min lesen“. Der Regler steht ohnehin in jeder Zeile — dieser Text ändert nur, wie die Zeile heißt, wenn er rechts steht.</p>
+    </div>
+    <div class="checkbox-row" style="margin-bottom:12px;">
+      <input type="checkbox" id="mHabitNoMinimal" ${isEdit && editHabit.noMinimal ? "checked" : ""}>
+      <label for="mHabitNoMinimal">Ganz oder gar nicht — keinen Regler anzeigen</label>
     </div>
     <div class="checkbox-row">
       <input type="checkbox" id="mHabitRoutine" ${(isEdit ? editHabit.routineOrder != null : forceRoutine) ? "checked" : ""}>
@@ -4406,6 +4415,7 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
       const isRoutine = body.querySelector("#mHabitRoutine").checked;
       const points = parseInt(body.querySelector("#mHabitPoints").value, 10) || 1;
       const minimalTitle = body.querySelector("#mHabitMinimalTitle").value.trim();
+      const noMinimal = body.querySelector("#mHabitNoMinimal").checked;
       const autoDone = body.querySelector("#mHabitAutoDone").checked;
       if (isEdit) {
         editHabit.title = title;
@@ -4413,6 +4423,10 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
         // Deshalb bleiben gesetzte Reglerstellungen erhalten, wenn der Text entfernt wird.
         if (minimalTitle) editHabit.minimalTitle = minimalTitle;
         else delete editHabit.minimalTitle;
+        // Ohne Regler auch die gesetzten Stufen aufraeumen, sonst blieben Tage auf "minimal"
+        // stehen, die nicht mehr umschaltbar sind.
+        if (noMinimal) { editHabit.noMinimal = true; editHabit.levelByDate = {}; }
+        else delete editHabit.noMinimal;
         editHabit.nodeId = nodeId;
         editHabit.frequency = frequency;
         delete editHabit.intervalDays; delete editHabit.weekday; delete editHabit.everyNWeeks;
@@ -4426,7 +4440,7 @@ function openHabitModal(forceRoutine = false, editHabit = null) {
         }
       } else {
         const routineOrder = isRoutine ? state.habits.reduce((max, h) => Math.max(max, h.routineOrder ?? -1), -1) + 1 : null;
-        state.habits.push({ id: uid(), title, nodeId, history: {}, levelByDate: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check", points, ...(minimalTitle ? { minimalTitle } : {}), ...(autoDone ? { autoDone: true } : {}) });
+        state.habits.push({ id: uid(), title, nodeId, history: {}, levelByDate: {}, createdAt: new Date().toISOString(), frequency, ...extra, routineOrder, type: "check", points, ...(minimalTitle ? { minimalTitle } : {}), ...(noMinimal ? { noMinimal: true } : {}), ...(autoDone ? { autoDone: true } : {}) });
       }
       saveData();
       closeModal();
