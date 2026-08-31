@@ -5914,31 +5914,59 @@ if (splashEl) {
     '<ellipse cx="12" cy="12" rx="4" ry="9" stroke="currentColor" stroke-width="1.3"/>' +
     '<path d="M3.2 9.2H20.8M3.2 14.8H20.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
 
-  function sendHandleHome() {
+  // ---------- Zustandsfuehrung der Blase ----------
+  // EIN Ort, der die Blase vollstaendig in einen bekannten Zustand versetzt. Synchron, ohne
+  // Zeitschalter, idempotent: ein zweiter Aufruf repariert jeden Zwischenstand. Alles Zierende
+  // (Aufquellen, Zerplatzen) wird danach nur noch obendrauf gelegt und ist nie tragend.
+  const BLASE_ZIER = ["is-liquid", "is-tap", "is-pop", "is-lensing", "is-invisible"];
+
+  function setzeBlase(modus) {
     if (!ringHandle) return;
-    ringHandle.classList.remove("no-anim", "is-invisible");
-    lensLayer = null;                    // wird von innerHTML mit entfernt
+    clearTimeout(tapTimer); clearTimeout(liquidTimer);
+    // Uebergaenge fuer den Sprung abschalten — ein unterbrochener Uebergang war die Ursache
+    // dafuer, dass die Blase auf halbem Weg stehenblieb.
+    ringHandle.classList.add("no-anim");
+    ringHandle.classList.remove(...BLASE_ZIER);
+    ringHandle.style.opacity = "1";
     clearRingHole();
-    ringHandle.innerHTML = GLOBE_ICON;   // unten zeigt die Blase das Globus-Symbol
-    ringHandle.classList.remove("is-lensing");
-    ringHandle.classList.add("has-icon");
-    handleMode = "home";
-    // Im Ruhezustand per CSS unten mittig verankern statt in einmalig berechneten Pixeln:
-    // die alten --hx/--hy blieben beim Scrollen und beim Ein-/Ausklappen der iOS-Adressleiste
-    // stehen, wodurch die Blase mitten ueber den Inhalt rutschte.
-    // Der Wechsel auf die CSS-Verankerung aendert die transform-Formel. Liesse man das ueber die
-    // 0,42-s-Transition laufen, bliebe die Blase bei jeder Unterbrechung irgendwo auf halbem Weg
-    // stehen — genau das Herumspringen, das aufgefallen ist. Deshalb hart setzen und die
-    // Uebergaenge erst im naechsten Bild wieder zulassen; die fluessige Anmutung tragen weiterhin
-    // is-liquid und is-tap (Deckkraft und Skalierung).
-    ringHandle.classList.add("no-anim", "at-home");
-    const uebergaengeWiederZulassen = () => ringHandle.classList.remove("no-anim");
-    requestAnimationFrame(() => requestAnimationFrame(uebergaengeWiederZulassen));
-    setTimeout(uebergaengeWiederZulassen, 120);   // Netz, falls kein Bild gezeichnet wird
+
+    if (modus === "home") {
+      handleMode = "home";
+      ringHandle.classList.add("has-icon", "at-home");
+      ringHandle.innerHTML = GLOBE_ICON;   // unten zeigt die Blase das Globus-Symbol
+      lensLayer = null;
+      placeAtHome();
+    } else {
+      handleMode = "ring";
+      ringHandle.classList.remove("has-icon");
+      ringHandle.classList.remove("at-home");
+      ringHandle.innerHTML = "";           // am Ring leer — das Symbol liegt dort schon darunter
+      lensLayer = null;
+      buildLens();
+      refreshLensRect();
+      const cur = ringSlots.find(sl => sl.tab === document.body.dataset.tab) || ringSlots[0];
+      if (cur) placeAtSlot(cur);
+    }
+
+    // Uebergaenge im naechsten Bild wieder zulassen, mit Zeitlimit als Netz, falls kein Bild
+    // gezeichnet wird (Tab im Hintergrund).
+    const wiederAnimieren = () => ringHandle.classList.remove("no-anim");
+    requestAnimationFrame(() => requestAnimationFrame(wiederAnimieren));
+    setTimeout(wiederAnimieren, 150);
+  }
+
+  // Die Zierde: kurz aufquellen, danach von selbst zurueckfallen. Setzt keinen Zustand.
+  function blaseAntippen() {
+    if (!ringHandle) return;
     ringHandle.classList.add("is-liquid", "is-tap");
     clearTimeout(tapTimer); clearTimeout(liquidTimer);
     tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 260);
-    liquidTimer = setTimeout(() => { ringHandle.classList.remove("is-liquid", "is-lensing"); clearRingHole(); }, 560);
+    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 560);
+  }
+
+  function sendHandleHome() {
+    setzeBlase("home");
+    blaseAntippen();
   }
 
   function activateSlot(slot) {
@@ -5960,38 +5988,27 @@ if (splashEl) {
       if (handleMode !== "home") return;
       homeMenu.classList.remove("home-hidden");
       if (globeModel) globeModel.autoRotate = true;
-      handleMode = "ring";
-      const cur = ringSlots.find(sl => sl.tab === document.body.dataset.tab) || ringSlots[0];
-      clearTimeout(tapTimer); clearTimeout(liquidTimer);
-      // 1) unten zerplatzen lassen
-      ringHandle.classList.remove("is-liquid", "is-tap");
-      ringHandle.style.opacity = "";      // Inline-Wert loesen, sonst kann is-pop nicht ausblenden
-      ringHandle.classList.add("is-pop");
-      setTimeout(() => {
-        // 2) unsichtbar und ohne Animation ans Ringsymbol versetzen
-        ringHandle.classList.add("no-anim", "is-invisible");
-        ringHandle.classList.remove("is-pop", "has-icon");
-        ringHandle.innerHTML = "";        // am Ring leer -- das Symbol liegt dort schon darunter
-        lensLayer = null;
-        buildLens();
-        refreshLensRect();
-        placeAtSlot(cur);
-        // 3) dort wieder normal auftauchen
-        // Sichtbarkeit NOCH mit no-anim zuruecknehmen: so ist die Blase sofort da, auch wenn ein
-        // Uebergang aus irgendeinem Grund nicht durchlaeuft (sonst bliebe sie unsichtbar haengen).
-        setTimeout(() => {
-          ringHandle.classList.remove("is-invisible");
-          ringHandle.style.opacity = "1";   // hart sichtbar -- unabhaengig von laufenden Uebergaengen
-          setTimeout(() => ringHandle.classList.remove("no-anim"), 30);
-        }, 40);
-      }, 300);
+      // Ein einziger, vollstaendiger Zustandswechsel statt dreier verschachtelter Zeitschalter.
+      setzeBlase("ring");
+      blaseAntippen();
     });
   }
 
   // Startposition setzen, sobald das Layout steht, und bei Groessenaenderung nachziehen.
+  // Zusaetzlich Sicherheitsnetz: welcher Zustand richtig ist, ergibt sich daraus, ob das
+  // Globus-Menue sichtbar ist — nicht aus einer Variablen, die aus dem Tritt geraten kann.
   function repositionHandle() {
     if (!ringHandle) return;
     lensRect = null;                      // Layout hat sich geaendert -> neu vermessen
+    // Sollzustand ergibt sich allein daraus, ob das Globus-Menue sichtbar ist. Weicht irgendetwas
+    // davon ab — der Modus, die Verankerung oder das Symbol in der Blase —, wird der ganze
+    // Zustand neu gesetzt statt nur die Position nachgezogen.
+    const menueOffen = !homeMenu.classList.contains("home-hidden");
+    const soll = menueOffen ? "ring" : "home";
+    const stimmt = handleMode === soll
+      && ringHandle.classList.contains("at-home") === (soll === "home")
+      && ringHandle.classList.contains("has-icon") === (soll === "home");
+    if (!stimmt) { setzeBlase(soll); return; }
     if (handleMode === "home") { placeAtHome(); return; }
     const cur = ringSlots.find(sl => sl.tab === document.body.dataset.tab) || ringSlots[0];
     if (cur) placeAtSlot(cur);
