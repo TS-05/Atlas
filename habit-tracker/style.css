@@ -181,7 +181,16 @@ textarea.input { min-height: 90px; resize: vertical; }
   100% { filter: brightness(1) saturate(1); transform: scale(1); }
 }
 .ring-flare { animation: atlas-ring-flare 1.1s cubic-bezier(.22,.8,.28,1) 1 both; }
-.atlas-check { width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--color-divider); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: transparent; padding: 0; overflow: visible; }
+.atlas-check { width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--color-divider); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: transparent; padding: 0; overflow: visible; position: relative; }
+/* Sichtbar bleibt das 20-px-Kaestchen, angetippt wird eine 44-px-Flaeche darum herum. Ueber ein
+   Pseudo-Element statt ueber Polsterung, damit sich am Layout der Zeile nichts verschiebt und der
+   Rahmen an seinem Platz bleibt. 12 px je Seite ergeben 44 px -- Apples Richtwert und deutlich
+   ueber dem WCAG-Minimum von 24 px (2.5.8). Links liegt die Zeilenpolsterung (16 px), rechts der
+   Abstand zum Titel (12 px), oben und unten ist jede Zeile hoeher als 44 px: die Flaeche kann
+   also weder aus der Zeile herauslaufen noch mit der Nachbarzeile kollidieren.
+   -13px statt -12px, weil das Pseudo-Element am Innenrand (Polsterungskasten) haengt: 20 px minus
+   zweimal 1.5 px Rahmen ergibt 17 px, plus zweimal 13 px sind 43-44 px. */
+.atlas-check::after { content: ""; position: absolute; inset: -13px; border-radius: 12px; }
 .atlas-check.checked { border-color: transparent; }
 .atlas-chip { font-size: 10px; padding: 2px 7px; border-radius: 5px; white-space: nowrap; }
 .gold-frame {
@@ -604,21 +613,26 @@ textarea.input { min-height: 90px; resize: vertical; }
   background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
 }
+/* Unbestimmter Fortschritt statt gespieltem: der Balken sagt "laeuft", nicht "zu 47 % fertig".
+   Vorher lief hier eine feste Drei-Sekunden-Sequenz mit Zwischenstufen, die einen Fortschritt
+   anzeigte, den sie nicht gemessen hat -- der Ladebildschirm zaehlte nur ab. Jetzt endet er,
+   sobald die App wirklich bereit ist (siehe app.js), und der Balken macht dazu keine Aussage,
+   die er nicht halten kann. */
 .splash-bar-fill {
   height: 100%;
-  width: 0%;
+  width: 40%;
   border-radius: 2px;
   background: #ffffff;
-  animation: splashFillSteps 3s ease-in-out forwards;
+  animation: splashSlide 1.15s cubic-bezier(0.5, 0, 0.5, 1) infinite;
 }
-@keyframes splashFillSteps {
-  0% { width: 0%; }
-  6% { width: 18%; }
-  24% { width: 18%; }
-  34% { width: 47%; }
-  64% { width: 47%; }
-  72% { width: 100%; }
-  100% { width: 100%; }
+@keyframes splashSlide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+/* Die Schleife laeuft endlos -- wer reduzierte Bewegung eingestellt hat, bekommt stattdessen
+   eine ruhende Flaeche. */
+@media (prefers-reduced-motion: reduce) {
+  .splash-bar-fill { animation: none; width: 100%; opacity: 0.45; }
 }
 
 /* ---------- Homemenü ----------
@@ -1385,6 +1399,30 @@ textarea.input { min-height: 90px; resize: vertical; }
   bottom: calc(26px + env(safe-area-inset-bottom));
   transform: translate(-50%, 0)
              scale(calc(var(--sy, 1) * var(--grow, 1)), calc(var(--sx, 1) * var(--grow, 1)));
+}
+/* In Ruhe ist die Blase ein Bedienelement, keine Glasscheibe. Vorher lag sie mit 10 % Weiss und
+   ohne Unschaerfe ueber dem Inhalt -- der Text darunter schien hindurch und las sich als Schleier
+   ueber der Schrift statt als schwebender Knopf. Jetzt bekommt sie eine eigene, weitgehend
+   deckende Flaeche mit Unschaerfe dahinter.
+   Nur der wirklich ruhende Zustand: sobald angefasst wird, kommt .is-liquid dazu und die
+   Glasbehandlung von oben gilt wieder. */
+.ring-handle.at-home:not(.is-liquid) {
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+              0 6px 18px rgba(0, 0, 0, 0.45);
+}
+/* Waehrend des Scrollens tritt sie zurueck, damit sie beim Lesen keine Zeile dauerhaft verdeckt,
+   und kommt zurueck, sobald das Scrollen steht. Bewusst NUR ueber die Deckkraft: Position und
+   Transformation bleiben unangetastet, damit sie nicht wieder zwischen zwei Zustaenden haengen
+   bleiben kann. Die ausgeschlossenen Klassen sind die Zustaende, in denen etwas anderes die
+   Deckkraft fuehrt -- sonst wuerde diese Regel sie dort ueberstimmen. */
+.ring-handle.at-home.is-scrolling:not(.is-invisible):not(.is-pop):not(.is-boot):not(.is-dragging) {
+  /* !important, weil revealHandle() die Deckkraft als Sicherheitsnetz direkt am Element setzt
+     (die Blase ist schon zweimal unsichtbar haengen geblieben, deshalb steht das dort inline).
+     Eine Klasse allein kaeme dagegen nicht an. */
+  opacity: 0.18 !important;
 }
 
 /* ---------- Mehrere Pausen gleichzeitig ---------- */

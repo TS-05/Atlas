@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=70">
+<link rel="stylesheet" href="style.css?v=72">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -217,7 +217,7 @@
 <polygon points="84.4,146.2 100.0,141.7 100.0,160.0" fill="#12161d"/>
 <polygon points="84.4,146.2 100.0,160.0 86.6,160.0" fill="#151a22"/>
 </svg>
-  <img src="assets/atlas-figure-cutout.png?v=3" class="splash-figure" alt="Atlas">
+  <img src="assets/atlas-figure-cutout.webp?v=1" class="splash-figure" alt="Atlas">
   <div class="splash-tagline">God first. Keep pushing.</div>
   <div class="splash-bar-plate"><div class="splash-bar"><div class="splash-bar-fill"></div></div></div>
 </div>
@@ -382,7 +382,7 @@
   <div class="home-stage">
     <div class="home-tagline home-tagline-top">God first.</div>
     <div class="globe-stage">
-      <!-- Echtes 3D-Modell (assets/atlas_globe_v17.glb) über das lokal gehostete model-viewer
+      <!-- Echtes 3D-Modell (assets/atlas_globe_v18.glb) über das lokal gehostete model-viewer
            (habit-tracker/vendor/model-viewer.min.js, kein CDN -- bleibt offline-fähig, der Service
            Worker cacht beide Dateien wie jede andere same-origin Ressource). camera-controls ohne
            min/max-camera-orbit-Einschränkung erlaubt freies Drehen in alle Richtungen (auch nach
@@ -393,10 +393,15 @@
 
            Der Globus ist reine Anzeige/Drehung -- die Tab-Auswahl passiert über den Ring darum.
       -->
+      <!-- src steht bewusst NICHT hier, sondern wird in app.js gesetzt, sobald der Ladebildschirm
+           weg ist. Vorher lud das Modell mit loading="eager" sofort mit und konkurrierte beim
+           Kaltstart mit app.js und dem Stylesheet um die Leitung -- sichtbar ist der Globus zu dem
+           Zeitpunkt ohnehin nicht, er liegt hinter dem Ladebildschirm. Der Dateiname steht in
+           data-src. -->
       <model-viewer
         id="globeModel"
         class="globe-model"
-        src="assets/atlas_globe_v17.glb?v=3"
+        data-src="assets/atlas_globe_v18.glb?v=1"
         alt="Atlas-Globus"
         loading="eager"
         reveal="auto"
@@ -467,7 +472,7 @@
 
   <header class="topbar">
     <div class="topbar-left">
-      <img src="assets/atlas-logo.png?v=2" class="topbar-logo" alt="Atlas">
+      <img src="assets/atlas-logo.webp?v=1" width="26" height="26" class="topbar-logo" alt="Atlas">
       <div class="today" id="todayLabel"></div>
     </div>
     <div class="header-actions">
@@ -781,6 +786,6 @@
   <span id="undoText"></span>
   <button class="btn btn-ghost" id="undoBtn">Rückgängig</button>
 </div>
-<script src="app.js?v=77"></script>
+<script src="app.js?v=78"></script>
 </body>
 </html>

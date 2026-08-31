@@ -2281,8 +2281,8 @@ function renderRoutineChain() {
     }
 
     const checkHtml = h.type === "weight"
-      ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1">${doneToday ? splatSvg(h.id) : ""}</button>`
-      : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}">${doneToday ? splatSvg(h.id) : ""}</button>`;
+      ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1" aria-hidden="true">${doneToday ? splatSvg(h.id) : ""}</button>`
+      : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" aria-label="${escapeHtml(habitTitleOn(h, today))}: ${doneToday ? "erledigt, zum Zurücknehmen antippen" : "offen, zum Abhaken antippen"}">${doneToday ? splatSvg(h.id) : ""}</button>`;
     const weightInputHtml = h.type === "weight"
       ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:72px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
       : "";
@@ -2361,7 +2361,7 @@ function renderOtherHabits() {
     const el = document.createElement("div");
     el.className = "atlas-row" + (doneToday ? " done" : "");
     el.innerHTML = `
-      <button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}">${doneToday ? splatSvg(h.id) : ""}</button>
+      <button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" aria-label="${escapeHtml(shownTitle)}: ${doneToday ? "erledigt, zum Zurücknehmen antippen" : "offen, zum Abhaken antippen"}">${doneToday ? splatSvg(h.id) : ""}</button>
       <div style="flex:1; min-width:0;">
         ${titleHtml}
         <div class="item-meta">${frequencyLabel(h)} · ${formatPoints(habitLevelOn(h, today) === "minimal" ? (h.points ?? 1) * HABIT_MINIMAL_FACTOR : (h.points ?? 1))} Punkt${(habitLevelOn(h, today) === "minimal" ? (h.points ?? 1) * HABIT_MINIMAL_FACTOR : (h.points ?? 1)) === 1 ? "" : "e"}</div>
@@ -2995,8 +2995,8 @@ function renderDaySheetHabits(dateObj) {
     const rawValue = h.history[key];
     const doneToday = h.type === "weight" ? (rawValue !== undefined && rawValue !== null) : !!rawValue;
     const checkHtml = h.type === "weight"
-      ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1">${doneToday ? splatSvg(h.id) : ""}</button>`
-      : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" data-date="${key}">${doneToday ? splatSvg(h.id) : ""}</button>`;
+      ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1" aria-hidden="true">${doneToday ? splatSvg(h.id) : ""}</button>`
+      : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" data-date="${key}" aria-label="${escapeHtml(h.title)}: ${doneToday ? "erledigt, zum Zurücknehmen antippen" : "offen, zum Abhaken antippen"}">${doneToday ? splatSvg(h.id) : ""}</button>`;
     const weightInputHtml = h.type === "weight"
       ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:72px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" data-date="${key}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
       : "";
@@ -5727,19 +5727,63 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => { commitActiveFreeText(); flushPendingSave(); });
 window.addEventListener("blur", () => { commitActiveFreeText(); flushPendingSave(); });
 
-// Ladebildschirm: läuft bei jedem App-Start als feste 3-Sekunden-Sequenz durch (unabhängig davon,
-// wie schnell der eigentliche Render aus localStorage steht) und blendet danach aus.
+// Der Globus laedt erst, wenn der Ladebildschirm weg ist. Vorher hing er mit loading="eager" und
+// gesetztem src am Start und teilte sich die Leitung mit app.js, dem Stylesheet und den Masken --
+// sichtbar ist er zu dem Zeitpunkt ohnehin nicht, er liegt hinter dem Ladebildschirm. Der Pfad
+// steht als data-src in index.html.
+let globusGeladen = false;
+function globusLaden() {
+  if (globusGeladen) return;
+  globusGeladen = true;
+  const mv = document.getElementById("globeModel");
+  if (mv && mv.dataset.src) mv.setAttribute("src", mv.dataset.src);
+}
+
+// Ladebildschirm: endet, sobald die Seite wirklich geladen ist -- vorher lief er als feste
+// 3-Sekunden-Sequenz und zeigte einen Fortschritt an, den er nicht gemessen hat. Die Untergrenze
+// verhindert, dass er nur aufblitzt; die Obergrenze ist das Sicherheitsnetz und entspricht der
+// alten festen Dauer, laenger wird es also in keinem Fall.
 const splashEl = document.getElementById("splashScreen");
 if (splashEl) {
-  setTimeout(() => {
+  const MIN_MS = 700;
+  const MAX_MS = 3000;
+  const start = performance.now();
+  let ausgeblendet = false;
+  const ausblenden = () => {
+    if (ausgeblendet) return;
+    ausgeblendet = true;
     splashEl.classList.add("splash-hidden");
     // transitionend allein reicht nicht: laeuft der Uebergang nicht an (Tab im Hintergrund,
     // unterbrochene Animation), bliebe der Ladebildschirm fuer immer im DOM stehen.
-    const wegRaeumen = () => splashEl.remove();
+    const wegRaeumen = () => { splashEl.remove(); globusLaden(); };
     splashEl.addEventListener("transitionend", wegRaeumen, { once: true });
     setTimeout(wegRaeumen, 1200);
-  }, 3000);
+  };
+  const wennBereit = () => setTimeout(ausblenden, Math.max(0, MIN_MS - (performance.now() - start)));
+  if (document.readyState === "complete") wennBereit();
+  else window.addEventListener("load", wennBereit, { once: true });
+  setTimeout(ausblenden, MAX_MS);
+} else {
+  globusLaden();
 }
+
+// ---------- Die ruhende Blase tritt beim Scrollen zurueck ----------
+// Sie haengt an der Bildschirmposition, nicht am Inhalt -- was gerade unter ihr steht, liegt
+// darunter. Waehrend des Scrollens blendet sie deshalb ab und kommt zurueck, sobald es steht.
+// Bewusst ueber eine Klasse, die AUSSCHLIESSLICH die Deckkraft aendert: Position und
+// Transformation bleiben unangetastet, damit die Blase nicht wieder in einem Zwischenzustand
+// stehen bleiben kann (siehe die Timer-Kette, die dafuer schon einmal ausgebaut wurde). Der
+// Zeitgeber nimmt die Klasse in jedem Fall wieder weg -- dauerhaft blass werden kann sie nicht.
+(() => {
+  const handle = document.getElementById("ringHandle");
+  if (!handle) return;
+  let zurueck;
+  addEventListener("scroll", () => {
+    handle.classList.add("is-scrolling");
+    clearTimeout(zurueck);
+    zurueck = setTimeout(() => handle.classList.remove("is-scrolling"), 320);
+  }, { passive: true });
+})();
 
 // ---------- Homemenü: 3D-Globus-Navigation ----------
 // Drehung (Auto-Rotation + Wisch-Ziehen) übernimmt <model-viewer> selbst (siehe camera-controls/
