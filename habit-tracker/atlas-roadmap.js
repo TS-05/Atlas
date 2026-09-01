@@ -266,7 +266,7 @@ function renderRoadmapCategory(rootId) {
         const targets = projects.length ? projects : [theme];
         return `
           <div class="roadmap-theme-head">
-            <h6 class="metal-gold" style="margin:22px 0 8px;">${escapeHtml(theme.title)}</h6>
+            <h2 class="metal-gold abschnitt" style="margin:22px 0 8px;">${escapeHtml(theme.title)}</h2>
             ${nodeEditBtnHtml(theme.id)}
           </div>
           <div class="roadmap-card-list">${targets.map(roadmapCardHtml).join("")}</div>
@@ -614,10 +614,18 @@ function renderActivityHeatmap() {
     }
     const pct = dayCompletionPct(d);
     const base = lerpColor(HEATMAP_GREY, HEATMAP_GOLD, heatmapColorT(pct));
-    cell.style.background = `linear-gradient(135deg, color-mix(in srgb, ${base} 100%, white 22%) 0%, ${base} 45%, color-mix(in srgb, ${base} 100%, black 25%) 100%)`;
-    cell.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 2px rgba(0,0,0,0.35)";
+    // Eine Flaeche, ein Wert. Vorher lag auf jeder Zelle zusaetzlich ein Verlauf von 22 % heller
+    // nach 25 % dunkler plus zwei Innenschatten -- eine einzelne Zelle schwankte damit in sich um
+    // rund 47 Prozentpunkte. In einer Heatmap IST die Helligkeit die Aussage: dadurch konnte die
+    // untere rechte Ecke einer guten Woche dunkler sein als die obere linke einer schlechten, und
+    // beim Vergleich zweier Zellen wusste man nicht, ob der Unterschied aus den Daten kam.
+    cell.style.background = base;
+    // Der Tag laesst sich am Titel schon ablesen, dazu noch der Wert in Klartext -- vorher stand
+    // dort das Maschinendatum.
+    cell.title = pct === null
+      ? formatDatum(key)
+      : `${formatDatum(key)}: ${pct} % der Punkte`;
     if (key === todayKey) cell.classList.add("today");
-    cell.title = `${key}${pct === null ? "" : ": " + pct + "%"}`;
     cell.dataset.date = key;
     wrap.appendChild(cell);
   }
@@ -643,7 +651,7 @@ function renderDaySheetHabits(dateObj) {
       ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1" aria-hidden="true">${doneToday ? splatSvg(h.id) : ""}</button>`
       : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" data-date="${key}" aria-label="${escapeHtml(h.title)}: ${doneToday ? "erledigt, zum Zurücknehmen antippen" : "offen, zum Abhaken antippen"}">${doneToday ? splatSvg(h.id) : ""}</button>`;
     const weightInputHtml = h.type === "weight"
-      ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:72px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" data-date="${key}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
+      ? `<span class="wert-mit-einheit"><input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:62px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" data-date="${key}" aria-label="${escapeHtml(h.title)}: Gewicht in Kilogramm" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}"><span class="wert-einheit">kg</span></span>`
       : "";
     return `
       <div class="atlas-row${doneToday ? " done" : ""}">

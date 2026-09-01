@@ -479,16 +479,68 @@ function markiereFehlendesFeld(feld, text) {
   }, { once: true });
 }
 
+// Merkt sich, was vor dem Dialog den Fokus hatte, damit er danach dorthin zurueckkehrt.
+let fokusVorDialog = null;
+// Scrollstand der Seite, solange ein Dialog sie festhaelt.
+let gemerkterScroll = 0;
+
+// Alles, was in einem Dialog anspringbar ist -- in Dokumentreihenfolge.
+function dialogZiele() {
+  return [...modalBody.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )].filter(el => el.offsetParent !== null || el === document.activeElement);
+}
+
 function openModal(html, onMount, mode = "dialog") {
+  fokusVorDialog = document.activeElement;
   overlay.classList.toggle("dialog-mode", mode === "dialog");
   modalBody.innerHTML = mode === "sheet" ? '<div class="modal-grabber"></div>' + html : html;
   overlay.classList.remove("hidden");
+  // Ein Dialog muss sich auch als solcher zu erkennen geben: sonst liest eine Vorlesestimme
+  // einfach durch die Seite dahinter weiter, weil das hier fuer sie nur ein sichtbar gewordenes
+  // div ist.
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  const ueberschrift = modalBody.querySelector("h2, h3");
+  if (ueberschrift) {
+    if (!ueberschrift.id) ueberschrift.id = "dialogTitel";
+    overlay.setAttribute("aria-labelledby", ueberschrift.id);
+  } else {
+    overlay.removeAttribute("aria-labelledby");
+  }
+  // Seite dahinter festhalten. Ohne das scrollt die Liste unter dem Dialog mit, und nach dem
+  // Schliessen steht man woanders als vorher. scrollTop wird gemerkt und zurueckgesetzt, weil
+  // position:fixed den Stand sonst verliert.
+  gemerkterScroll = window.scrollY;
+  document.body.classList.add("dialog-offen");
+  document.body.style.top = `-${gemerkterScroll}px`;
+
   if (onMount) onMount(modalBody);
+
+  // In den Dialog hinein fokussieren, sonst landet die erste Tabulatortaste in der Kopfzeile
+  // dahinter. Ein Eingabefeld zuerst -- da will man ohnehin hin.
+  const ziele = dialogZiele();
+  const feld = modalBody.querySelector('input:not([type="hidden"]), textarea, select');
+  (feld || ziele[0] || modalBody).focus({ preventScroll: true });
 }
+
+
 function closeModal() {
   overlay.classList.add("hidden");
+  overlay.removeAttribute("role");
+  overlay.removeAttribute("aria-modal");
+  overlay.removeAttribute("aria-labelledby");
   modalBody.innerHTML = "";
   currentDaySheetKey = null;
+  document.body.classList.remove("dialog-offen");
+  document.body.style.top = "";
+  window.scrollTo(0, gemerkterScroll);
+  // Zurueck zu dem Element, von dem aus geoeffnet wurde -- sonst faengt man nach dem Schliessen
+  // wieder ganz oben an.
+  if (fokusVorDialog && document.contains(fokusVorDialog)) {
+    fokusVorDialog.focus({ preventScroll: true });
+  }
+  fokusVorDialog = null;
 }
 overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
 // Escape schliesst, Enter in einem einzeiligen Feld speichert — vorher ging beides nur mit der Maus
@@ -496,6 +548,20 @@ overlay.addEventListener("click", e => { if (e.target === overlay) closeModal();
 document.addEventListener("keydown", e => {
   if (overlay.classList.contains("hidden")) return;
   if (e.key === "Escape") { e.preventDefault(); closeModal(); return; }
+  // Fokusfang: der Tabulator laeuft im Kreis durch den Dialog, statt hinter ihn zu wandern.
+  if (e.key === "Tab") {
+    const ziele = dialogZiele();
+    if (!ziele.length) { e.preventDefault(); return; }
+    const erstes = ziele[0], letztes = ziele[ziele.length - 1];
+    if (!modalBody.contains(document.activeElement)) {
+      e.preventDefault(); (e.shiftKey ? letztes : erstes).focus();
+    } else if (e.shiftKey && document.activeElement === erstes) {
+      e.preventDefault(); letztes.focus();
+    } else if (!e.shiftKey && document.activeElement === letztes) {
+      e.preventDefault(); erstes.focus();
+    }
+    return;
+  }
   if (e.key === "Enter" && !e.shiftKey && e.target.tagName === "INPUT" && e.target.type !== "date" && e.target.type !== "time") {
     const speichern = modalBody.querySelector("#mSave");
     if (speichern) { e.preventDefault(); speichern.click(); }

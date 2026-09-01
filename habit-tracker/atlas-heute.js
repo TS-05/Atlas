@@ -415,7 +415,7 @@ function renderRoutineChain() {
       ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1" aria-hidden="true">${doneToday ? splatSvg(h.id) : ""}</button>`
       : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" aria-label="${escapeHtml(habitTitleOn(h, today))}: ${doneToday ? "erledigt, zum Zurücknehmen antippen" : "offen, zum Abhaken antippen"}">${doneToday ? splatSvg(h.id) : ""}</button>`;
     const weightInputHtml = h.type === "weight"
-      ? `<input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:72px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" placeholder="kg" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}">`
+      ? `<span class="wert-mit-einheit"><input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:62px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" aria-label="${escapeHtml(h.title)}: Gewicht in Kilogramm" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}"><span class="wert-einheit">kg</span></span>`
       : "";
     // Der Titel zeigt die Stufe, auf der der Regler gerade steht ("6 Uhr aufstehen" vs. "7 Uhr
     // aufstehen") — so ist ohne zweite Zeile klar, was heute gilt.
