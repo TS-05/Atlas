@@ -864,50 +864,29 @@ textarea.input { min-height: 90px; resize: vertical; }
   /* Der Container vergroessert selbst nicht mehr -- das tun die drei Zonen darin. */
 }
 
-/* ---------- Zonen der Tropfenlinse ----------
-   Ein Tropfen vergroessert in der Mitte am staerksten, zum Rand hin faellt es ab, und ganz aussen
-   staucht sich das Bild. Drei Schichten bilden dieses Profil nach; die Masken laufen weich
-   ineinander, damit zwischen den Zonen keine Kante steht.
-   Die Maske sitzt aussen und wird NICHT skaliert -- sonst zoege die Vergroesserung die
-   Zonengrenzen mit. Skaliert wird erst innen. */
-.lens-schicht {
-  position: absolute; inset: 0; pointer-events: none;
-  /* Ohne das kachelt die Maske: mask-repeat steht ohne Angabe auf "repeat", der Kreis wiederholt
-     sich also ueber die ganze Flaeche und schneidet ueberall Fenster aus -- genau das sah wie ein
-     Doppelbild aus. */
-  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+/* ---------- Tropfenlinse ----------
+   .ring-lens fuellt genau die Blase: dort haengt der Verzerrungsfilter, damit seine Karte immer
+   mittig und blasengross liegt, egal wo die Blase gerade steht. Vorher lag hier die Ringkopie
+   selbst und wurde per scale() vergroessert -- gleichmaessig, also wie flaches Glas.
+   Drei gestaffelte Zoomstufen waren der Zwischenschritt und hatten an jeder Stufengrenze eine
+   sichtbare Kante; der Filter macht denselben Verlauf stetig. */
+.ring-lens {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.26s ease;
+  filter: url(#tropfenBrechung);
 }
 .lens-inhalt {
-  position: absolute; inset: 0;
-  /* Die Blase waechst beim Ziehen (--grow) und skaliert als Elternelement ihren Inhalt mit.
-     Das wuerde jede Zone heimlich mit hochziehen -- also herausrechnen. Die gerichtete Dehnung
-     (--sx/--sy) bleibt bewusst drin: dadurch verschmiert der Inhalt beim schnellen Ziehen mit. */
-  transform: scale(calc(var(--zoom, 1) / var(--grow, 1)));
-  transform-origin: var(--lx, 50%) var(--ly, 50%);
-}
-/* Die Zonengrenzen sind hart, nicht weich. Weiche Uebergaenge blenden zwei Zonen ineinander --
-   und weil beide dieselbe Beschriftung in unterschiedlicher Groesse zeigen, entsteht dort ein
-   Doppelbild. Echte Brechung zeigt an jedem Punkt genau ein Bild, nur unterschiedlich stark
-   verschoben. Also gehoert jeder Punkt zu genau einer Zone; an den Grenzen versetzt sich das
-   Bild, wie es an einer starken Brechungskante auch tut. */
-.lens-mitte {
-  -webkit-mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
-    #000 0%, #000 45%, transparent 45.5%);
-  mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
-    #000 0%, #000 45%, transparent 45.5%);
-}
-.lens-mittelring {
-  -webkit-mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
-    transparent 45%, #000 45.5%, #000 78%, transparent 78.5%);
-  mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
-    transparent 45%, #000 45.5%, #000 78%, transparent 78.5%);
-}
-.lens-rand {
-  -webkit-mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
-    transparent 78%, #000 78.5%, #000 100%);
-  mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
-    transparent 78%, #000 78.5%, #000 100%);
+  position: absolute;
+  /* Die Blase waechst beim Ziehen (--grow) und skaliert als Elternelement ihren Inhalt mit --
+     herausrechnen, damit die Ringkopie deckungsgleich ueber dem echten Ring bleibt. Die
+     gerichtete Dehnung (--sx/--sy) bleibt bewusst drin: dadurch verschmiert der Inhalt beim
+     schnellen Ziehen mit. */
+  transform: scale(calc(1 / var(--grow, 1)));
+  /* Bezugspunkt setzt app.js auf die Blasenmitte. */
 }
 .ring-handle.is-lensing .ring-lens { opacity: 1; }
 .ring-lens .ring-btn {

@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=84">
+<link rel="stylesheet" href="style.css?v=86">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -50,6 +50,24 @@
     <filter id="inkRoughWide" x="-30%" y="-60%" width="160%" height="220%">
       <feTurbulence type="fractalNoise" baseFrequency="0.06 0.35" numOctaves="3" seed="7" result="noise"/>
       <feDisplacementMap in="SourceGraphic" in2="noise" scale="6"/>
+    </filter>
+    <!-- Brechung des Wassertropfens. Die Karte (assets/tropfen-brechung.png) kodiert in Rot und
+         Gruen, um wie viel jeder Punkt verschoben wird: in der Mitte am staerksten, nach aussen
+         stetig abfallend, am Rand ins Stauchen kippend. Stetig heisst hier woertlich -- gestaffelte
+         Zoomstufen hatten an jeder Stufengrenze eine sichtbare Kante.
+         color-interpolation-filters="sRGB" ist Pflicht: sonst liest der Filter die Karte in
+         linearem RGB und das ganze Feld stimmt nicht mehr.
+         Die Staerke (scale) setzt app.js, weil sie mit dem Blasenradius mitwachsen muss. -->
+    <!-- Filterbereich EXAKT auf den Kasten des Elements. Mit einem Rand (-25%/150%) landete die
+         Karte am Rand des Filterbereichs statt auf der Blase, und der Inhalt war sichtbar nach
+         oben versetzt. Ohne eigene Masse am feImage erbt es den Filterbereich und liegt damit
+         genau auf dem Element. Abgeschnitten wird dabei nichts, was man sonst saehe: die Blase
+         beschneidet ihren Inhalt ohnehin (overflow:hidden). -->
+    <filter id="tropfenBrechung" x="0" y="0" width="100%" height="100%"
+            color-interpolation-filters="sRGB">
+      <feImage href="assets/tropfen-brechung.png?v=1" preserveAspectRatio="none" result="karte"/>
+      <feDisplacementMap id="tropfenVersatz" in="SourceGraphic" in2="karte"
+                         scale="9" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
     <radialGradient id="liquidBallGrad" cx="35%" cy="28%" r="75%">
       <stop offset="0" stop-color="#fffdf2"/>
@@ -785,6 +803,6 @@
   <span id="undoText"></span>
   <button class="btn btn-ghost" id="undoBtn">Rückgängig</button>
 </div>
-<script src="app.js?v=86"></script>
+<script src="app.js?v=87"></script>
 </body>
 </html>
