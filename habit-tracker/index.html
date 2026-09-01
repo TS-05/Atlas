@@ -679,6 +679,19 @@
   <span id="undoText"></span>
   <button class="btn btn-ghost" id="undoBtn">Rückgängig</button>
 </div>
-<script src="app.js?v=99"></script>
+<!-- app.js war eine Datei mit 6.461 Zeilen. Aufgeteilt in neun, die Reihenfolge hier ist
+     exakt die frühere Reihenfolge in der einen Datei. Bewusst normale Skripte und keine
+     Module: sie teilen sich damit weiterhin einen Gültigkeitsbereich, und das Aufteilen
+     ändert am Verhalten nichts. Die Reihenfolge ist deshalb nicht beliebig — sie muss so
+     bleiben, weil Funktionen nicht mehr über Dateigrenzen hinweg vorgezogen werden. -->
+<script src="atlas-daten.js?v=2"></script>
+<script src="atlas-grundlagen.js?v=2"></script>
+<script src="atlas-aufgaben.js?v=2"></script>
+<script src="atlas-heute.js?v=2"></script>
+<script src="atlas-roadmap.js?v=2"></script>
+<script src="atlas-ereignisse.js?v=2"></script>
+<script src="atlas-gym.js?v=2"></script>
+<script src="atlas-finanzen.js?v=2"></script>
+<script src="atlas-start.js?v=2"></script>
 </body>
 </html>
