@@ -931,27 +931,33 @@ textarea.input { min-height: 90px; resize: vertical; }
   opacity: 0;                       /* in Ruhe komplett weg */
   transition: opacity 0.28s ease;
 }
-/* Brechungskante, 1 mm breit.
-   Vorher stand hier ein gesaettigter Saum in Blau, Orange und Violett. Das ist die Physik einer
-   SEIFENBLASE: Interferenz an einer duennen Haut erzeugt kraeftige Regenbogenfarben. Wasser hat
-   keine Haut -- ein Tropfen ist ein Volumen, und was man an seinem Rand sieht, ist Brechung:
-   eine helle Kante dort, wo das Licht austritt, ein dunkles Band aus Totalreflexion gegenueber,
-   und nur ein Hauch Farbzerlegung. Deshalb hier fast farblos, mit einer Spur warm/kalt an den
-   gegenueberliegenden Kanten. */
+/* Brechungskante mit Farbzerlegung -- als Haarlinie ganz aussen, 1,4 px.
+   Die Farben sind zurueck, aber die Breite entscheidet, was man sieht: als 1 mm breites Band
+   lesen sie sich als Seifenhaut (Interferenz), als Haarlinie am aeussersten Rand als Dispersion.
+   Und dort gehoeren sie auch physikalisch hin: die Zerlegung in Farben ist am Rand eines Tropfens
+   am staerksten, wo die Strahlen am flachsten durchs Glas laufen -- in der Flaeche sieht man sie
+   praktisch nicht.
+   In dieselbe Linie faellt die uebrige Randoptik: die helle Austrittskante dort, wo das Licht
+   austritt, und das dunkle Band der Totalreflexion gegenueber. */
 .ring-handle::before {
   inset: 0;
-  padding: 1mm;
+  padding: 1.4px;
   background: conic-gradient(from 205deg,
     rgba(255,255,255,0.00)   0deg,
-    rgba(214,232,255,0.18)  22deg,    /* Spur kalt -- Blau bricht am staerksten */
-    rgba(255,255,255,0.62)  46deg,    /* helle Austrittskante, der Lichtquelle gegenueber */
-    rgba(255,255,255,0.14) 100deg,
-    rgba(0,0,0,0.26)       152deg,    /* Totalreflexion: dunkles Band am streifenden Rand */
-    rgba(0,0,0,0.09)       212deg,
-    rgba(255,232,198,0.16) 250deg,    /* Spur warm -- Rot bricht am schwaechsten */
-    rgba(255,255,255,0.34) 292deg,
+    rgba(120,200,255,0.78)  16deg,    /* kalt -- Blau bricht am staerksten */
+    rgba(255,255,255,0.72)  46deg,    /* helle Austrittskante */
+    rgba(255,190,130,0.70)  74deg,    /* warm, direkt daneben: die Zerlegung selbst */
+    rgba(255,255,255,0.10) 108deg,
+    rgba(0,0,0,0.30)       152deg,    /* Totalreflexion: dunkles Band am streifenden Rand */
+    rgba(0,0,0,0.10)       206deg,
+    rgba(150,120,255,0.72) 236deg,    /* violett */
+    rgba(255,170,120,0.68) 262deg,    /* orange */
+    rgba(255,255,255,0.40) 292deg,
+    rgba(120,220,255,0.60) 322deg,    /* kalt */
     rgba(255,255,255,0.00) 360deg);
-  filter: blur(0.8px);
+  /* Kaum Unschaerfe -- sonst laeuft die Haarlinie zu einem Band auseinander und ist wieder Haut
+     statt Kante. Ein Hauch bleibt, damit sie nicht auf dem Pixelraster ausfranst. */
+  filter: blur(0.35px);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
