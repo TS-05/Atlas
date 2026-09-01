@@ -1688,6 +1688,44 @@ function levelSwitchHtml(habit, dateKey) {
     </button>`;
 }
 
+// Fragt den Namen der kleinen Version ab. Bewusst NACH dem Umlegen: der Regler reagiert sofort,
+// die Frage kommt obendrauf und laesst sich uebergehen -- dann bleibt es bei halben Punkten ohne
+// eigenen Namen, so wie bisher.
+function openMinimalTitelModal(habit) {
+  openModal(`
+    <h3>Wie heißt die kleine Version?</h3>
+    <p class="text-muted" style="font-size:var(--text-sm); margin:0 0 12px;">
+      „${escapeHtml(habit.title)}“ steht jetzt auf der niedrigeren Latte. Gib ihr einen eigenen
+      Namen, dann heißt die Zeile so, sobald der Regler rechts steht.
+    </p>
+    <div class="field">
+      <label>Name auf Minimalstufe</label>
+      <input type="text" id="mMinTitel" value="${escapeHtml(habit.title)}">
+      <p class="hint" style="margin-top:4px;">Beispiel: „6 Uhr aufstehen“ wird zu „7 Uhr aufstehen“.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mMinSkip">Ohne Namen</button>
+      <button class="btn btn-primary" id="mMinSave">Speichern</button>
+    </div>
+  `, body => {
+    const feld = body.querySelector("#mMinTitel");
+    feld.focus();
+    feld.select();
+    body.querySelector("#mMinSkip").addEventListener("click", closeModal);
+    body.querySelector("#mMinSave").addEventListener("click", () => {
+      const wert = feld.value.trim();
+      if (!wert) { markiereFehlendesFeld(feld, "Schreib den Namen der kleinen Version hin — oder geh ohne Namen weiter."); return; }
+      if (wert === habit.title) { markiereFehlendesFeld(feld, "Das ist derselbe Name wie auf der Idealstufe. Dann ändert sich beim Umlegen nichts."); return; }
+      habit.minimalTitle = wert;
+      saveData();
+      closeModal();
+      renderAll();
+      if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
+    });
+    feld.addEventListener("keydown", ev => { if (ev.key === "Enter") body.querySelector("#mMinSave").click(); });
+  });
+}
+
 function computeStreak(habit) {
   let streak = 0;
   let d = new Date();
@@ -3503,6 +3541,14 @@ document.addEventListener("click", e => {
       saveData();
       renderAll();
       if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
+      // Der Regler steht in jeder Zeile, aber die Zeile heisst nur dann anders, wenn fuer die
+      // Gewohnheit ueberhaupt eine kleine Version benannt ist. Ohne die passierte beim Umlegen
+      // sichtbar nichts ausser halben Punkten -- der Regler versprach also etwas, das er nicht
+      // halten konnte. Beim ERSTEN Umlegen auf Minimal wird der Name deshalb hier erfragt,
+      // genau an der Stelle, an der die Frage aufkommt. Danach nie wieder.
+      if (neu === "minimal" && !habitHasMinimal(habit) && !habit.noMinimal) {
+        openMinimalTitelModal(habit);
+      }
     }
     return;
   }
