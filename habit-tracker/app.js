@@ -1438,9 +1438,8 @@ document.getElementById("prayerTypeBitte").addEventListener("click", () => { pra
 document.getElementById("prayerTypeDank").addEventListener("click", () => { prayerAddType = "dank"; updatePrayerTypeButtons(); });
 updatePrayerTypeButtons();
 
-document.getElementById("todayLabel").textContent = new Date().toLocaleDateString("de-DE", {
-  weekday: "long", day: "2-digit", month: "long", year: "numeric"
-});
+document.getElementById("todayLabel").textContent =
+  new Date().toLocaleDateString("de-DE", { weekday: "long" }) + ", " + formatDatum(todayStr());
 
 // ---------- Modal helper ----------
 const overlay = document.getElementById("modalOverlay");
@@ -1826,7 +1825,7 @@ function renderTaskItem(t) {
   // die Zahl trägt nichts, was das Wort nicht schon sagt.
   const metaParts = isLernfeld ? [] : [escapeHtml(effort.label)];
   if (t.dueDate) {
-    const faellig = "fällig " + formatDatumKurz(t.dueDate) + (t.dueTime ? ", " + t.dueTime : "");
+    const faellig = "fällig " + formatDatum(t.dueDate) + (t.dueTime ? ", " + t.dueTime : "");
     // Überfällig färbt das Datum selbst, statt daneben einen zweiten roten Chip zu stellen: der
     // war das breiteste Element der Zeile und stand bei fast jeder Aufgabe — als Warnung damit
     // wertlos, und er wiederholte nur, was das Datum schon sagt.
@@ -1865,7 +1864,7 @@ function renderTaskItem(t) {
       <textarea data-task-notes="${t.id}" rows="3" placeholder="Details, Kontext, nächste Schritte…">${escapeHtml(t.notes || "")}</textarea>
       <div class="task-expand-meta">
         <span>Aufwand: ${effort.level} · ${escapeHtml(effort.label)} (${escapeHtml(effort.time)})</span>
-        ${t.dueDate ? `<span>Fällig: ${formatDatumKurz(t.dueDate)}${t.dueTime ? " · " + t.dueTime : ""}</span>` : ""}
+        ${t.dueDate ? `<span>Fällig: ${formatDatum(t.dueDate)}${t.dueTime ? " · " + t.dueTime : ""}</span>` : ""}
         ${t.priority > 0 ? `<span>Priorität: ${PRIORITAETS_WORT[t.priority] || t.priority}</span>` : ""}
         ${node ? `<span>Zielbereich: ${escapeHtml(node.title)}</span>` : ""}
       </div>
@@ -2064,16 +2063,14 @@ function learningRoutineHabit(habits) {
   }) || null;
 }
 
-// Ein Datum, eine Schreibweise. Vorher standen auf dem ToDo-Bildschirm gleichzeitig
-// "Montag, 31. August 2026" (Kopfzeile), "Montag 27.7.2026" (Gruppe) und "fällig 2026-07-21"
-// (Zeile) — die letzte ist Maschinenformat und liest sich auch so. Das Jahr steht nur, wenn es
-// nicht das laufende ist.
-function formatDatumKurz(key) {
-  const d = dateFromKey(key);
-  const gleichesJahr = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString("de-DE", gleichesJahr
-    ? { day: "numeric", month: "long" }
-    : { day: "numeric", month: "long", year: "numeric" });
+// Ein Datum, eine Schreibweise: TT.MM.JJJJ, ueberall gleich, Jahr immer dabei.
+// Vorher gab es sieben verschiedene Konfigurationen im Code -- unter anderem "1. September" bei
+// Aufgaben neben "01.09.2026" bei den Sparzielen, also dieselbe Sache in zwei Schreibweisen.
+// Ausdruecklich NICHT hierueber laufen Monats- und Wochentagsbeschriftungen ("September 2026" als
+// Abschnittsueberschrift, "Sep" an einer Diagrammachse, "Montag" im Tagesblatt): das sind keine
+// Daten, sondern Zeitraum- bzw. Tagesnamen.
+function formatDatum(key) {
+  return dateFromKey(key).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 // "P4" sagt nicht, ob 4 viel oder wenig ist — je nach System ist mal 1 und mal 5 das Dringendste.
@@ -3119,7 +3116,7 @@ function openDaySheet(dateKey) {
   const d = dateFromKey(dateKey);
   const pct = dayCompletionPct(d);
   const weekday = d.toLocaleDateString("de-DE", { weekday: "long" });
-  const dateLabel = d.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+  const dateLabel = formatDatum(dateKey);
   const levelLabel = pct === null ? "Keine Gewohnheiten an diesem Tag fällig." : `${pct}% der Aufgaben erledigt`;
   openModal(`
     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
@@ -3846,7 +3843,7 @@ function gymNum(v) {
   return (Math.round(v * 10) / 10).toLocaleString("de-DE");
 }
 function gymDateLabel(key) {
-  return dateFromKey(key).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+  return dateFromKey(key).toLocaleDateString("de-DE", { weekday: "short" }) + ", " + formatDatum(key);
 }
 function gymSessions() {
   state.gymSessions = state.gymSessions || [];
@@ -4927,7 +4924,7 @@ function financeWealthHeroHtml() {
 function financeExpenseDayLabel(dateKey) {
   if (dateKey === todayStr()) return "Heute";
   if (dateKey === todayStr(-1)) return "Gestern";
-  return dateFromKey(dateKey).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+  return dateFromKey(dateKey).toLocaleDateString("de-DE", { weekday: "short" }) + ", " + formatDatum(dateKey);
 }
 
 // Merkt je Sparziel, ob es beim letzten Rendern schon erreicht war — sonst wuerde die
@@ -5042,7 +5039,7 @@ function renderFinance() {
             ${budgetRingHtml(cur, target, 40, 0, true)}
             <div class="fin-goal-body">
               <div class="item-title">${escapeHtml(g.title)}</div>
-              <div class="item-meta">${formatEuro(cur)} von ${formatEuro(target)}${g.dueDate ? " · bis " + dateFromKey(g.dueDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}</div>
+              <div class="item-meta">${formatEuro(cur)} von ${formatEuro(target)}${g.dueDate ? " · bis " + formatDatum(g.dueDate) : ""}</div>
             </div>
             <div class="fin-goal-pct">${pct}%</div>
           </div>
@@ -5443,7 +5440,7 @@ function renderPrayers() {
   // nicht die Liste — inhaltlich sind das zwei verschiedene Dinge.
   const archiveEntryHtml = (p, dateKey, textKey) => `
         <div class="prayer-archive-entry">
-          <div class="item-meta">${p[dateKey] ? formatDatumKurz(p[dateKey].slice(0, 10)) : ""}</div>
+          <div class="item-meta">${p[dateKey] ? formatDatum(p[dateKey].slice(0, 10)) : ""}</div>
           <div class="item-title">${escapeHtml(p.title)}</div>
           ${p[textKey] ? `<div class="small-text">${escapeHtml(p[textKey])}</div>` : ""}
           ${(p.attachments || []).map(a => a.type.startsWith("image/")
@@ -5473,7 +5470,7 @@ function renderPrayers() {
   irrelevantWrap.innerHTML = irrelevant.length
     ? irrelevant.map(p => `
         <div class="prayer-archive-entry">
-          <div class="item-meta">${p.irrelevantAt ? formatDatumKurz(p.irrelevantAt.slice(0, 10)) : ""}</div>
+          <div class="item-meta">${p.irrelevantAt ? formatDatum(p.irrelevantAt.slice(0, 10)) : ""}</div>
           <div class="item-title">${escapeHtml(p.title)}</div>
         </div>
       `).join("")
