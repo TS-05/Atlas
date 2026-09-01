@@ -872,12 +872,33 @@ textarea.input { min-height: 90px; resize: vertical; }
    sichtbare Kante; der Filter macht denselben Verlauf stetig. */
 .ring-lens {
   position: absolute;
-  inset: 0;
+  /* Doppelt so gross gezeichnet und wieder halbiert. Der Verzerrungsfilter rastert seine Eingabe
+     einmal und schiebt danach nur noch Bildpunkte -- eine 1,75-fache Vergroesserung ist deshalb
+     echtes Hochrechnen und wird weich. Wird die Vorlage vorher in doppelter Aufloesung gezeichnet,
+     liegt die Vergroesserung wieder im Bereich des Vorhandenen und bleibt scharf.
+     transform-origin: 0 0 -- damit die Halbierung den Kasten exakt auf die Blase zurueckbringt. */
+  left: 0;
+  top: 0;
+  width: 200%;
+  height: 200%;
+  transform: scale(0.5);
+  transform-origin: 0 0;
   pointer-events: none;
   z-index: 0;
   opacity: 0;
   transition: opacity 0.26s ease;
   filter: url(#tropfenBrechung);
+}
+/* Hebt die Halbierung von .ring-lens fuer den Inhalt wieder auf. Dadurch bleibt die doppelte
+   Zeichenaufloesung eine reine Angelegenheit der aeusseren Ebene, und der Inhalt rechnet weiter
+   in normalen Koordinaten -- die beiden Skalierungen brauchen naemlich verschiedene Bezugspunkte
+   (die Halbierung die Ecke, das Herausrechnen von --grow die Blasenmitte), und das geht in einer
+   einzigen transform-Angabe nicht. */
+.lens-zoom {
+  position: absolute;
+  inset: 0;
+  transform: scale(2);
+  transform-origin: 0 0;
 }
 .lens-inhalt {
   position: absolute;

@@ -5949,6 +5949,8 @@ if (splashEl) {
     lensLayer = document.createElement("div");
     lensLayer.className = "ring-lens";
     lensLayer.setAttribute("aria-hidden", "true");
+    const zoom = document.createElement("div");
+    zoom.className = "lens-zoom";
     const inhalt = document.createElement("div");
     inhalt.className = "lens-inhalt";
     ringButtons.forEach(btn => {
@@ -5958,7 +5960,8 @@ if (splashEl) {
       copy.setAttribute("tabindex", "-1");
       inhalt.appendChild(copy);
     });
-    lensLayer.appendChild(inhalt);
+    zoom.appendChild(inhalt);
+    lensLayer.appendChild(zoom);
     ringHandle.appendChild(lensLayer);
   }
   // Die Kopie deckungsgleich ueber den echten Ring legen -- in Blasen-Koordinaten, weil sie ein
@@ -5988,7 +5991,7 @@ if (splashEl) {
     const hw = ringHandle.offsetWidth / 2, hh = ringHandle.offsetHeight / 2;
     const left = hw + (rr.left - hx);
     const top = hh + (rr.top - hy);
-    const inhalt = lensLayer.firstElementChild;
+    const inhalt = lensLayer.querySelector(".lens-inhalt");
     if (inhalt) {
       inhalt.style.left = `${left}px`;
       inhalt.style.top = `${top}px`;
@@ -5996,15 +5999,35 @@ if (splashEl) {
       inhalt.style.height = `${rr.height}px`;
       // Das Herausrechnen von --grow muss um die BLASENMITTE geschehen, nicht um die Mitte der
       // Ringkopie -- sonst wandert die Kopie beim Aufquellen unter der Blase weg.
+      // Die doppelte Zeichenaufloesung spielt hier bewusst keine Rolle: .lens-zoom hebt die
+      // Halbierung von .ring-lens auf, der Inhalt rechnet dadurch in normalen Koordinaten.
       inhalt.style.transformOrigin = `${hw - left}px ${hh - top}px`;
     }
     // Die Verschiebung der Karte ist als Anteil des Radius kodiert; der Filter rechnet in Pixeln.
     // Also muss die Staerke mit der Blase mitwachsen, sonst wird die Brechung schwaecher, je
     // groesser der Tropfen beim Ziehen wird. 0.3 = 2 x DMAX aus dem Erzeugerskript der Karte.
     const versatz = document.getElementById("tropfenVersatz");
+    const karte = document.querySelector("#tropfenBrechung feImage");
     if (versatz) {
       const sichtbarerRadius = ringHandle.getBoundingClientRect().width / 2;
-      versatz.setAttribute("scale", (sichtbarerRadius * 0.3).toFixed(2));
+      // 1.3 = 2 x DMAX aus dem Erzeugerskript der Karte. Die Auslenkung ist dort als Anteil des
+      // Radius kodiert, der Filter rechnet in Pixeln -- also muss die Staerke mit der Blase
+      // mitwachsen, sonst wird die Brechung schwaecher, je groesser der Tropfen beim Ziehen wird.
+      // x2, weil die Linse in doppelter Aufloesung gezeichnet wird: im Kasten des Filters ist
+      // alles doppelt so gross, also muss die Auslenkung es auch sein.
+      versatz.setAttribute("scale", (sichtbarerRadius * 1.3 * 2).toFixed(2));
+    }
+    // Der Filterbereich reicht bewusst ueber die Blase hinaus: bei 0,62 am Rand holt sich die
+    // Randzone Bildpunkte von bis zu 1,61 Radien aus der Mitte, also von weit ausserhalb der
+    // Blase -- ohne Rand waere dort nichts zu holen und der Saum liefe leer.
+    // Die Karte selbst muss dabei aber weiterhin genau auf der Blase liegen, nicht auf dem
+    // groesseren Filterbereich. Ihre Masse stehen deshalb ausdruecklich hier, in Pixeln.
+    if (karte) {
+      const b = ringHandle.offsetWidth * 2, hgh = ringHandle.offsetHeight * 2;
+      karte.setAttribute("x", "0");
+      karte.setAttribute("y", "0");
+      karte.setAttribute("width", String(b));
+      karte.setAttribute("height", String(hgh));
     }
 
     // Nur stanzen, solange das Glas wirklich da ist. Sonst bliebe nach dem Ausblenden ein

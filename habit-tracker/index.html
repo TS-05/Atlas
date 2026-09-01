@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=89">
+<link rel="stylesheet" href="style.css?v=92">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -63,9 +63,9 @@
          oben versetzt. Ohne eigene Masse am feImage erbt es den Filterbereich und liegt damit
          genau auf dem Element. Abgeschnitten wird dabei nichts, was man sonst saehe: die Blase
          beschneidet ihren Inhalt ohnehin (overflow:hidden). -->
-    <filter id="tropfenBrechung" x="0" y="0" width="100%" height="100%"
+    <filter id="tropfenBrechung" x="-50%" y="-50%" width="200%" height="200%"
             color-interpolation-filters="sRGB">
-      <feImage href="assets/tropfen-brechung.png?v=1" preserveAspectRatio="none" result="karte"/>
+      <feImage href="assets/tropfen-brechung.png?v=2" preserveAspectRatio="none" result="karte"/>
       <feDisplacementMap id="tropfenVersatz" in="SourceGraphic" in2="karte"
                          scale="9" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
@@ -803,6 +803,6 @@
   <span id="undoText"></span>
   <button class="btn btn-ghost" id="undoBtn">Rückgängig</button>
 </div>
-<script src="app.js?v=89"></script>
+<script src="app.js?v=92"></script>
 </body>
 </html>
