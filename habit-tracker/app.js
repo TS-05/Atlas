@@ -6090,6 +6090,30 @@ if (splashEl) {
     setTimeout(wiederAnimieren, 150);
   }
 
+  // ---------- Der Weg zwischen zwei Zustaenden ----------
+  // setzeBlase() setzt den Zielzustand synchron und ohne Uebergang -- das ist die Lehre aus den
+  // beiden Malen, an denen die Blase zwischen zwei Positionen haengen geblieben ist. Sichtbar
+  // gesprungen ist sie dadurch aber auch.
+  // Diese Funktion holt die Bewegung zurueck, ohne das Risiko: der Endzustand steht bereits im
+  // DOM, animiert wird nur die Differenz von der alten Position dorthin. Bricht die Animation ab,
+  // laeuft sie nicht an oder wird sie unterbrochen, steht die Blase trotzdem richtig.
+  // Bewusst ueber "translate" und nicht ueber "transform": transform traegt hier Position,
+  // Drehung und Dehnung aus CSS-Variablen -- eine Animation darauf wuerde das alles ersetzen.
+  // "translate" ist eine eigene Eigenschaft und legt sich obendrauf.
+  const RUHIGE_BEWEGUNG = matchMedia("(prefers-reduced-motion: reduce)");
+  function blaseGleitenLassen(vorher) {
+    if (!ringHandle || !vorher || RUHIGE_BEWEGUNG.matches) return;
+    if (typeof ringHandle.animate !== "function") return;
+    const jetzt = ringHandle.getBoundingClientRect();
+    const dx = vorher.left - jetzt.left;
+    const dy = vorher.top - jetzt.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    ringHandle.animate(
+      [{ translate: `${dx}px ${dy}px` }, { translate: "0px 0px" }],
+      { duration: 420, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" }
+    );
+  }
+
   // Die Zierde: kurz aufquellen, danach von selbst zurueckfallen. Setzt keinen Zustand.
   function blaseAntippen() {
     if (!ringHandle) return;
@@ -6100,16 +6124,24 @@ if (splashEl) {
   }
 
   function sendHandleHome() {
+    const vorher = ringHandle && ringHandle.getBoundingClientRect();
     setzeBlase("home");
+    blaseGleitenLassen(vorher);
     blaseAntippen();
   }
 
+  // Vorher lag zwischen Antippen und Tab eine feste Wartezeit von 850 ms, in der nichts passierte
+  // ausser dass sich der Globus drehte -- danach wechselte alles auf einen Schlag. Zusammen mit dem
+  // 400-ms-Ausblenden des Menues waren das 1,25 s vom Tippen bis zum benutzbaren Tab, mit einer
+  // toten Dreiviertelsekunde am Anfang. Jetzt startet der Wechsel nach 260 ms; die Globusdrehung
+  // laeuft hinter dem ausblendenden Menue weiter, statt ihn aufzuhalten.
+  const WARTEN_BIS_TAB = 260;
   function activateSlot(slot) {
     moveHandleTo(slot);
     if (globeModel && !isNaN(slot.lat) && !isNaN(slot.lon)) {
       globeModel.autoRotate = false;
       globeModel.cameraOrbit = `${slot.lon}deg ${90 - slot.lat}deg 105%`;
-      setTimeout(() => { goToTab(slot.tab); sendHandleHome(); }, 850);
+      setTimeout(() => { goToTab(slot.tab); sendHandleHome(); }, WARTEN_BIS_TAB);
     } else {
       goToTab(slot.tab); sendHandleHome();
     }
@@ -6124,7 +6156,9 @@ if (splashEl) {
       homeMenu.classList.remove("home-hidden");
       if (globeModel) globeModel.autoRotate = true;
       // Ein einziger, vollstaendiger Zustandswechsel statt dreier verschachtelter Zeitschalter.
+      const vorher = ringHandle.getBoundingClientRect();
       setzeBlase("ring");
+      blaseGleitenLassen(vorher);
       blaseAntippen();
     });
   }
