@@ -4442,55 +4442,7 @@ document.getElementById("enableNotifBtn").addEventListener("click", () => {
     checkMissedRoutineStreaks();
   });
 });
-document.getElementById("importReviewBtn").addEventListener("click", () => openImportReviewModal());
 
-// Fehlende Aufgaben aus einem zuvor heruntergeladenen Wochenrückblick (.md) wiederherstellen.
-// Fügt nur Aufgaben hinzu, deren id noch nicht existiert — bestehende Daten werden nie überschrieben.
-function openImportReviewModal() {
-  openModal(`
-    <h3>Wochenrückblick importieren</h3>
-    <p class="text-muted" style="font-size:var(--text-sm); margin-bottom:10px;">Kompletten Inhalt einer heruntergeladenen Wochenrückblick-Datei (.md) hier einfügen. Fehlende Aufgaben werden ergänzt — nichts Bestehendes wird verändert oder dupliziert.</p>
-    <div class="field">
-      <textarea id="mImportText" class="input" style="min-height:180px;" placeholder="Inhalt der .md-Datei hier einfügen …"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
-      <button class="btn btn-primary" id="mImport">Wiederherstellen</button>
-    </div>
-  `, body => {
-    body.querySelector("#mImportText").focus();
-    body.querySelector("#mCancel").addEventListener("click", closeModal);
-    body.querySelector("#mImport").addEventListener("click", () => {
-      // Fehler stehen am Feld, nicht in einem Systemfenster: sie betreffen genau diesen Text, und
-      // der Nutzer soll ihn korrigieren koennen, ohne vorher etwas wegzuklicken.
-      const feld = body.querySelector("#mImportText");
-      const raw = feld.value;
-      const match = raw.match(/```json\s*([\s\S]*?)```/);
-      if (!match) {
-        markiereFehlendesFeld(feld, "Darin steckt kein Rohdaten-Block. Füge den kompletten Inhalt der .md-Datei ein, nicht nur einen Ausschnitt.");
-        return;
-      }
-      let data;
-      try { data = JSON.parse(match[1]); } catch (e) {
-        markiereFehlendesFeld(feld, "Der Rohdaten-Block lässt sich nicht lesen — vermutlich ist beim Kopieren etwas abgeschnitten worden.");
-        return;
-      }
-      if (!Array.isArray(data.tasks)) {
-        markiereFehlendesFeld(feld, "In dieser Datei stehen keine Aufgaben. Stammt sie wirklich aus einem Wochenrückblick?");
-        return;
-      }
-      const existingIds = new Set(state.tasks.map(t => t.id));
-      const restored = data.tasks.filter(t => !existingIds.has(t.id));
-      restored.forEach(t => state.tasks.push(t));
-      saveData();
-      closeModal();
-      renderAll();
-      showToast(restored.length
-        ? `${restored.length} Aufgabe${restored.length === 1 ? "" : "n"} wiederhergestellt`
-        : "Keine fehlenden Aufgaben gefunden — alles war schon da");
-    });
-  });
-}
 function openTaskModal(defaultNodeId, source = "todo") {
   const node = defaultNodeId ? nodeById(defaultNodeId) : null;
   const isLernfeld = source === "category";
