@@ -888,6 +888,13 @@ textarea.input { min-height: 90px; resize: vertical; }
   opacity: 0;
   transition: opacity 0.26s ease;
   filter: url(#tropfenBrechung);
+  /* Beschneidet sich selbst auf den Kreis, statt sich auf das overflow:hidden der Blase zu
+     verlassen. WebKit wendet den runden Beschnitt des Elternelements NICHT auf Kinder an, die
+     eine eigene Compositing-Ebene haben -- und die hat die Linse, seit der Filter darauf liegt.
+     Auf dem iPhone lief sie deshalb ueber den Kreis hinaus bis an die eckigen Kastengrenzen, die
+     Blase sah aus wie ein abgerundetes Viereck. In Chromium faellt das nicht auf.
+     50 % im doppelt grossen Kasten ergeben nach der Halbierung genau den Blasenradius. */
+  clip-path: circle(50%);
 }
 /* Hebt die Halbierung von .ring-lens fuer den Inhalt wieder auf. Dadurch bleibt die doppelte
    Zeichenaufloesung eine reine Angelegenheit der aeusseren Ebene, und der Inhalt rechnet weiter
