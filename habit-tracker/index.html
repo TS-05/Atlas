@@ -288,6 +288,11 @@
         exposure="1.1"
         shadow-intensity="0"
       >
+        <!-- Der eigene Fortschrittsbalken von model-viewer wird ersetzt: er lief als dunkler
+             Streifen quer durch den Ring, sobald man den Globus laden sah. Sichtbar sein soll er
+             ohnehin nie -- der Ladebildschirm wartet auf ihn. Der leere Halter bleibt trotzdem,
+             falls die Wartezeit einmal in die Obergrenze laeuft. -->
+        <div slot="progress-bar" style="display:none;"></div>
       </model-viewer>
       <!-- Navigations-Ring um den Globus. Bewusst normale HTML-Buttons AUSSERHALB des 3D-Canvas:
            damit ist das Antippen zuverlässig (model-viewers eigene Dreh-Geste kann Touches auf der
@@ -657,6 +662,6 @@
   <span id="undoText"></span>
   <button class="btn btn-ghost" id="undoBtn">Rückgängig</button>
 </div>
-<script src="app.js?v=96"></script>
+<script src="app.js?v=97"></script>
 </body>
 </html>

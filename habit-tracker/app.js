@@ -5840,10 +5840,20 @@ function globusLaden() {
 // 3-Sekunden-Sequenz und zeigte einen Fortschritt an, den er nicht gemessen hat. Die Untergrenze
 // verhindert, dass er nur aufblitzt; die Obergrenze ist das Sicherheitsnetz und entspricht der
 // alten festen Dauer, laenger wird es also in keinem Fall.
+// Der Globus faengt an zu laden, sobald die Oberflaeche steht -- nicht mehr erst, wenn der
+// Ladebildschirm weg ist. Die urspruengliche Sorge war, er wuerde beim Kaltstart mit app.js und
+// dem Stylesheet um die Leitung streiten; an dieser Stelle sind die aber laengst geladen, app.js
+// laeuft am Ende des Body. Wartete der Ladebildschirm dagegen nicht auf ihn, sah man ihm beim
+// Ankommen zu: erst fehlte der Globus, dann stand der Fortschrittsbalken von model-viewer als
+// Streifen im Ring, dann war er da.
+globusLaden();
+
 const splashEl = document.getElementById("splashScreen");
 if (splashEl) {
   const MIN_MS = 700;
-  const MAX_MS = 3000;
+  // Obergrenze grosszuegiger als vorher (3 s): sie greift nur, wenn der Globus beim allerersten
+  // Start ueber eine langsame Verbindung kommt. Danach liegt er im Cache und ist sofort da.
+  const MAX_MS = 6000;
   const start = performance.now();
   let ausgeblendet = false;
   const ausblenden = () => {
@@ -5852,16 +5862,25 @@ if (splashEl) {
     splashEl.classList.add("splash-hidden");
     // transitionend allein reicht nicht: laeuft der Uebergang nicht an (Tab im Hintergrund,
     // unterbrochene Animation), bliebe der Ladebildschirm fuer immer im DOM stehen.
-    const wegRaeumen = () => { splashEl.remove(); globusLaden(); };
+    const wegRaeumen = () => splashEl.remove();
     splashEl.addEventListener("transitionend", wegRaeumen, { once: true });
     setTimeout(wegRaeumen, 1200);
   };
   const wennBereit = () => setTimeout(ausblenden, Math.max(0, MIN_MS - (performance.now() - start)));
-  if (document.readyState === "complete") wennBereit();
-  else window.addEventListener("load", wennBereit, { once: true });
+  const seiteFertig = new Promise(fertig => {
+    if (document.readyState === "complete") fertig();
+    else window.addEventListener("load", fertig, { once: true });
+  });
+  // Auf den Globus warten heisst: der Ladebildschirm bleibt, bis wirklich alles steht. Ein Fehler
+  // beim Laden zaehlt auch als fertig -- sonst haenge die App an einem Modell, das nie kommt.
+  const globusFertig = new Promise(fertig => {
+    const mv = document.getElementById("globeModel");
+    if (!mv || mv.loaded) return fertig();
+    mv.addEventListener("load", fertig, { once: true });
+    mv.addEventListener("error", fertig, { once: true });
+  });
+  Promise.all([seiteFertig, globusFertig]).then(wennBereit);
   setTimeout(ausblenden, MAX_MS);
-} else {
-  globusLaden();
 }
 
 // ---------- Die ruhende Blase tritt beim Scrollen zurueck ----------
