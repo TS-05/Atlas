@@ -655,26 +655,16 @@ textarea.input { min-height: 90px; resize: vertical; }
   background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
 }
-/* Unbestimmter Fortschritt statt gespieltem: der Balken sagt "laeuft", nicht "zu 47 % fertig".
-   Vorher lief hier eine feste Drei-Sekunden-Sequenz mit Zwischenstufen, die einen Fortschritt
-   anzeigte, den sie nicht gemessen hat -- der Ladebildschirm zaehlte nur ab. Jetzt endet er,
-   sobald die App wirklich bereit ist (siehe app.js), und der Balken macht dazu keine Aussage,
-   die er nicht halten kann. */
+/* Echter Fortschritt, ein stetig laufender Balken. Die Breite setzt app.js aus dem tatsaechlichen
+   Ladezustand (Seite und Globus, gewichtet) -- er steht also nie weiter, als wirklich geladen ist,
+   und ist erst voll, wenn alles da ist. Der Uebergang glaettet die Spruenge zwischen den
+   Fortschrittsmeldungen, damit es ein Laufen wird und kein Springen. */
 .splash-bar-fill {
   height: 100%;
-  width: 40%;
+  width: var(--fortschritt, 0%);
   border-radius: 2px;
   background: #ffffff;
-  animation: splashSlide 1.15s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-}
-@keyframes splashSlide {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(250%); }
-}
-/* Die Schleife laeuft endlos -- wer reduzierte Bewegung eingestellt hat, bekommt stattdessen
-   eine ruhende Flaeche. */
-@media (prefers-reduced-motion: reduce) {
-  .splash-bar-fill { animation: none; width: 100%; opacity: 0.45; }
+  transition: width 0.25s ease-out;
 }
 
 /* ---------- Homemenü ----------

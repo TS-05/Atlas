@@ -5855,10 +5855,39 @@ if (splashEl) {
   // Start ueber eine langsame Verbindung kommt. Danach liegt er im Cache und ist sofort da.
   const MAX_MS = 6000;
   const start = performance.now();
+  const balken = splashEl.querySelector(".splash-bar-fill");
+  const globus = document.getElementById("globeModel");
   let ausgeblendet = false;
+
+  // ---------- Der Ladebalken ----------
+  // Er zeigt echten Fortschritt, keine abgespielte Sequenz. Zwei Anteile, gewichtet nach dem,
+  // was sie tatsaechlich wiegen: alles ausser dem Globus (app.js, Stylesheet, model-viewer,
+  // Ringmasken, Splash-Bild) sind zusammen rund 1,9 MB, der Globus allein 2,4 MB.
+  const GEWICHT_SEITE = 0.4;
+  const GEWICHT_GLOBUS = 0.6;
+  let seiteWert = document.readyState === "complete" ? 1 : 0;
+  let globusWert = (globus && globus.loaded) ? 1 : 0;
+
+  function zeichne() {
+    if (!balken) return;
+    const echt = seiteWert * GEWICHT_SEITE + globusWert * GEWICHT_GLOBUS;
+    // Der kleinere der beiden Werte. Dadurch zweierlei: der Balken laeuft IMMER sichtbar an,
+    // auch wenn alles schon im Cache liegt und "echt" sofort 1 waere -- und er steht nie weiter,
+    // als tatsaechlich geladen ist. Dauert es laenger, bleibt er eben stehen, wo er steht.
+    const zeit = Math.min(1, (performance.now() - start) / MIN_MS);
+    balken.style.setProperty("--fortschritt", (Math.min(echt, zeit) * 100).toFixed(1) + "%");
+  }
+  // Der Zeitanteil muss von selbst weiterlaufen, sonst stuende der Balken zwischen zwei
+  // Ladeereignissen still.
+  const takt = setInterval(zeichne, 60);
+  zeichne();
+
   const ausblenden = () => {
     if (ausgeblendet) return;
     ausgeblendet = true;
+    clearInterval(takt);
+    // Zum Schluss ausdruecklich voll -- der Balken soll sein Ende zeigen, nicht bei 97 % abreissen.
+    if (balken) balken.style.setProperty("--fortschritt", "100%");
     splashEl.classList.add("splash-hidden");
     // transitionend allein reicht nicht: laeuft der Uebergang nicht an (Tab im Hintergrund,
     // unterbrochene Animation), bliebe der Ladebildschirm fuer immer im DOM stehen.
@@ -5866,18 +5895,25 @@ if (splashEl) {
     splashEl.addEventListener("transitionend", wegRaeumen, { once: true });
     setTimeout(wegRaeumen, 1200);
   };
+
   const wennBereit = () => setTimeout(ausblenden, Math.max(0, MIN_MS - (performance.now() - start)));
   const seiteFertig = new Promise(fertig => {
-    if (document.readyState === "complete") fertig();
-    else window.addEventListener("load", fertig, { once: true });
+    if (seiteWert === 1) return fertig();
+    window.addEventListener("load", () => { seiteWert = 1; zeichne(); fertig(); }, { once: true });
   });
   // Auf den Globus warten heisst: der Ladebildschirm bleibt, bis wirklich alles steht. Ein Fehler
   // beim Laden zaehlt auch als fertig -- sonst haenge die App an einem Modell, das nie kommt.
   const globusFertig = new Promise(fertig => {
-    const mv = document.getElementById("globeModel");
-    if (!mv || mv.loaded) return fertig();
-    mv.addEventListener("load", fertig, { once: true });
-    mv.addEventListener("error", fertig, { once: true });
+    if (!globus || globusWert === 1) return fertig();
+    // model-viewer meldet seinen Ladefortschritt laufend -- das ist der genaue Teil des Balkens.
+    globus.addEventListener("progress", e => {
+      const p = e.detail && typeof e.detail.totalProgress === "number" ? e.detail.totalProgress : 0;
+      globusWert = Math.max(globusWert, Math.min(1, p));
+      zeichne();
+    });
+    const fertigMelden = () => { globusWert = 1; zeichne(); fertig(); };
+    globus.addEventListener("load", fertigMelden, { once: true });
+    globus.addEventListener("error", fertigMelden, { once: true });
   });
   Promise.all([seiteFertig, globusFertig]).then(wennBereit);
   setTimeout(ausblenden, MAX_MS);
