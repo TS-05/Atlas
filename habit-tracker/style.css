@@ -408,10 +408,11 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-neutral-500);
   white-space: nowrap; transition: color 0.18s ease, background 0.18s ease;
 }
+/* Flach wie der Primärknopf. Der Verlauf mit Schein darunter war nach dem Glätten von .btn-primary
+   die letzte glänzende Fläche der App und stach dadurch heraus, obwohl er nur eine Auswahl zeigt. */
 .subtab.active {
   color: var(--color-bg); font-weight: 600;
-  background: linear-gradient(160deg, var(--color-accent-200), var(--color-accent-600));
-  box-shadow: 0 1px 6px color-mix(in srgb, var(--color-accent-700) 45%, transparent);
+  background: var(--color-accent-500);
 }
 .subpanel { display: none; }
 .subpanel.active { display: block; animation: subpanelIn 0.22s ease both; }
