@@ -1238,21 +1238,6 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* "In Arbeit" steht in der Meta-Zeile statt als Chip neben dem Titel: als Chip drückte er den
    Titel von vier auf sechs Zeilen und die Zeile von 127 auf 241 px (gemessen bei 375 px Breite).
    Das Kästchen (halb gefüllter Kreis) und die Sortierung nach ganz oben tragen das Signal ohnehin. */
-/* "In Arbeit" ruhig, aber unübersehbar: ein langsam atmender Punkt vor dem Titel statt eines
-   Balkens quer durch die Zeile. Der Zustand steht ohnehin ganz oben in der Liste — er muss nicht
-   auch noch schreien. */
-.titel-in-arbeit { position: relative; padding-left: 16px; }
-.titel-in-arbeit::before {
-  content: ''; position: absolute; left: 1px; top: 50%;
-  width: 7px; height: 7px; margin-top: -4px; border-radius: 50%;
-  background: var(--color-accent-400);
-  animation: in-arbeit-puls 2.6s ease-out infinite;
-}
-@keyframes in-arbeit-puls {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-400) 50%, transparent); }
-  70%  { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-accent-400) 0%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-400) 0%, transparent); }
-}
 .meta-progress {
   color: var(--color-accent-300); font-weight: 600;
   font-size: var(--text-3xs); letter-spacing: 0.06em; text-transform: uppercase;
@@ -1600,3 +1585,34 @@ textarea.input { min-height: 90px; resize: vertical; }
    sonst wuerde das Kreuz als spaeteres Element dem Haken Flaeche wegnehmen. */
 .gebet-aktion::after { content: ""; position: absolute; inset: -10px; border-radius: 12px; }
 .gebet-aktion-ablegen { margin-left: 8px; }
+
+/* ---------- Aufgabe „In Arbeit": der ganze Rahmen leuchtet ----------
+   Als innen liegender Ring über box-shadow, nicht als echter Rahmen: ein Rahmen würde die Zeile
+   um 3 px höher machen und die Liste beim Umschalten springen lassen.
+   Das Leuchten liegt auf einem eigenen Pseudo-Element und atmet über die Deckkraft — die läuft auf
+   dem Compositor, eine animierte box-shadow müsste in jedem Bild neu gezeichnet werden.
+   Der bisher atmende Punkt vor dem Titel ist dafür entfallen; zwei pulsierende Dinge in einer
+   Zeile sind Unruhe, kein Signal. */
+.atlas-row.in-arbeit {
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1.5px var(--color-accent-500);
+  background: color-mix(in srgb, var(--color-accent-900) 22%, transparent);
+  /* Schlägt .gold-frame („heute fällig"), wenn beides zutrifft: „in Arbeit" ist der aktive
+     Zustand, „heute fällig" nur ein Termin. overflow muss dabei offen bleiben, sonst schneidet
+     der Rahmen von .gold-frame das Leuchten ab. */
+  border-color: transparent;
+  overflow: visible;
+}
+.atlas-row.in-arbeit::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  border-radius: inherit;
+  box-shadow: 0 0 16px 1px color-mix(in srgb, var(--color-accent-500) 55%, transparent);
+  animation: in-arbeit-atmen 2.6s ease-in-out infinite;
+}
+@keyframes in-arbeit-atmen {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
+}
+/* Die Trennlinien ober- und unterhalb würden in den Rahmen hineinlaufen. */
+.task-item + .task-item > .atlas-row.in-arbeit::before { display: none; }
+.task-item:has(.atlas-row.in-arbeit) + .task-item > .atlas-row::before { display: none; }

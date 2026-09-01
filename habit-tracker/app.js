@@ -1798,11 +1798,11 @@ function renderTaskItem(t) {
         <span class="paint-done-stroke">${paintStrokeSvgHtml(t.id)}</span>
         <span class="paint-done-text">${escapeHtml(t.title)}</span>
       </div>`
-    : `<div class="item-title${status === "inArbeit" ? " titel-in-arbeit" : ""}">${escapeHtml(t.title)}</div>`;
+    : `<div class="item-title">${escapeHtml(t.title)}</div>`;
   const el = document.createElement("div");
   el.className = "task-item" + (expanded ? " expanded" : "");
   el.innerHTML = `
-    <div class="atlas-row${t.done ? " done" : ""}${dueToday ? " gold-frame" : ""}" data-task-row="${t.id}">
+    <div class="atlas-row${t.done ? " done" : ""}${dueToday ? " gold-frame" : ""}${status === "inArbeit" ? " in-arbeit" : ""}" data-task-row="${t.id}">
       <button class="atlas-check${t.done ? " checked" : ""}${status === "inArbeit" ? " in-progress" : ""}" data-task="${t.id}"
               aria-label="${status === "offen" ? "Als in Arbeit markieren" : status === "inArbeit" ? "Als erledigt markieren" : "Wieder auf offen setzen"}"
               >${t.done ? splatSvg(t.id) : (status === "inArbeit" ? inProgressSvg() : "")}</button>
