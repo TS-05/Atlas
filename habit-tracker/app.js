@@ -1066,7 +1066,14 @@ function splatSvg(id) {
 // als quadratischer Schein verstaerkt wurde; bei Mi/Fr lief der Pinselstrich zusaetzlich hart in den
 // Bildrand. Beides ist in den PNGs behoben — der Query-Parameter erzwingt, dass der Service-Worker-
 // Cache (cache-first) die neuen Dateien holt statt der alten.
-const RING_MASKS = ["ring-mask-1.png?v=2", "ring-mask-2.png?v=2", "ring-mask-3.png?v=2", "ring-mask-4.png?v=2", "ring-mask-5.png?v=2", "ring-mask-6.png?v=2", "ring-mask-7.png?v=2"];
+// ?v=3: die sieben Masken hatten unterschiedlich grosse und unterschiedlich platzierte
+// Pinselstriche (Tinte 505-553 px breit, teils bis an den unteren Bildrand). Weil sie ueber die
+// Karten durchgewechselt werden, hatte dadurch "Karriere" bei 1 % einen sichtbar groesseren Ring
+// als "Glaube" bei 0 % -- Geometrie, die in einer Fortschrittsanzeige nichts kodiert, aber am
+// staerksten von allem variiert. Jetzt ist die Tinte in jeder Maske gleichmaessig auf denselben
+// Aussendurchmesser skaliert und zentriert; die handgezeichnete Kontur bleibt.
+// Originale vor der Normalisierung: assets/_backup-ring-masks-vor-normalisierung/
+const RING_MASKS = ["ring-mask-1.png?v=3", "ring-mask-2.png?v=3", "ring-mask-3.png?v=3", "ring-mask-4.png?v=3", "ring-mask-5.png?v=3", "ring-mask-6.png?v=3", "ring-mask-7.png?v=3"];
 function pieSlicePath(pct) {
   const cx = 100, cy = 100, R = 105;
   if (pct >= 99.5) return "M0,0 H200 V200 H0 Z";
@@ -2606,10 +2613,20 @@ function renderRoadmapDashboard() {
     const ringHtml = pct === null
       ? goldRingHtml(0, 88, i).replace(">0%<", ">\u2013<")
       : goldRingHtml(pct, 88, i);
+    // "-" heisst "hier ist noch nichts geplant", "0 %" heisst "geplant, aber nichts davon erledigt".
+    // Der Unterschied stand bisher nur im Code -- auf der Kachel sahen beide gleich aus.
+    const kinder = childNodes(node.id);
+    const aufgaben = categoryTasksForNode(node.id);
+    const etappen = kinder.length || aufgaben.length;
+    const fertig = kinder.length
+      ? kinder.filter(nodeIstFertig).length
+      : aufgaben.filter(t => t.done).length;
+    const fussnote = pct === null ? "noch nichts geplant" : `${fertig} von ${etappen} Etappen`;
     card.innerHTML = `
       ${nodeEditBtnHtml(node.id)}
       <div class="roadmap-folder-name">${escapeHtml(node.title)}</div>
       <div style="display:flex; justify-content:center;">${ringHtml}</div>
+      <div class="roadmap-folder-meta">${fussnote}</div>
     `;
     wrap.appendChild(card);
   });
@@ -3990,7 +4007,7 @@ function gymRenderHeader() {
       <div class="gym-header-title"><span class="gym-day-tag">${day.tag}</span>${escapeHtml(day.label)}</div>
       <div class="gym-header-count">${done}<span> / ${total}</span></div>
     </div>
-    <div class="gym-header-bar"><i style="width:${pct}%"></i></div>
+    <div class="gym-header-bar"><i style="transform:scaleX(${(pct / 100).toFixed(4)})"></i></div>
     <div class="gym-header-foot">
       <span>${vol ? gymNum(vol) + " kg Volumen" : "noch nichts erfasst"}</span>
       ${timerHtml}
@@ -4398,19 +4415,22 @@ function openImportReviewModal() {
     body.querySelector("#mImportText").focus();
     body.querySelector("#mCancel").addEventListener("click", closeModal);
     body.querySelector("#mImport").addEventListener("click", () => {
-      const raw = body.querySelector("#mImportText").value;
+      // Fehler stehen am Feld, nicht in einem Systemfenster: sie betreffen genau diesen Text, und
+      // der Nutzer soll ihn korrigieren koennen, ohne vorher etwas wegzuklicken.
+      const feld = body.querySelector("#mImportText");
+      const raw = feld.value;
       const match = raw.match(/```json\s*([\s\S]*?)```/);
       if (!match) {
-        alert("Kein Rohdaten-JSON-Block gefunden. Bitte den kompletten Datei-Inhalt einfügen.");
+        markiereFehlendesFeld(feld, "Darin steckt kein Rohdaten-Block. Füge den kompletten Inhalt der .md-Datei ein, nicht nur einen Ausschnitt.");
         return;
       }
       let data;
       try { data = JSON.parse(match[1]); } catch (e) {
-        alert("Die Datei konnte nicht gelesen werden (ungültiges JSON).");
+        markiereFehlendesFeld(feld, "Der Rohdaten-Block lässt sich nicht lesen — vermutlich ist beim Kopieren etwas abgeschnitten worden.");
         return;
       }
       if (!Array.isArray(data.tasks)) {
-        alert("Keine Aufgaben in dieser Datei gefunden.");
+        markiereFehlendesFeld(feld, "In dieser Datei stehen keine Aufgaben. Stammt sie wirklich aus einem Wochenrückblick?");
         return;
       }
       const existingIds = new Set(state.tasks.map(t => t.id));
@@ -4419,7 +4439,9 @@ function openImportReviewModal() {
       saveData();
       closeModal();
       renderAll();
-      alert(restored.length ? `${restored.length} Aufgabe(n) wiederhergestellt.` : "Keine fehlenden Aufgaben gefunden — alles war schon vorhanden.");
+      showToast(restored.length
+        ? `${restored.length} Aufgabe${restored.length === 1 ? "" : "n"} wiederhergestellt`
+        : "Keine fehlenden Aufgaben gefunden — alles war schon da");
     });
   });
 }
@@ -4840,7 +4862,7 @@ function financePaceBar(spent, limit, small) {
   const over = pct > 100;
   const ahead = !over && pct > mp.pct + 8;
   return `<div class="fin-pace-bar${small ? " small" : ""}${over ? " over" : ahead ? " ahead" : ""}">
-      <i style="width:${Math.min(100, pct)}%"></i>
+      <i style="transform:scaleX(${(Math.min(100, pct) / 100).toFixed(4)})"></i>
       <u style="left:${Math.min(100, mp.pct)}%" title="Tag ${mp.day} von ${mp.days}"></u>
     </div>`;
 }
@@ -5384,8 +5406,18 @@ function prayerRowHtml(p) {
       <div style="flex:1; min-width:0;">
         <div class="item-title">${escapeHtml(p.title)}</div>
       </div>
-      <button class="btn btn-icon btn-ghost" data-prayer-close="${p.id}" title="${(p.type || "bitte") === "dank" ? "Gedankt" : "Erfüllt"}" style="width:26px; height:26px;">${CHECK_ICON}</button>
-      <button class="btn btn-icon btn-ghost" data-prayer-irrelevant="${p.id}" title="Nicht mehr relevant" style="width:26px; height:26px;">${CROSS_ICON}</button>
+      ${(() => {
+        // Haken und Kreuz lagen 26 px gross direkt nebeneinander — zwei folgenreiche, nur als
+        // Symbol beschriftete Aktionen in Daumenbreite. Beide haben jetzt 44 px Trefferflaeche
+        // (sichtbar bleiben sie klein) und dazwischen liegt Abstand. Rueckgaengig gibt es fuer
+        // beide schon.
+        const abschluss = (p.type || "bitte") === "dank" ? "Gedankt" : "Erfüllt";
+        return `
+      <button class="btn btn-icon btn-ghost gebet-aktion" data-prayer-close="${p.id}"
+              title="${abschluss}" aria-label="${escapeHtml(p.title)}: als ${abschluss} abschließen">${CHECK_ICON}</button>
+      <button class="btn btn-icon btn-ghost gebet-aktion gebet-aktion-ablegen" data-prayer-irrelevant="${p.id}"
+              title="Nicht mehr relevant" aria-label="${escapeHtml(p.title)}: als nicht mehr relevant ablegen">${CROSS_ICON}</button>`;
+      })()}
     </div>
   `;
 }
@@ -5405,7 +5437,7 @@ function renderPrayers() {
   // nicht die Liste — inhaltlich sind das zwei verschiedene Dinge.
   const archiveEntryHtml = (p, dateKey, textKey) => `
         <div class="prayer-archive-entry">
-          <div class="item-meta">${(p[dateKey] || "").slice(0, 10)}</div>
+          <div class="item-meta">${p[dateKey] ? formatDatumKurz(p[dateKey].slice(0, 10)) : ""}</div>
           <div class="item-title">${escapeHtml(p.title)}</div>
           ${p[textKey] ? `<div class="small-text">${escapeHtml(p[textKey])}</div>` : ""}
           ${(p.attachments || []).map(a => a.type.startsWith("image/")
@@ -5435,7 +5467,7 @@ function renderPrayers() {
   irrelevantWrap.innerHTML = irrelevant.length
     ? irrelevant.map(p => `
         <div class="prayer-archive-entry">
-          <div class="item-meta">${(p.irrelevantAt || "").slice(0, 10)}</div>
+          <div class="item-meta">${p.irrelevantAt ? formatDatumKurz(p.irrelevantAt.slice(0, 10)) : ""}</div>
           <div class="item-title">${escapeHtml(p.title)}</div>
         </div>
       `).join("")
