@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=96">
+<link rel="stylesheet" href="style.css?v=97">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -65,7 +65,7 @@
          beschneidet ihren Inhalt ohnehin (overflow:hidden). -->
     <filter id="tropfenBrechung" x="-50%" y="-50%" width="200%" height="200%"
             color-interpolation-filters="sRGB">
-      <feImage href="assets/tropfen-brechung.png?v=3" preserveAspectRatio="none" result="karte"/>
+      <feImage href="assets/tropfen-brechung.png?v=4" preserveAspectRatio="none" result="karte"/>
       <feDisplacementMap id="tropfenVersatz" in="SourceGraphic" in2="karte"
                          scale="9" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
