@@ -3,7 +3,7 @@
 // liefert sie danach auch offline aus. Bei Netzverbindung wird der Cache im Hintergrund aktualisiert.
 // Nichts fest verdrahtet — neue/versionierte Dateinamen (z.B. app.js?v=15) landen automatisch im Cache,
 // sobald sie einmal geladen wurden.
-const CACHE_NAME = "atlas-cache-v3";
+const CACHE_NAME = "atlas-cache-v4";
 const APP_SHELL = ["./", "./index.html"];
 
 self.addEventListener("install", e => {
@@ -30,7 +30,13 @@ self.addEventListener("fetch", e => {
   // Netz offline ist, sonst auf die gecachte index.html zurückfallen statt mit leerem Bildschirm zu enden.
   if (e.request.mode === "navigate") {
     e.respondWith(
-      fetch(e.request)
+      // cache: "no-cache" erzwingt eine Rueckfrage beim Server, statt index.html aus dem
+      // HTTP-Cache zu nehmen. Genau daran hing der Fehler "auf dem Handy ist noch die alte
+      // Fassung": die versionierten Adressen (style.css?v=NN) helfen nur, wenn das HTML frisch
+      // ist, das auf sie zeigt. Kommt index.html aus dem Cache, zeigt es auf die ALTEN Adressen
+      // -- und die liegen im Service-Worker-Cache, also kommt die ganze App alt zurueck.
+      // Ist nichts Neues da, antwortet der Server mit 304 und es fliesst fast nichts.
+      fetch(e.request, { cache: "no-cache" })
         .then(res => {
           const copy = res.clone();
           caches.open(CACHE_NAME).then(c => c.put(e.request, copy));
