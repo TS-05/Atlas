@@ -5933,6 +5933,20 @@ if (splashEl) {
   // frueheren Version ("sie saugt das Symbol ein"). overflow:hidden der Blase schneidet sie auf
   // die Blasenform zu, die Vergroesserung passiert um den Blasenmittelpunkt.
   let lensLayer = null;
+  // Ein echter Tropfen vergroessert nicht ueberall gleich: in der Mitte am staerksten, zum Rand hin
+  // faellt die Vergroesserung ab, und ganz aussen staucht sich das Bild sogar zusammen. Eine
+  // einzelne scale()-Angabe kann das nicht -- die vergroessert die Flaeche gleichmaessig und sieht
+  // dadurch aus wie flaches Glas, nicht wie ein Tropfen.
+  // Deshalb liegen drei Schichten uebereinander, jede mit eigener Vergroesserung und auf einen
+  // eigenen Ring der Blase maskiert. Die Masken laufen weich ineinander, damit keine Kanten
+  // zwischen den Zonen stehen bleiben.
+  // Aufbau je Schicht: aussen die Maske (nicht skaliert, sonst wuerde die Skalierung die
+  // Zonengrenzen mitziehen), innen die Vergroesserung.
+  const LINSEN_ZONEN = [
+    { name: "mitte", zoom: 1.52 },
+    { name: "mittelring", zoom: 1.24 },
+    { name: "rand", zoom: 0.94 }   // unter 1: am Rand staucht sich das Bild, statt zu wachsen
+  ];
   function buildLens() {
     if (!ringHandle || lensLayer) return;
     const ring = homeMenu.querySelector(".globe-ring");
@@ -5940,12 +5954,21 @@ if (splashEl) {
     lensLayer = document.createElement("div");
     lensLayer.className = "ring-lens";
     lensLayer.setAttribute("aria-hidden", "true");
-    ringButtons.forEach(btn => {
-      const copy = btn.cloneNode(true);
-      copy.removeAttribute("data-tab");
-      copy.removeAttribute("aria-label");
-      copy.setAttribute("tabindex", "-1");
-      lensLayer.appendChild(copy);
+    LINSEN_ZONEN.forEach(zone => {
+      const schicht = document.createElement("div");
+      schicht.className = `lens-schicht lens-${zone.name}`;
+      const inhalt = document.createElement("div");
+      inhalt.className = "lens-inhalt";
+      inhalt.style.setProperty("--zoom", zone.zoom);
+      ringButtons.forEach(btn => {
+        const copy = btn.cloneNode(true);
+        copy.removeAttribute("data-tab");
+        copy.removeAttribute("aria-label");
+        copy.setAttribute("tabindex", "-1");
+        inhalt.appendChild(copy);
+      });
+      schicht.appendChild(inhalt);
+      lensLayer.appendChild(schicht);
     });
     ringHandle.appendChild(lensLayer);
   }
@@ -5980,9 +6003,12 @@ if (splashEl) {
     lensLayer.style.top = `${top}px`;
     lensLayer.style.width = `${rr.width}px`;
     lensLayer.style.height = `${rr.height}px`;
-    // Bezugspunkt der Vergroesserung ist die Blasenmitte; der Faktor selbst steht als
-    // --lens-zoom im Stylesheet (dort wird auch --grow herausgerechnet).
-    lensLayer.style.transformOrigin = `${hw - left}px ${hh - top}px`;
+    // Bezugspunkt der Vergroesserung und Mittelpunkt der Zonen-Masken ist die Blasenmitte.
+    // Beides liest das Stylesheet aus diesen Variablen; --lr ist der Blasenradius, an dem die
+    // Zonengrenzen haengen.
+    lensLayer.style.setProperty("--lx", `${hw - left}px`);
+    lensLayer.style.setProperty("--ly", `${hh - top}px`);
+    lensLayer.style.setProperty("--lr", `${hw}px`);
     // Nur stanzen, solange das Glas wirklich da ist. Sonst bliebe nach dem Ausblenden ein
     // Symbol unsichtbar, weil die Maske einfach stehen bliebe.
     if (ringHandle.classList.contains("is-lensing")) punchRingHole(hx, hy, rr);
@@ -6205,6 +6231,12 @@ if (splashEl) {
   }
   revealHandle();
   setTimeout(() => revealHandle(true), 3600);
+
+  // Die Linse wurde bisher nur in setzeBlase("ring") gebaut -- und das laeuft beim ersten Start
+  // nie. Die allererste Auswahl setzte also is-lensing, ohne dass eine Linse existierte: keine
+  // Vergroesserung, bis man einmal in einen Tab und wieder zurueck war.
+  buildLens();
+  refreshLensRect();
 
   repositionHandle();
   setTimeout(repositionHandle, 0);

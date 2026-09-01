@@ -861,12 +861,53 @@ textarea.input { min-height: 90px; resize: vertical; }
   z-index: 0;
   opacity: 0;
   transition: opacity 0.26s ease;
+  /* Der Container vergroessert selbst nicht mehr -- das tun die drei Zonen darin. */
+}
+
+/* ---------- Zonen der Tropfenlinse ----------
+   Ein Tropfen vergroessert in der Mitte am staerksten, zum Rand hin faellt es ab, und ganz aussen
+   staucht sich das Bild. Drei Schichten bilden dieses Profil nach; die Masken laufen weich
+   ineinander, damit zwischen den Zonen keine Kante steht.
+   Die Maske sitzt aussen und wird NICHT skaliert -- sonst zoege die Vergroesserung die
+   Zonengrenzen mit. Skaliert wird erst innen. */
+.lens-schicht {
+  position: absolute; inset: 0; pointer-events: none;
+  /* Ohne das kachelt die Maske: mask-repeat steht ohne Angabe auf "repeat", der Kreis wiederholt
+     sich also ueber die ganze Flaeche und schneidet ueberall Fenster aus -- genau das sah wie ein
+     Doppelbild aus. */
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+}
+.lens-inhalt {
+  position: absolute; inset: 0;
   /* Die Blase waechst beim Ziehen (--grow) und skaliert als Elternelement ihren Inhalt mit.
-     Das wuerde die Vergroesserung heimlich auf 2 * 1.18 treiben. Also herausrechnen: die Lupe
-     bleibt bei genau --lens-zoom, die groessere Blase zeigt dafuer mehr vom Ring.
-     Die gerichtete Dehnung (--sx/--sy) bleibt bewusst drin -- dadurch verschmiert der Inhalt
-     beim schnellen Ziehen mit, so wie in der Vorlage. */
-  transform: scale(calc(var(--lens-zoom, 2) / var(--grow, 1)));
+     Das wuerde jede Zone heimlich mit hochziehen -- also herausrechnen. Die gerichtete Dehnung
+     (--sx/--sy) bleibt bewusst drin: dadurch verschmiert der Inhalt beim schnellen Ziehen mit. */
+  transform: scale(calc(var(--zoom, 1) / var(--grow, 1)));
+  transform-origin: var(--lx, 50%) var(--ly, 50%);
+}
+/* Die Zonengrenzen sind hart, nicht weich. Weiche Uebergaenge blenden zwei Zonen ineinander --
+   und weil beide dieselbe Beschriftung in unterschiedlicher Groesse zeigen, entsteht dort ein
+   Doppelbild. Echte Brechung zeigt an jedem Punkt genau ein Bild, nur unterschiedlich stark
+   verschoben. Also gehoert jeder Punkt zu genau einer Zone; an den Grenzen versetzt sich das
+   Bild, wie es an einer starken Brechungskante auch tut. */
+.lens-mitte {
+  -webkit-mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
+    #000 0%, #000 45%, transparent 45.5%);
+  mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
+    #000 0%, #000 45%, transparent 45.5%);
+}
+.lens-mittelring {
+  -webkit-mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
+    transparent 45%, #000 45.5%, #000 78%, transparent 78.5%);
+  mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
+    transparent 45%, #000 45.5%, #000 78%, transparent 78.5%);
+}
+.lens-rand {
+  -webkit-mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
+    transparent 78%, #000 78.5%, #000 100%);
+  mask-image: radial-gradient(circle var(--lr, 50%) at var(--lx, 50%) var(--ly, 50%),
+    transparent 78%, #000 78.5%, #000 100%);
 }
 .ring-handle.is-lensing .ring-lens { opacity: 1; }
 .ring-lens .ring-btn {
@@ -932,13 +973,9 @@ textarea.input { min-height: 90px; resize: vertical; }
   /* Praktisch klar: in der Vorlage sieht man die Leistenkante durch die Blase hindurchlaufen
      und ueber der Leiste den schwarzen Hintergrund. Nur ein Hauch Aufhellung oben links. */
   background:
-    /* Glanzpunkt: klein, scharf, aus der Mitte geruecht. Das ist der staerkste einzelne Hinweis
-       darauf, dass etwas fluessig ist -- er hat vorher komplett gefehlt. */
-    radial-gradient(ellipse 6% 6% at 31% 25%, rgba(255,255,255,0.95), rgba(255,255,255,0.45) 45%, transparent 78%),
-    /* Zweiter, viel schwaecherer Glanz gegenueber: Licht, das durch den Tropfen laeuft und an der
-       Rueckseite innen reflektiert wird. */
-    radial-gradient(ellipse 13% 13% at 68% 76%, rgba(255,255,255,0.20), transparent 72%),
-    /* Der Koerper bleibt fast klar -- Wasser faerbt nicht. */
+    /* Kein Glanzpunkt: ausdruecklich nicht gewuenscht. Was den Tropfen traegt, ist die Brechung
+       am Rand und das ungleichmaessige Vergroesserungsprofil, nicht ein aufgesetztes Licht.
+       Der Koerper bleibt fast klar -- Wasser faerbt nicht. */
     radial-gradient(125% 105% at 32% 20%, rgba(255,255,255,0.07), rgba(255,255,255,0.01) 45%, rgba(255,255,255,0.02) 100%);
   /* Kein saturate mehr: das faerbte den Untergrund kraeftiger und liess die Blase getoent wirken.
      Wasser bricht und hellt auf, es saettigt nicht. */
