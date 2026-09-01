@@ -966,10 +966,10 @@ textarea.input { min-height: 90px; resize: vertical; }
      Wasser bricht und hellt auf, es saettigt nicht. */
   backdrop-filter: brightness(1.07) contrast(1.03);
   -webkit-backdrop-filter: brightness(1.07) contrast(1.03);
-  /* Ein Tropfen an einer senkrechten Flaeche ist nicht kreisrund -- die Schwerkraft zieht ihn
-     unten leicht in die Laenge. Nur waehrend er angefasst wird; in Ruhe ist die Blase ein runder
-     Knopf und soll auch so aussehen. */
-  border-radius: 50% 50% 53% 53% / 47% 47% 53% 53%;
+  /* Rund. Die leicht in die Laenge gezogene Tropfenform war physikalisch begruendbar, hat aber
+     unruhig gewirkt -- bei den Groessenwechseln (Antippen, Ziehen) beult die abweichende Rundung
+     sichtbar. Ein Kreis bleibt in jeder Groesse ein Kreis. */
+  border-radius: 50%;
   /* Feine helle Kante statt Leuchtrand -- in der Vorlage ist sie kaum mehr als ein Haarstrich. */
   box-shadow:
     inset 0 0 0 1px rgba(255,255,255,0.34),
@@ -997,7 +997,10 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* Unten traegt die Blase das Globus-Symbol (Zurueck zum Hauptmenue). */
 .ring-handle.has-icon {
   display: flex; align-items: center; justify-content: center;
-  color: var(--color-accent-200);
+  /* Exakt dieselbe Farbe wie die Ringsymbole (.ring-btn) -- es ist dasselbe Bedienelement in
+     seinem anderen Zustand. Vorher stand hier das helle Gold (accent-200), wodurch der
+     Zurueck-Knopf waermer wirkte als alles, wozu er zurueckfuehrt. */
+  color: #eef3f8;
 }
 .ring-handle.has-icon .ring-lens { display: none; }
 .ring-handle.has-icon svg { display: block; }

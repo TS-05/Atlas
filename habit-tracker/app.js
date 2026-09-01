@@ -6132,10 +6132,28 @@ if (splashEl) {
     const dx = vorher.left - jetzt.left;
     const dy = vorher.top - jetzt.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-    ringHandle.animate(
+    const lauf = ringHandle.animate(
       [{ translate: `${dx}px ${dy}px` }, { translate: "0px 0px" }],
       { duration: 420, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" }
     );
+    // SICHERHEITSNETZ, und zwar ein notwendiges: die Dokumentzeit steht still, solange die Seite
+    // nicht gezeichnet wird (Tab im Hintergrund, App weggewischt). Die Animation bleibt dann bei
+    // Zeit 0 stehen -- also auf dem ERSTEN Bild, und das ist die alte Position. Ohne dieses Netz
+    // haengt die Blase genau so fest, wie sie hier schon zweimal festhing; gemessen 482 px neben
+    // ihrem Platz, waehrend der Code sie laengst am Ring waehnte.
+    // Zeitgeber laufen auch ohne Zeichnen weiter. cancel() nimmt die Animation heraus, danach
+    // gilt wieder der DOM-Zustand -- und der ist die ganze Zeit ueber der richtige.
+    const abbrechen = () => { try { lauf.cancel(); } catch (e) { /* schon beendet */ } };
+    setTimeout(abbrechen, 700);
+    // Der Zeitgeber allein reicht nicht: in einer versteckten Seite werden auch Zeitgeber
+    // gedrosselt (auf eine Sekunde und mehr). Deshalb zusaetzlich genau auf das Ereignis hoeren,
+    // das die Dokumentzeit anhaelt -- wird die Seite versteckt, wird die Animation sofort
+    // weggenommen und der richtige DOM-Zustand gilt wieder.
+    document.addEventListener("visibilitychange", function weg() {
+      if (document.visibilityState !== "hidden") return;
+      abbrechen();
+      document.removeEventListener("visibilitychange", weg);
+    });
   }
 
   // Die Zierde: kurz aufquellen, danach von selbst zurueckfallen. Setzt keinen Zustand.
