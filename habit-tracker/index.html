@@ -15,7 +15,7 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=86">
+<link rel="stylesheet" href="style.css?v=87">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -630,7 +630,7 @@
       <div id="prayerListDank" class="list" style="margin-bottom: 18px;"></div>
 
       <div class="card elev-sm" style="margin-bottom: 14px;">
-        <div class="card-title" style="font-size: 14px;">Erhörungen</div>
+        <div class="card-title" style="font-size: var(--text-lg);">Erhörungen</div>
         <p class="card-body">Beantwortete Bitten mit Datum, Text und Anhang.</p>
         <div id="prayerArchive" class="list"></div>
       </div>
@@ -638,13 +638,13 @@
       <!-- Ein abgeschlossener Dank gehört nicht zu den Erhörungen: die Erhörung ist das, wofür
            gedankt wird, nicht der Dank selbst. Deshalb ein eigener Abschnitt. -->
       <div class="card elev-sm" style="margin-bottom: 14px;">
-        <div class="card-title" style="font-size: 14px;">Wofür ich gedankt habe</div>
+        <div class="card-title" style="font-size: var(--text-lg);">Wofür ich gedankt habe</div>
         <p class="card-body">Ausgesprochener Dank mit Datum, Text und Anhang.</p>
         <div id="prayerThanksArchive" class="list"></div>
       </div>
 
       <div class="card elev-sm">
-        <div class="card-title" style="font-size: 14px;">Nicht mehr relevant</div>
+        <div class="card-title" style="font-size: var(--text-lg);">Nicht mehr relevant</div>
         <div id="prayerIrrelevantList" class="list"></div>
       </div>
     </section>
@@ -697,7 +697,7 @@
         <h6 class="metal-gold">Pünktlichkeit erledigter Aufgaben</h6>
         <div class="panel-card" style="margin-bottom:30px;">
           <div class="progress-outer"><div class="progress-inner" id="punctualityFill"></div></div>
-          <p class="text-muted" id="punctualityText" style="font-size: 12.5px; margin:0;"></p>
+          <p class="text-muted" id="punctualityText" style="font-size: var(--text-sm); margin:0;"></p>
         </div>
 
         <!-- Aufgaben und Gewohnheiten sind zwei verschiedene Dinge: bei Aufgaben zaehlen
@@ -743,7 +743,7 @@
         <div class="panel-card" style="display:flex; align-items:center; gap:14px; margin-bottom: 26px;">
           <div id="financeBudgetRing"></div>
           <div>
-            <div class="text-muted" style="font-size: 11.5px;">Budgetauslastung diesen Monat</div>
+            <div class="text-muted" style="font-size: var(--text-xs);">Budgetauslastung diesen Monat</div>
             <div class="item-title" id="financeBudgetBarLabel" style="margin-top:2px;"></div>
           </div>
         </div>
