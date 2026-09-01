@@ -1707,12 +1707,12 @@ textarea.input { min-height: 90px; resize: vertical; }
   display: block;
   /* Nur so weit vergroessert, wie die Unschaerfe an den Raendern frisst -- bei weniger Unschaerfe
      darf entsprechend weniger abgeschnitten werden, sonst sieht man vom Netz unnoetig wenig. */
-  transform: scale(1.06);
+  transform: scale(1.04);
   /* Abgedunkelt: im Homemenü ist das Netz das Bild, hier liegt Inhalt darauf. Die Helligkeit
      nimmt vor allem den warmen Flecken oben rechts zurück, der von allem am weitesten vorstand.
      saturate senkt zusätzlich das Gold, damit es nicht mit den Akzenten der Oberfläche
      konkurriert. */
-  filter: blur(8px) brightness(0.5) saturate(0.8);
+  filter: blur(5px) brightness(0.5) saturate(0.8);
   /* Teildeckend, damit der Verlauf aus body::before durchkommt — sonst wäre die Tiefe weg und
      das Netz stünde flach im Bild. */
   opacity: 0.5;
