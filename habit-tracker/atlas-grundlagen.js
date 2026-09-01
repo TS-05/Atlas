@@ -86,7 +86,7 @@ function splatSvg(id) {
 // staerksten von allem variiert. Jetzt ist die Tinte in jeder Maske gleichmaessig auf denselben
 // Aussendurchmesser skaliert und zentriert; die handgezeichnete Kontur bleibt.
 // Originale vor der Normalisierung: assets/_backup-ring-masks-vor-normalisierung/
-const RING_MASKS = ["ring-mask-1.png?v=3", "ring-mask-2.png?v=3", "ring-mask-3.png?v=3", "ring-mask-4.png?v=3", "ring-mask-5.png?v=3", "ring-mask-6.png?v=3", "ring-mask-7.png?v=3"];
+const RING_MASKS = ["ring-mask-1.png?v=4", "ring-mask-2.png?v=4", "ring-mask-3.png?v=4", "ring-mask-4.png?v=4", "ring-mask-5.png?v=4", "ring-mask-6.png?v=4", "ring-mask-7.png?v=4"];
 function pieSlicePath(pct) {
   const cx = 100, cy = 100, R = 105;
   if (pct >= 99.5) return "M0,0 H200 V200 H0 Z";
