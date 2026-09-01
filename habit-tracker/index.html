@@ -15,7 +15,24 @@
      verhinderte echtes Offline-Funktionieren bei file://, wo kein Service Worker greifen kann).
      style.css nutzt "Inter", system-ui, sans-serif — ohne das Web-Font fällt es sauber auf die
      native System-Schrift zurück, sieht dem gewählten Look sehr ähnlich. -->
-<link rel="stylesheet" href="style.css?v=100">
+<!-- Kritische Formatierung direkt im Dokument, VOR dem Stylesheet.
+     Ohne sie war der Ablauf bei schwacher Verbindung: dunkel (Hintergrundfarbe aus dem Manifest)
+     -> WEISS -> Ladebildschirm. Das Weiss ist die Zeitspanne, in der das HTML schon da ist und das
+     Stylesheet noch nicht: die Hintergrundfarbe stand ausschliesslich dort, und bis dahin malt der
+     Browser seine eigene, also Weiss.
+     Diese paar Zeilen reichen, damit schon der allererste Anstrich der Ladebildschirm ist. Alles
+     Weitere (Netz, Figur, Balken) kommt danach mit dem Stylesheet dazu. -->
+<style>
+  html { background: #0a0d12; }
+  body { margin: 0; background: #12161d; }
+  .splash-screen {
+    position: fixed; inset: 0; z-index: 999;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 34px; overflow: hidden;
+    background: #12161d;
+  }
+</style>
+<link rel="stylesheet" href="style.css?v=101">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
