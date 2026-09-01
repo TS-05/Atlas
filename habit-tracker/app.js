@@ -1629,7 +1629,12 @@ function habitCompletionRate(habit, days = 30) {
 // jeweiligen Tag; gespeichert wird sie in h.levelByDate[Datum]. Jeder Tag startet auf "ideal".
 // Wichtig zur Abgrenzung vom 2026-07 wieder entfernten "Minimal-Tag": hier wird nichts ausgeblendet,
 // nur die Anforderung gesenkt — die Gewohnheit bleibt sichtbar und zaehlt weiter mit.
-const HABIT_MINIMAL_FACTOR = 0.5;
+// Minimal zaehlt ein Viertel weniger als Ideal, nicht die Haelfte: die kleine Version ist eine
+// abgesenkte Latte, kein halber Tag -- wer sie schafft, hat den Tag gehalten.
+// Die Stufe wird gespeichert, nicht die Punktzahl (h.levelByDate bzw. h.history). Der Faktor
+// wirkt deshalb rueckwirkend auf alles schon Abgehakte -- gewollt, sonst haetten alte und
+// neue Tage verschiedene Massstaebe in derselben Auswertung.
+const HABIT_MINIMAL_FACTOR = 0.75;
 
 function habitHasMinimal(habit) {
   return !!(habit.minimalTitle && habit.minimalTitle.trim());
@@ -1662,7 +1667,10 @@ function habitPointsOn(habit, dateKey) {
 }
 // Punkte fuer die Anzeige: 2 statt 2,0 — aber 0,5 bleibt 0,5.
 function formatPoints(n) {
-  return Number.isInteger(n) ? String(n) : n.toLocaleString("de-DE", { maximumFractionDigits: 1 });
+  // Zwei Nachkommastellen, wo sie noetig sind. Mit einer stand bei einem Punkt auf Minimalstufe
+  // "0,8 Punkte statt 1" -- gerechnet wird aber mit 0,75, und die Summen im Ring und in der
+  // Auswertung gingen dadurch sichtbar nicht mit den einzelnen Zeilen zusammen.
+  return Number.isInteger(n) ? String(n) : n.toLocaleString("de-DE", { maximumFractionDigits: 2 });
 }
 
 // Der Regler selbst. Ein Knopf mit data-level, damit CSS die Knopfstellung uebernimmt und JS nur
