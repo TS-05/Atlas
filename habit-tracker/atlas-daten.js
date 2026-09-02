@@ -878,9 +878,10 @@ const IDENTITY_SEED = [
     fx: 32, fy: 16, side: "links", labelY: 13,
     areas: ["Karriere", "Sprachen"],
     beliefs: [
-      "Ich bin intelligent und ein Arbeitstier — ich denke klar und ich leiste.",
       "Ich bin technischer Projektmanager: kompetent, organisiert, verantwortungsbewusst, mit gutem Gespür für Menschen.",
-      "Ich bin fleißig, ohne mich als faul abzuwerten — ich handle aus Klarheit, nicht aus Druck."
+      "Ich schließe das Abitur mit 1,5 ab — ein Maßstab, den ich mir selbst setze.",
+      "Ich bin intelligent und ein Arbeitstier: ich denke klar und ich leiste.",
+      "Ich messe meine Arbeit an meinem eigenen Anspruch, nicht an Lob."
     ]
   },
   {
@@ -888,9 +889,9 @@ const IDENTITY_SEED = [
     fx: 67, fy: 17, side: "rechts", labelY: 14,
     areas: ["Ehe", "Familie"],
     beliefs: [
-      "Ich bin der Ehemann und Vater, der geistliche Führung übernimmt, ohne zu kontrollieren.",
-      "Ich bin ein sicherer Ort für andere, ohne mich dabei selbst zu verlieren — ich gebe und ich empfange.",
-      "Ich grenze mich nicht ab, auch nicht gegenüber meiner Mutter."
+      "Ich bin verlässlich da: bei mir fällt niemand weg.",
+      "Ich führe geistlich, ohne zu kontrollieren.",
+      "Ich warte auf Gottes Ja, bevor ich mich binde."
     ]
   },
   {
@@ -898,16 +899,18 @@ const IDENTITY_SEED = [
     fx: 27, fy: 35, side: "links", labelY: 33,
     areas: [],
     beliefs: [
-      "Ich bin bei meinen Freunden beliebt — das müssen nicht viele sein.",
-      "Ich bin auch anpassungsbereit; das steht nicht im Widerspruch zu meiner Ehrlichkeit."
+      "Ich bin ein sicherer Ort für andere — und ich habe selbst einen.",
+      "Ich bin bei meinen Freunden beliebt; das müssen nicht viele sein."
     ]
   },
   {
-    key: "musik", short: "Musik", title: "Musik & Kunst", zone: "welt",
+    key: "versorgung", short: "Freiheit", title: "Freiheit & Versorgung", zone: "welt",
     fx: 72, fy: 35, side: "rechts", labelY: 34,
-    areas: ["Musik", "Kreatives Schaffen"],
+    areas: ["Vermögen", "Auswandern"],
     beliefs: [
-      "Ich bin Musiker und Künstler."
+      "Ich baue und kaufe Immobilien im Ausland und vermiete sie als Ferienhäuser.",
+      "Ich hänge nicht von einem Arbeitgeber ab.",
+      "Ich versorge meine Familie sicher, und meine Rente steht."
     ]
   },
   {
@@ -915,11 +918,11 @@ const IDENTITY_SEED = [
     fx: 47, fy: 49, side: "links", labelY: 52,
     areas: ["Glaube"],
     beliefs: [
-      "Ich lese täglich in der Bibel — nicht aus Pflicht, sondern weil ich Gott dadurch besser kennenlerne.",
-      "Ich bin geistlich gereift und habe fundierte Bibelkenntnisse, auch für komplexe Fragen.",
-      "Ich bin von niemandem abhängig außer von Gott — und ich will diese Abhängigkeit bewusst.",
-      "Ich bin am meisten ich selbst, wenn ich mit Gott bin.",
-      "Fehler sind kein Beweis für ein altes Selbstbild, sondern ein einzelner Moment. Jede gute Tat ist ein Beweis für das neue."
+      "Ich rede mit Gott, weil er jemand ist — nicht weil ich etwas von ihm will.",
+      "Ich lese in der Bibel, um ihn kennenzulernen, nicht um ein Pensum zu erfüllen.",
+      "Ich bin von niemandem abhängig außer von Gott.",
+      "Ich bin geistlich nie fertig: es geht immer mehr und besser.",
+      "Ich bin geistlich gereift und komme auch bei komplexen Fragen nicht ins Schwimmen."
     ]
   },
   {
@@ -927,11 +930,12 @@ const IDENTITY_SEED = [
     fx: 58, fy: 59, side: "rechts", labelY: 55,
     areas: ["Charakter & Persönlichkeit"],
     beliefs: [
-      "Ich bin diszipliniert — nicht aus Druck, sondern als gelebte Konsequenz aus dem, wer ich sein will.",
-      "Ich bin ehrlich, auch wenn Anpassung leichter wäre: Wahrheit vor Gefallen-wollen.",
-      "Ich bin besonnen und weise — ich entscheide, nehme die Folgen an und stehe dazu.",
-      "Ich bin selbstbewusst.",
-      "Gott ist gnädig mit mir; ich muss mich deshalb nicht selbst fertigmachen."
+      "Mein Maßstab bleibt hoch, mein Ton wird ruhig.",
+      "Ich sage wenige, aber bedeutende Worte.",
+      "Ich bin ehrlich, auch wenn Anpassung leichter wäre.",
+      "Ich bin besonnen und weise: ich entscheide, nehme die Folgen an und stehe dazu.",
+      "Ich bin diszipliniert — nicht aus Druck, sondern als Konsequenz aus dem, wer ich sein will.",
+      "Ich bin selbstbewusst."
     ]
   },
   {
@@ -950,7 +954,8 @@ const IDENTITY_SEED = [
     beliefs: [
       "Ich jogge täglich und ernähre mich im Rahmen; mein Körper trägt, was ich vorhabe.",
       "Ich stehe pünktlich auf, lege das Handy um 21:30 weg und habe meinen Tag im Griff.",
-      "Ich bin nicht abhängig von meiner Tagesroutine — ich kann auch spontan reagieren, ohne aus der Bahn zu geraten."
+      "Ich halte meine Struktur auch in den Ferien und wenn etwas dazwischenkommt.",
+      "Ich mache eine Sache zur Zeit."
     ]
   }
 ];
@@ -970,6 +975,74 @@ function ensureIdentity(data) {
     }))
   };
   data.identityApplied = true;
+}
+
+// Zweite Fassung nach der Fragerunde vom 2026-09-02 (siehe
+// 10_Persoenlich/Zielidentitaet_Fragerunde_2026-09-02.md). Der erste Bestand war ausdruecklich als
+// Beispiel angelegt und ist jetzt durch Tims eigene Antworten ersetzt: "Musik & Kunst" faellt weg
+// (von ihm als "gern, aber nicht identitaetsstiftend" eingestuft), "Freiheit & Versorgung" kommt
+// dazu -- das Endziel, das im Vault vorher nirgends stand.
+//
+// Selbst geschriebene Saetze gehen dabei NICHT verloren: alles, was nicht woertlich aus dem ersten
+// Bestand stammt, wandert in die Region mit demselben Schluessel mit, und was keine neue Heimat hat
+// (die Musik-Region), landet unter Freunde statt im Nichts. Beispielsaetze der ersten Fassung
+// werden ersetzt, eigene nicht.
+const IDENTITY_SEED_V1_TEXTE = [
+  "Ich bin intelligent und ein Arbeitstier — ich denke klar und ich leiste.",
+  "Ich bin technischer Projektmanager: kompetent, organisiert, verantwortungsbewusst, mit gutem Gespür für Menschen.",
+  "Ich bin fleißig, ohne mich als faul abzuwerten — ich handle aus Klarheit, nicht aus Druck.",
+  "Ich bin der Ehemann und Vater, der geistliche Führung übernimmt, ohne zu kontrollieren.",
+  "Ich bin ein sicherer Ort für andere, ohne mich dabei selbst zu verlieren — ich gebe und ich empfange.",
+  "Ich grenze mich nicht ab, auch nicht gegenüber meiner Mutter.",
+  "Ich bin bei meinen Freunden beliebt — das müssen nicht viele sein.",
+  "Ich bin auch anpassungsbereit; das steht nicht im Widerspruch zu meiner Ehrlichkeit.",
+  "Ich bin Musiker und Künstler.",
+  "Ich lese täglich in der Bibel — nicht aus Pflicht, sondern weil ich Gott dadurch besser kennenlerne.",
+  "Ich bin geistlich gereift und habe fundierte Bibelkenntnisse, auch für komplexe Fragen.",
+  "Ich bin von niemandem abhängig außer von Gott — und ich will diese Abhängigkeit bewusst.",
+  "Ich bin am meisten ich selbst, wenn ich mit Gott bin.",
+  "Fehler sind kein Beweis für ein altes Selbstbild, sondern ein einzelner Moment. Jede gute Tat ist ein Beweis für das neue.",
+  "Ich bin diszipliniert — nicht aus Druck, sondern als gelebte Konsequenz aus dem, wer ich sein will.",
+  "Ich bin ehrlich, auch wenn Anpassung leichter wäre: Wahrheit vor Gefallen-wollen.",
+  "Ich bin besonnen und weise — ich entscheide, nehme die Folgen an und stehe dazu.",
+  "Ich bin selbstbewusst.",
+  "Gott ist gnädig mit mir; ich muss mich deshalb nicht selbst fertigmachen.",
+  "Ich lebe meine Enthaltsamkeit bis zur Ehe als Ausdruck dessen, wer ich bin — nicht als Kampf gegen mich selbst.",
+  "Lust gehört in die Ehe. In diesem Rahmen ist sie gut.",
+  "Ich jogge täglich und ernähre mich im Rahmen; mein Körper trägt, was ich vorhabe.",
+  "Ich stehe pünktlich auf, lege das Handy um 21:30 weg und habe meinen Tag im Griff.",
+  "Ich bin nicht abhängig von meiner Tagesroutine — ich kann auch spontan reagieren, ohne aus der Bahn zu geraten."
+];
+
+function migrateIdentityV2(data) {
+  if (data.identityV2Applied) return;
+  if (!data.identity || !Array.isArray(data.identity.regions)) { data.identityV2Applied = true; return; }
+
+  // Eigene Saetze je alter Region einsammeln (alles, was nicht aus dem ersten Bestand stammt).
+  const eigene = {};
+  data.identity.regions.forEach(r => {
+    const behalten = (r.beliefs || []).filter(b => !IDENTITY_SEED_V1_TEXTE.includes(b.text));
+    if (behalten.length) eigene[r.key] = behalten;
+  });
+  // "musik" gibt es nicht mehr -- was dort selbst geschrieben wurde, kommt zu den Freunden.
+  if (eigene.musik) {
+    eigene.freunde = (eigene.freunde || []).concat(eigene.musik);
+    delete eigene.musik;
+  }
+
+  data.identity.regions = IDENTITY_SEED.map(r => ({
+    id: uid(),
+    key: r.key, title: r.title, short: r.short, zone: r.zone,
+    fx: r.fx, fy: r.fy, side: r.side, labelY: r.labelY,
+    areas: r.areas.slice(),
+    beliefs: r.beliefs.map(text => ({ id: uid(), text })).concat(eigene[r.key] || [])
+  }));
+
+  // Gewohnheiten, die ausdruecklich auf eine Region gezeigt haben, verlieren ihren Bezug (die IDs
+  // sind neu). Die Bereichsregel greift danach wieder -- besser als ein Zeiger ins Leere.
+  (data.habits || []).forEach(h => { if (h.identityRegion && h.identityRegion !== "-") delete h.identityRegion; });
+
+  data.identityV2Applied = true;
 }
 
 let state = loadData();
@@ -1033,6 +1106,7 @@ state.savingsGoals = state.savingsGoals || [];
 state.financeIncomeSources = state.financeIncomeSources || [];
 state.projects = state.projects || [];
 ensureIdentity(state);
+migrateIdentityV2(state);
 // Migration: einzelnes financeIncome (Vorgänger-Feld) in eine erste Einkommensquelle überführen.
 if (state.financeIncome) {
   state.financeIncomeSources.push({ id: uid(), title: "Einkommen", amount: state.financeIncome });

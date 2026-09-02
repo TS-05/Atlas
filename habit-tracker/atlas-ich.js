@@ -63,14 +63,31 @@ function ichHabitsForRegion(region) {
   return state.habits.filter(h => ichRegionForHabit(h) === region.id);
 }
 
-// Quote und Serie einer Region. null = keine Gewohnheit zahlt ein; das ist ein echter Zustand und
-// wird als solcher angezeigt, nicht als 0 %.
+// Gezaehlt wird, was passiert ist -- nicht, was gefehlt hat.
+//
+// Vorher stand hier eine 30-Tage-Quote. Die misst zwangslaeufig das Versaeumte mit: bei keinem
+// erledigten Tag stand "0 % in 30 Tagen dafuer gestimmt / keine laufende Serie", also eine Bilanz
+// des Fehlenden auf einer Seite, die Richtung geben soll. Tim hat das am 2026-09-02 ausdruecklich
+// anders bestimmt: "Ich will meine Zielidentitaet da drauf und nur das positive was ich dafuer
+// schon gemacht habe." Also absolute Stimmen statt Prozent, und wo nichts ist, steht nichts --
+// keine Null, keine "keine Serie".
+function ichStimmenIn30(habit) {
+  let n = 0;
+  const heute = new Date();
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(heute);
+    d.setDate(d.getDate() - i);
+    if (habit.history[localDateKey(d)]) n++;
+  }
+  return n;
+}
+
 function ichBallot(region) {
   const habits = ichHabitsForRegion(region);
   if (!habits.length) return null;
-  const quote = habits.reduce((s, h) => s + habitCompletionRate(h, 30), 0) / habits.length;
+  const stimmen = habits.reduce((s, h) => s + ichStimmenIn30(h), 0);
   const streak = habits.reduce((m, h) => Math.max(m, computeStreak(h)), 0);
-  return { habits, quote, streak };
+  return { habits, stimmen, streak };
 }
 
 // ---------- Figur mit Fuehrungslinien ----------
@@ -116,21 +133,21 @@ function ichFigurHtml() {
 // ---------- Karten unter der Figur ----------
 function ichBallotHtml(region) {
   const b = ichBallot(region);
-  if (!b) {
-    return `<p class="ich-stimmen ich-stimmen-leer">Keine Gewohnheit zahlt hier ein.
-      <button class="btn-inline" data-ich-habits="${region.id}">Zuordnen</button></p>`;
+  // Ohne zugeordnete Gewohnheit oder ohne eine einzige Stimme bleibt die Zeile leer -- nur der
+  // stille Weg zum Zuordnen. Ein "0" oder ein "keine Gewohnheit zahlt hier ein" waere genau die
+  // Bilanz des Fehlenden, die hier nicht hingehoert.
+  if (!b || b.stimmen === 0) {
+    return `<p class="ich-stimmen-still"><button class="btn-inline" data-ich-habits="${region.id}">Gewohnheiten zuordnen</button></p>`;
   }
-  const quote = Math.round(b.quote * 100);
-  const serie = b.streak > 0 ? `${b.streak} ${b.streak === 1 ? "Tag" : "Tage"} am Stück` : "keine laufende Serie";
-  // Eine Null wird nicht in Messing gefeiert. Der Wert steht trotzdem da -- er soll nur nicht die
-  // auffaelligste Zahl der Karte sein, wenn er nichts Erreichtes meldet.
+  const serie = b.streak > 0
+    ? ` · ${b.streak} ${b.streak === 1 ? "Tag" : "Tage"} am Stück`
+    : "";
   return `
     <div class="ich-stimmen">
-      <span class="ich-stimmen-quote${quote === 0 ? " ich-stimmen-null" : ""}">${quote}<span class="ich-stimmen-prozent">%</span></span>
+      <span class="ich-stimmen-quote">${b.stimmen}</span>
       <span class="ich-stimmen-text">
-        in 30 Tagen dafür gestimmt · ${escapeHtml(serie)}<br>
-        <span class="ich-stimmen-quellen">${b.habits.length === 1 ? "1 Gewohnheit" : b.habits.length + " Gewohnheiten"}:
-        ${b.habits.map(h => escapeHtml(h.title)).join(", ")}</span>
+        ${b.stimmen === 1 ? "Stimme" : "Stimmen"} in 30 Tagen${escapeHtml(serie)}<br>
+        <span class="ich-stimmen-quellen">aus: ${b.habits.map(h => escapeHtml(h.title)).join(", ")}</span>
       </span>
       <button class="btn-inline" data-ich-habits="${region.id}">Ändern</button>
     </div>`;

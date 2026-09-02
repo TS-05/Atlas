@@ -1877,14 +1877,14 @@ body.dialog-offen {
   color: var(--color-accent-300);
   flex-shrink: 0;
 }
-.ich-stimmen-prozent { font-size: var(--text-sm); }
+.ich-stimmen-still { margin: 0; }
 .ich-stimmen-text { flex: 1; line-height: 1.4; }
 /* Bewusst KEINE eigene, dunklere Farbe: neutral-600 kaeme auf 3,67:1 und liegt damit unter den
    geforderten 4,5:1 -- genau der Fehler, der beim Qualitaetsdurchgang an fuenf Stellen behoben
    wurde. Die Trennung zur Zeile darueber macht der Umbruch, nicht der Kontrast. */
 .ich-stimmen-quellen { color: inherit; }
-.ich-stimmen-null { color: var(--color-text-muted); }
-.ich-stimmen-leer { display: block; margin: 0; }
+
+
 
 .ich-saetze { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .ich-satz {
