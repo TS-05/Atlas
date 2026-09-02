@@ -1739,3 +1739,200 @@ body.dialog-offen {
    beim Tippen — wer beim Eintragen unterbrochen wird, sieht danach nur noch eine Zahl. */
 .wert-mit-einheit { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .wert-einheit { font-size: var(--text-2xs); color: var(--color-text-muted); }
+
+/* ============================================================
+   Ich — Selbstbild und Glaubenssätze
+   ============================================================
+   Aufbau nach Tims Skizze: die Atlas-Figur in der Mitte, links und rechts eine Spalte mit
+   Kurznamen, dazwischen Führungslinien, die waagrecht beginnen und dann schräg zum Punkt laufen.
+
+   Warum die Figur genau 52 % breit ist: der Rest sind die beiden Beschriftungsspalten. Bei 375 px
+   Gerätebreite bleiben dort rund 75 px — genug für „Charakter" bei 11 px Schrift. Die vollen
+   Titel stehen ohnehin in den Karten darunter, die Spalte muss nur wiedererkennbar sein.
+
+   Warum die Höhe fest im Seitenverhältnis steht: das Bild ist 921x1656, die unteren 13 % sind der
+   ATLAS-Schriftzug, der hier nichts zu suchen hat (das Logo steht schon in der Kopfzeile). Der
+   Kasten um das Bild schneidet ihn ab. 100/81,4 ist das Verhältnis, das dabei herauskommt --
+   dadurch entspricht ein fy-Prozentwert aus IDENTITY_SEED genau einem Prozent der Containerhöhe,
+   und die Ankerpunkte müssen nicht umgerechnet werden. */
+.ich-claim {
+  display: block;
+  width: 100%;
+  margin: var(--space-4) 0 var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  border-left: 2px solid var(--color-accent-600);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+  color: var(--color-neutral-100);
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: var(--text-xl);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+.ich-claim-leer { color: var(--color-text-muted); font-size: var(--text-md); font-style: italic; }
+
+.ich-figur {
+  position: relative;
+  aspect-ratio: 100 / 81.4;
+  margin: var(--space-4) 0 var(--space-6);
+}
+/* Kasten schneidet den ATLAS-Schriftzug unten weg. left/width kommen als Inline-Stil aus
+   ichFigurHtml(), damit Lage und Ankerberechnung dieselbe Zahl benutzen und nicht auseinander
+   laufen können. */
+.ich-figur-bild-box {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+.ich-figur-bild {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* preserveAspectRatio="none" streckt das Koordinatensystem auf den Container — bei einer Linie ist
+   genau das erwünscht (die Prozentwerte stimmen dann in beiden Achsen). Damit die Strichstärke
+   davon unberührt bleibt, trägt jede Linie vector-effect="non-scaling-stroke". */
+.ich-linien {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--color-accent-600);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+/* Reine Grafik am Ende der Führungslinie. Bewusst kein Bedienelement: „Charakter" und „Reinheit"
+   liegen 28 px auseinander, zwei 44-px-Trefferflächen würden sich überlappen. Getippt wird die
+   Beschriftung. */
+.ich-anker {
+  position: absolute;
+  display: block;
+  width: 9px;
+  height: 9px;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid var(--color-accent-300);
+  border-radius: 50%;
+  background: var(--color-bg);
+  pointer-events: none;
+}
+
+.ich-label {
+  position: absolute;
+  width: 22%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-1);
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--color-neutral-200);
+  font-family: var(--font-body);
+  font-size: var(--text-2xs);
+  line-height: 1.2;
+  cursor: pointer;
+}
+/* Beschriftungen sind Bedienelemente, kein Fließtext — eine Textmarkierung beim Antippen wäre
+   nur Störung. */
+.ich-label, .ich-anker { -webkit-user-select: none; user-select: none; }
+.ich-label-links { left: 0; justify-content: flex-end; text-align: right; }
+.ich-label-rechts { right: 0; justify-content: flex-start; text-align: left; }
+.ich-label:active { color: var(--color-accent-300); }
+
+/* ---------- Karten je Bereich ---------- */
+.ich-karte { display: flex; flex-direction: column; gap: var(--space-3); }
+.ich-karte-kopf { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+/* Kurzes Aufleuchten nach dem Sprung von einem Anker — sonst landet man irgendwo und weiß nicht,
+   ob etwas passiert ist. Läuft über eine Animation, damit die Regel für reduzierte Bewegung sie
+   mit abschaltet. */
+.ich-karte-treffer { animation: ichTreffer 1.4s ease-out; }
+@keyframes ichTreffer {
+  0%   { box-shadow: var(--shadow-sm), 0 0 0 2px var(--color-accent-500); }
+  100% { box-shadow: var(--shadow-sm), 0 0 0 2px transparent; }
+}
+
+.ich-stimmen {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-accent-900) 40%, transparent);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.ich-stimmen-quote {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: var(--text-2xl);
+  line-height: 1;
+  color: var(--color-accent-300);
+  flex-shrink: 0;
+}
+.ich-stimmen-prozent { font-size: var(--text-sm); }
+.ich-stimmen-text { flex: 1; line-height: 1.4; }
+/* Bewusst KEINE eigene, dunklere Farbe: neutral-600 kaeme auf 3,67:1 und liegt damit unter den
+   geforderten 4,5:1 -- genau der Fehler, der beim Qualitaetsdurchgang an fuenf Stellen behoben
+   wurde. Die Trennung zur Zeile darueber macht der Umbruch, nicht der Kontrast. */
+.ich-stimmen-quellen { color: inherit; }
+.ich-stimmen-null { color: var(--color-text-muted); }
+.ich-stimmen-leer { display: block; margin: 0; }
+
+.ich-saetze { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ich-satz {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-divider);
+}
+.ich-satz:first-child { border-top: none; }
+/* Der Satz selbst ist der Knopf zum Bearbeiten — es gibt keinen zweiten Weg hinein, also braucht
+   es auch keinen zusätzlichen Stift daneben. Linksbündig und in Fließtextgröße, damit die Liste
+   sich wie Text liest und nicht wie eine Reihe Schaltflächen. */
+.ich-satz-text {
+  flex: 1;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.ich-satz-text:active { color: var(--color-accent-200); }
+
+/* Ein Leerzustand innerhalb einer Karte darf nicht die halbe Bildschirmhöhe beanspruchen — die
+   Vorgabe aus .leerzustand ist für einen ganzen Tab gedacht. */
+.ich-karte .leerzustand { min-height: 0; padding: var(--space-4) var(--space-2); }
+
+/* Textknopf für Nebenhandlungen in einer Zeile („Ändern", „Zuordnen"). Kein btn, weil er in einem
+   Fließtext steht und dessen Zeilenhöhe halten muss. */
+.btn-inline {
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--color-accent-300);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ich-habit-wahl { display: flex; flex-direction: column; gap: var(--space-2); max-height: 46vh; overflow-y: auto; margin-bottom: var(--space-4); }
+.ich-habit-wahl .checkbox-row { min-height: 44px; color: var(--color-text); font-size: var(--text-md); }

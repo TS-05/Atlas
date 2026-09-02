@@ -233,7 +233,7 @@ function budgetRingHtml(spent, limit, size = 40, maskIdx = 0, erreichenIstGut = 
 }
 
 // ---------- Tabs ----------
-const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "projekte", "gym", "analyse"];
+const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "projekte", "gym", "ich", "analyse"];
 const TAB_ROT = [-6, 10, 5, -12, 7, 9, -4];
 const TAB_SCALE = [1.05, 0.92, 1, 1.1, 0.95, 1.03, 1.02];
 const tabBtns = Array.from(document.querySelectorAll(".tab-btn"));
@@ -425,6 +425,9 @@ document.getElementById("headerPlusBtn").addEventListener("click", () => {
     exportWeekReview();
   } else if (tab === "projekte") {
     openProjectModal();
+  } else if (tab === "ich") {
+    // Ein Satz gehoert immer in genau einen Bereich; welchen, fragt der Dialog selbst ab.
+    openIchBeliefModal(null, null);
   }
 });
 document.getElementById("roadmapEditToggle").addEventListener("click", () => {
