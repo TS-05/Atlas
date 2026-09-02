@@ -853,6 +853,125 @@ function migrateToGoalDrivenStructure(data) {
   data.goalDrivenRestructureApplied = true;
 }
 
+// ---------- Ich: Selbstbild und Glaubenssaetze ----------
+// Feste Regionen mit fester Bedeutung, geheftet an Punkte der Atlas-Figur. Die Einteilung kommt
+// von Tim (2026-09-01): Alles Irdische liegt auf der Welt, die er traegt -- dort duerfen mehrere
+// Punkte sitzen; Koerperliches sitzt am Koerper; Geistliches und Charakterliches an Kopf und Herz.
+//
+// fx/fy sind Prozentwerte IM SICHTBAREN Bildausschnitt der Figur (die unteren 13 % mit dem
+// ATLAS-Schriftzug werden weggeschnitten, siehe .ich-figur-bild in style.css) -- nicht der
+// Containerbreite. Die Umrechnung auf den Container macht ichAnkerPos() in atlas-ich.js.
+// labelY ist die Hoehe der Beschriftung am Rand, in Prozent der Containerhoehe; die Werte sind je
+// Seite aufsteigend sortiert, damit sich die Fuehrungslinien nicht kreuzen.
+//
+// areas verbindet eine Region mit Wurzeln des Zielbaums. Darueber zaehlen Gewohnheiten als
+// Stimmzettel mit, OHNE dass jede einzeln zugeordnet werden muss -- eine Gewohnheit haengt ohnehin
+// schon per nodeId im Baum. Eine ausdrueckliche Zuordnung an der Gewohnheit (h.identityRegion)
+// sticht die Bereichsregel; "-" heisst ausdruecklich "zaehlt nirgends mit".
+//
+// Die Saetze sind der Startbestand, uebernommen aus 10_Persoenlich/Ich-in-perfekt.md (Stand
+// 2026-08-18) und an zwei Stellen aus Ueber_mich.md ergaenzt. Sie sind ausdruecklich Beispiele:
+// in der App vollstaendig aenderbar, und Tim arbeitet sie noch durch.
+const IDENTITY_SEED = [
+  {
+    key: "beruf", short: "Beruf", title: "Schule, Beruf & Kompetenz", zone: "welt",
+    fx: 32, fy: 16, side: "links", labelY: 13,
+    areas: ["Karriere", "Sprachen"],
+    beliefs: [
+      "Ich bin intelligent und ein Arbeitstier — ich denke klar und ich leiste.",
+      "Ich bin technischer Projektmanager: kompetent, organisiert, verantwortungsbewusst, mit gutem Gespür für Menschen.",
+      "Ich bin fleißig, ohne mich als faul abzuwerten — ich handle aus Klarheit, nicht aus Druck."
+    ]
+  },
+  {
+    key: "familie", short: "Familie", title: "Ehe & Familie", zone: "welt",
+    fx: 67, fy: 17, side: "rechts", labelY: 14,
+    areas: ["Ehe", "Familie"],
+    beliefs: [
+      "Ich bin der Ehemann und Vater, der geistliche Führung übernimmt, ohne zu kontrollieren.",
+      "Ich bin ein sicherer Ort für andere, ohne mich dabei selbst zu verlieren — ich gebe und ich empfange.",
+      "Ich grenze mich nicht ab, auch nicht gegenüber meiner Mutter."
+    ]
+  },
+  {
+    key: "freunde", short: "Freunde", title: "Freunde", zone: "welt",
+    fx: 27, fy: 35, side: "links", labelY: 33,
+    areas: [],
+    beliefs: [
+      "Ich bin bei meinen Freunden beliebt — das müssen nicht viele sein.",
+      "Ich bin auch anpassungsbereit; das steht nicht im Widerspruch zu meiner Ehrlichkeit."
+    ]
+  },
+  {
+    key: "musik", short: "Musik", title: "Musik & Kunst", zone: "welt",
+    fx: 72, fy: 35, side: "rechts", labelY: 34,
+    areas: ["Musik", "Kreatives Schaffen"],
+    beliefs: [
+      "Ich bin Musiker und Künstler."
+    ]
+  },
+  {
+    key: "glaube", short: "Glaube", title: "Glaube & Denken", zone: "kopf",
+    fx: 47, fy: 49, side: "links", labelY: 52,
+    areas: ["Glaube"],
+    beliefs: [
+      "Ich lese täglich in der Bibel — nicht aus Pflicht, sondern weil ich Gott dadurch besser kennenlerne.",
+      "Ich bin geistlich gereift und habe fundierte Bibelkenntnisse, auch für komplexe Fragen.",
+      "Ich bin von niemandem abhängig außer von Gott — und ich will diese Abhängigkeit bewusst.",
+      "Ich bin am meisten ich selbst, wenn ich mit Gott bin.",
+      "Fehler sind kein Beweis für ein altes Selbstbild, sondern ein einzelner Moment. Jede gute Tat ist ein Beweis für das neue."
+    ]
+  },
+  {
+    key: "charakter", short: "Charakter", title: "Charakter", zone: "kopf",
+    fx: 58, fy: 59, side: "rechts", labelY: 55,
+    areas: ["Charakter & Persönlichkeit"],
+    beliefs: [
+      "Ich bin diszipliniert — nicht aus Druck, sondern als gelebte Konsequenz aus dem, wer ich sein will.",
+      "Ich bin ehrlich, auch wenn Anpassung leichter wäre: Wahrheit vor Gefallen-wollen.",
+      "Ich bin besonnen und weise — ich entscheide, nehme die Folgen an und stehe dazu.",
+      "Ich bin selbstbewusst.",
+      "Gott ist gnädig mit mir; ich muss mich deshalb nicht selbst fertigmachen."
+    ]
+  },
+  {
+    key: "reinheit", short: "Reinheit", title: "Reinheit", zone: "koerper",
+    fx: 55, fy: 69, side: "rechts", labelY: 72,
+    areas: [],
+    beliefs: [
+      "Ich lebe meine Enthaltsamkeit bis zur Ehe als Ausdruck dessen, wer ich bin — nicht als Kampf gegen mich selbst.",
+      "Lust gehört in die Ehe. In diesem Rahmen ist sie gut."
+    ]
+  },
+  {
+    key: "koerper", short: "Körper", title: "Körper & Struktur", zone: "koerper",
+    fx: 33, fy: 75, side: "links", labelY: 79,
+    areas: ["Gesundheit & Sport"],
+    beliefs: [
+      "Ich jogge täglich und ernähre mich im Rahmen; mein Körper trägt, was ich vorhabe.",
+      "Ich stehe pünktlich auf, lege das Handy um 21:30 weg und habe meinen Tag im Griff.",
+      "Ich bin nicht abhängig von meiner Tagesroutine — ich kann auch spontan reagieren, ohne aus der Bahn zu geraten."
+    ]
+  }
+];
+
+// Legt die Ich-Seite an, wenn es sie noch nicht gibt. Bewusst nur EINMAL: wer seine Saetze spaeter
+// alle loescht, soll sie beim naechsten Start nicht wiederfinden.
+function ensureIdentity(data) {
+  if (data.identityApplied && data.identity) return;
+  data.identity = data.identity || {
+    claim: "Ich bin Christ. Von Gott abhängig — sonst von niemandem.",
+    regions: IDENTITY_SEED.map(r => ({
+      id: uid(),
+      key: r.key, title: r.title, short: r.short, zone: r.zone,
+      fx: r.fx, fy: r.fy, side: r.side, labelY: r.labelY,
+      areas: r.areas.slice(),
+      beliefs: r.beliefs.map(text => ({ id: uid(), text }))
+    }))
+  };
+  data.identityApplied = true;
+}
+
 let state = loadData();
 migrateToGoalNodes(state);
 repairCyclicGoalNodes(state);
@@ -913,6 +1032,7 @@ state.financeExpenses = state.financeExpenses || [];
 state.savingsGoals = state.savingsGoals || [];
 state.financeIncomeSources = state.financeIncomeSources || [];
 state.projects = state.projects || [];
+ensureIdentity(state);
 // Migration: einzelnes financeIncome (Vorgänger-Feld) in eine erste Einkommensquelle überführen.
 if (state.financeIncome) {
   state.financeIncomeSources.push({ id: uid(), title: "Einkommen", amount: state.financeIncome });

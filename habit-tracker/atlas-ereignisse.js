@@ -143,6 +143,7 @@ function renderAll() {
   renderProjekte();
   renderGym();
   renderPrayers();
+  renderIch();
   renderWeekStats();
   updateNotifPermissionUI();
   // Muss NACH den Listen laufen: die Sichtbarkeit der Hinzufuegen-Knoepfe haengt davon ab, ob eine
