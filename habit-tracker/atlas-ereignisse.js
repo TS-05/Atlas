@@ -264,13 +264,48 @@ function toggleTaskDone(id) {
   renderAll();
 }
 
-// Einzelklick auf die ToDo-Zeile klappt die Details auf; Doppelklick hakt ab. Da jeder Doppelklick
-// mit zwei einzelnen "click"-Events beginnt, wird der Einzelklick kurz verzögert ausgeführt und
-// verworfen, falls in der Zwischenzeit ein "dblclick" auf derselben Zeile eintrifft.
-// Frueher wartete jeder Einzelklick 280 ms auf einen moeglichen Doppelklick — bei jedem Tippen auf
-// eine Zeile, ohne jede Rueckmeldung in der Zwischenzeit. Das war der Hauptgrund, warum sich die
-// Liste traege anfuehlte. Jetzt klappt die Zeile sofort auf; die beiden Klicks eines Doppelklicks
-// heben sich dabei gegenseitig auf, sodass am Ende nur das Abhaken uebrig bleibt.
+// ---------- ToDo: einmal tippen klappt auf, zweimal hakt vollstaendig ab ----------
+//
+// Bewusst NICHT ueber das native dblclick-Ereignis, obwohl genau das hier vorher stand.
+//
+// Der Grund: der erste Klick baut die Liste ueber renderTodo() komplett neu auf. Der angeklickte
+// Knoten existiert danach nicht mehr, der zweite Klick trifft einen frisch erzeugten. Damit hat der
+// Browser zwei verschiedene Klickziele und feuert dblclick nicht auf der Zeile, sondern auf einem
+// gemeinsamen Vorfahren -- dort greift closest("[data-task-row]") ins Leere, und das Abhaken
+// passierte schlicht nicht. Der Kommentar an dieser Stelle nahm an, die beiden Klicks wuerden sich
+// gegenseitig aufheben und der Doppelklick komme oben drauf; die erste Haelfte stimmt, die zweite
+// nicht. Auf dem iPhone kommt dazu, dass dblclick bei Beruehrung ohnehin unzuverlaessig ist.
+//
+// Deshalb wird der Doppeltipp hier selbst erkannt -- und zwar an der AUFGABEN-ID statt am
+// DOM-Knoten. Die ueberlebt jedes Neurendern. Der erste Tipp wirkt weiterhin sofort (kein
+// Wartefenster, das war 2026-08 der Grund fuer die traege Liste); der zweite nimmt zurueck, was der
+// erste getan hat, und setzt stattdessen den Endzustand.
+const TASK_DOPPELTIPP_MS = 400;
+// { id, zeit, statusVorher, warAufgeklappt } -- gemeinsam fuer Zeile und Kaestchen, damit auch ein
+// gemischter Doppeltipp (erst Kaestchen, dann Zeile) sauber aufgeht.
+let letzterTaskTipp = null;
+
+function taskTippIstZweiter(id) {
+  return letzterTaskTipp && letzterTaskTipp.id === id
+    && Date.now() - letzterTaskTipp.zeit < TASK_DOPPELTIPP_MS;
+}
+function taskTippMerken(id, task) {
+  letzterTaskTipp = {
+    id, zeit: Date.now(),
+    statusVorher: taskStatus(task),
+    warAufgeklappt: expandedTaskIds.has(id)
+  };
+}
+// Zweiter Tipp: erst den Effekt des ersten zuruecknehmen, dann vollstaendig abhaken (bzw. ein
+// bereits erledigtes wieder oeffnen). "In Arbeit" kann dabei nie herauskommen -- der Zustand ist
+// ausdruecklich nur ueber den EINZELNEN Tipp aufs Kaestchen erreichbar.
+function taskZweiterTippAusfuehren(id, task) {
+  if (letzterTaskTipp.warAufgeklappt) expandedTaskIds.add(id); else expandedTaskIds.delete(id);
+  setTaskStatus(task, letzterTaskTipp.statusVorher === "erledigt" ? "offen" : "erledigt");
+  letzterTaskTipp = null;
+  saveData();
+  renderAll();
+}
 
 document.addEventListener("dblclick", e => {
   // Gewohnheits-Zeilen (Tagesroutine und weitere Gewohnheiten) lassen sich per Doppeltipp auf die
@@ -293,28 +328,32 @@ document.addEventListener("dblclick", e => {
       return;
     }
   }
-  const taskRow = e.target.closest("[data-task-row]");
-  if (!taskRow || e.target.closest("[data-del-task]") || e.target.closest("[data-task]")) return;
-  const id = taskRow.dataset.taskRow;
-  // Bewusst KEINE Ruecknahme: ein Doppelklick liefert zwei click-Ereignisse, die den Aufklapp-
-  // Zustand bereits zweimal umschalten und damit von selbst wiederherstellen. Die frueher hier
-  // stehende "Ruecknahme" war ein dritter Umschaltvorgang und kehrte den Zustand jedes Mal um —
-  // beim Abhaken klappte dadurch die Detailansicht auf.
-  toggleTaskDone(id);
+  // ToDos haengen nicht mehr an diesem Ereignis, siehe die Begruendung bei TASK_DOPPELTIPP_MS.
 });
 
 document.addEventListener("click", e => {
   const taskCheck = e.target.closest("[data-task]");
   if (taskCheck) {
-    // Tipp aufs Kaestchen geht reihum: offen -> in Arbeit -> erledigt -> offen.
-    // Der Doppeltipp auf die Zeile bleibt die Abkuerzung direkt zu "erledigt".
-    const task = state.tasks.find(t => t.id === taskCheck.dataset.task);
-    if (task) { cycleTaskStatus(task); saveData(); renderAll(); }
+    const id = taskCheck.dataset.task;
+    const task = state.tasks.find(t => t.id === id);
+    if (task) {
+      if (taskTippIstZweiter(id)) { taskZweiterTippAusfuehren(id, task); return; }
+      // Einzelner Tipp aufs Kaestchen geht reihum: offen -> in Arbeit -> erledigt -> offen.
+      // Das ist der einzige Weg zu "in Arbeit".
+      taskTippMerken(id, task);
+      cycleTaskStatus(task);
+      saveData();
+      renderAll();
+    }
     return;
   }
   const taskRow = e.target.closest("[data-task-row]");
   if (taskRow && !e.target.closest("[data-del-task]")) {
     const id = taskRow.dataset.taskRow;
+    const task = state.tasks.find(t => t.id === id);
+    if (task && taskTippIstZweiter(id)) { taskZweiterTippAusfuehren(id, task); return; }
+    // Erster Tipp: sofort auf-/zuklappen, ohne auf einen moeglichen zweiten zu warten.
+    if (task) taskTippMerken(id, task);
     if (expandedTaskIds.has(id)) expandedTaskIds.delete(id); else expandedTaskIds.add(id);
     renderTodo();   // nur die Liste, nicht die ganze App
     return;
