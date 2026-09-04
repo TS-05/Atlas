@@ -536,6 +536,15 @@ function closeModal() {
   modalBody.innerHTML = "";
   currentDaySheetKey = null;
   document.body.classList.remove("dialog-offen");
+  // Die Kugel kommt ohne Ueberblendung zurueck. Ein Uebergang, der nicht laeuft (Seite im
+  // Hintergrund, kein Neuzeichnen), liesse sie sonst unsichtbar stehen -- genau der Fehler, gegen
+  // den in atlas-start.js beim Einblenden schon zweimal nachgebessert wurde.
+  const griff = document.getElementById("ringHandle");
+  if (griff) {
+    griff.classList.add("no-anim");
+    griff.style.opacity = "1";
+    setTimeout(() => griff.classList.remove("no-anim"), 50);
+  }
   document.body.style.top = "";
   window.scrollTo(0, gemerkterScroll);
   // Zurueck zu dem Element, von dem aus geoeffnet wurde -- sonst faengt man nach dem Schliessen

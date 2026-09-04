@@ -99,7 +99,7 @@ function exportWeekReview() {
     .filter(s => s.total > 0)
     .sort((a, b) => b.rate - a.rate);
   longTermHabitStats.forEach(s => {
-    md += `- **${s.habit.title}**: ${Math.round(s.rate * 100)}% (${s.done}/${s.total} fällige Tage)\n`;
+    md += `- **${s.habit.title}**: ${Math.round(s.rate * 100)}% (${s.done}/${s.total} fällige Tage)${s.minimal ? `, davon ${s.minimal} auf Minimalstufe` : ""}${s.punkteRate !== null && Math.round(s.punkteRate * 100) !== Math.round(s.rate * 100) ? ` · ${Math.round(s.punkteRate * 100)}% der Punkte` : ""}\n`;
   });
   const weekdayStats = weekdayDifficulty(longTermDays).filter(w => w.total > 0);
   if (weekdayStats.length) {

@@ -1029,6 +1029,21 @@ textarea.input { min-height: 90px; resize: vertical; }
 .ring-handle.is-invisible { opacity: 0; }
 /* Bis der Startbildschirm weg ist bleibt sie unsichtbar (sonst laege sie ueber dem Splash). */
 .ring-handle.is-boot { opacity: 0; pointer-events: none; }
+/* Der Griff liegt auf z-index 1000, der Dialog auf 50. Ohne diese Regel schwebt die Kugel ueber
+   dem offenen Tagesblatt, verdeckt dort eine Zeile und faengt deren Tipp ab -- genau die Zeile
+   liess sich dann nicht mehr abhaken. Waehrend ein Dialog offen ist, navigiert man ohnehin nicht. */
+body.dialog-offen .ring-handle {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  /* Ohne Uebergang, aus demselben Grund wie an den beiden Stellen in atlas-start.js: haengt
+     das Aus-/Einblenden an einer Transition und die laeuft nicht (Tab im Hintergrund, Seite
+     nicht gezeichnet), bleibt die Kugel auf ihrem Startwert stehen -- also sichtbar ueber dem
+     Dialog. Ein laufender Uebergang schlaegt in der Kaskade sogar !important. */
+  transition: none !important;
+}
+/* !important aus demselben Grund wie eine Zeile weiter unten bei .is-scrolling: revealHandle()
+   setzt die Deckkraft als Sicherheitsnetz direkt am Element (inline). Ohne !important kommt
+   keine Klasse dagegen an -- die Kugel blieb sichtbar ueber dem Dialog stehen. */
 /* Unten traegt die Blase das Globus-Symbol (Zurueck zum Hauptmenue). */
 .ring-handle.has-icon {
   display: flex; align-items: center; justify-content: center;

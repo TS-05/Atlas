@@ -130,18 +130,36 @@ function isScheduledToday(habit, dateObj = new Date()) {
   return true;
 }
 
+// Punktgewichtet statt Tage gezaehlt: ein Tag auf Minimalstufe ist ein gehaltener, aber
+// abgesenkter Tag. Vorher zaehlte er wie ein voller -- wer 30 Tage lang nur die kleine Version
+// geschafft hat, stand in der Auswertung auf 100 %, und die Quote konnte gar nicht zeigen, wo
+// die Latte unten war. Gerechnet wird mit denselben Punkten wie Ring und Heatmap
+// (habitPointsOn), damit dieselbe Woche ueberall dieselbe Zahl ergibt.
 function habitCompletionRate(habit, days = 30) {
-  let total = 0, done = 0;
+  let soll = 0, ist = 0;
   for (let i = 0; i < days; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     if (new Date(habit.createdAt) > d) continue;
     if (!isScheduledToday(habit, d)) continue;
-    const key = localDateKey(d);
-    total++;
-    if (habit.history[key]) done++;
+    soll += habit.points ?? 1;
+    ist += habitPointsOn(habit, localDateKey(d));
   }
-  return total === 0 ? 0 : done / total;
+  return soll === 0 ? 0 : ist / soll;
+}
+
+// Wie viele der faelligen Tage im Fenster auf der kleinen Version standen. Damit eine Quote von
+// 80 % nicht offenlaesst, ob sie aus vollen Tagen oder aus lauter Minimalstufen kommt.
+function habitMinimalDays(habit, days = 30) {
+  let n = 0;
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    if (new Date(habit.createdAt) > d) continue;
+    if (!isScheduledToday(habit, d)) continue;
+    if (habit.history[localDateKey(d)] === "minimal") n++;
+  }
+  return n;
 }
 
 // ---------- Ideal- und Minimalstufe einer Gewohnheit ----------
@@ -221,6 +239,10 @@ function levelSwitchHtml(habit, dateKey) {
 // die Frage kommt obendrauf und laesst sich uebergehen -- dann bleibt es bei halben Punkten ohne
 // eigenen Namen, so wie bisher.
 function openMinimalTitelModal(habit) {
+  // closeModal() setzt currentDaySheetKey auf null. Wurde der Regler im Tagesblatt umgelegt,
+  // waere der Rueckweg damit weg -- bei "Ohne Namen" landete man auf dem Tab statt wieder im
+  // Tagesblatt, und nach dem Speichern lief das openDaySheet() am Ende ins Leere.
+  const tagesblattKey = currentDaySheetKey;
   openModal(`
     <h3>Wie heißt die kleine Version?</h3>
     <p class="text-muted" style="font-size:var(--text-sm); margin:0 0 12px;">
@@ -240,7 +262,10 @@ function openMinimalTitelModal(habit) {
     const feld = body.querySelector("#mMinTitel");
     feld.focus();
     feld.select();
-    body.querySelector("#mMinSkip").addEventListener("click", closeModal);
+    body.querySelector("#mMinSkip").addEventListener("click", () => {
+      closeModal();
+      if (tagesblattKey) openDaySheet(tagesblattKey);
+    });
     body.querySelector("#mMinSave").addEventListener("click", () => {
       const wert = feld.value.trim();
       if (!wert) { markiereFehlendesFeld(feld, "Schreib den Namen der kleinen Version hin — oder geh ohne Namen weiter."); return; }
@@ -249,7 +274,7 @@ function openMinimalTitelModal(habit) {
       saveData();
       closeModal();
       renderAll();
-      if (currentDaySheetKey) openDaySheet(currentDaySheetKey);
+      if (tagesblattKey) openDaySheet(tagesblattKey);
     });
     feld.addEventListener("keydown", ev => { if (ev.key === "Enter") body.querySelector("#mMinSave").click(); });
   });

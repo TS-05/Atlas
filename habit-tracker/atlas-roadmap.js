@@ -354,7 +354,7 @@ function renderWeekStats() {
 
   const todayPct = dayCompletionPct(new Date());
   const dueToday = state.habits.filter(h => isScheduledToday(h, new Date()) && new Date(h.createdAt) <= new Date());
-  const doneToday = dueToday.filter(h => h.history[todayStr()]).length;
+  const doneToday = dueToday.filter(h => habitDoneOn(h, todayStr())).length;
   const taskPct = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   grid.innerHTML = [
@@ -457,12 +457,12 @@ function renderHabitStreaks() {
   const wrap = document.getElementById("habitStreakList");
   if (!wrap) return;
   const zeilen = state.habits
-    .map(h => ({ h, streak: computeStreak(h), quote: habitCompletionRate(h, 30) }))
+    .map(h => ({ h, streak: computeStreak(h), quote: habitCompletionRate(h, 30), minimal: habitMinimalDays(h, 30) }))
     .sort((x, y) => y.streak - x.streak || y.quote - x.quote);
   wrap.innerHTML = zeilen.length
-    ? zeilen.map(({ h, streak, quote }) => `
+    ? zeilen.map(({ h, streak, quote, minimal }) => `
         <div class="streak-zeile">
-          <span class="streak-name">${escapeHtml(h.title)}${h.routineOrder != null ? "" : ` <span class="streak-nebenrolle">weitere</span>`}</span>
+          <span class="streak-name">${escapeHtml(h.title)}${h.routineOrder != null ? "" : ` <span class="streak-nebenrolle">weitere</span>`}${minimal ? ` <span class="streak-nebenrolle">${minimal}× minimal</span>` : ""}</span>
           <span class="streak-quote">${Math.round(quote * 100)}%</span>
           <span class="streak-wert${streak > 0 ? " aktiv" : ""}">${streak > 0 ? streak + (streak === 1 ? " Tag" : " Tage") : "\u2013"}</span>
         </div>`).join("")
@@ -520,18 +520,25 @@ function renderMoreStats() {
     </div>`;
 }
 
+// Liefert beides: die Tage (wie oft ueberhaupt gehalten) und die Punktquote (wie hoch die Latte
+// dabei lag). Die Tageszahl allein verschweigt jede Minimalstufe.
 function habitStatsWindow(habit, days) {
-  let total = 0, done = 0;
+  let total = 0, done = 0, minimal = 0, soll = 0, ist = 0;
   for (let i = 0; i < days; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     if (new Date(habit.createdAt) > d) continue;
     if (!isScheduledToday(habit, d)) continue;
     total++;
+    soll += habit.points ?? 1;
     const key = localDateKey(d);
-    if (habit.history[key]) done++;
+    if (habitDoneOn(habit, key)) {
+      done++;
+      ist += habitPointsOn(habit, key);
+      if (habit.history[key] === "minimal") minimal++;
+    }
   }
-  return { total, done, rate: total ? done / total : null };
+  return { total, done, minimal, rate: total ? done / total : null, punkteRate: soll ? ist / soll : null };
 }
 
 function weekdayDifficulty(days) {
@@ -544,8 +551,10 @@ function weekdayDifficulty(days) {
     state.habits.forEach(h => {
       if (new Date(h.createdAt) > d) return;
       if (!isScheduledToday(h, d)) return;
-      totals[wd].total++;
-      if (h.history[key]) totals[wd].done++;
+      // Punkte statt Haken: ein Wochentag, an dem alles nur auf Minimalstufe lief, ist nicht
+      // derselbe wie einer, an dem alles voll stand -- vorher sahen beide gleich aus.
+      totals[wd].total += h.points ?? 1;
+      totals[wd].done += habitPointsOn(h, key);
     });
   }
   return totals.map((t, i) => ({
@@ -640,26 +649,41 @@ function dayHabitsList(dateObj) {
     .sort((a, b) => (a.routineOrder ?? 999) - (b.routineOrder ?? 999) || a.title.localeCompare(b.title, "de"));
 }
 
+// Dieselbe Zeile wie auf "Heute", nur fuer einen anderen Tag: Regler fuer die Minimalstufe,
+// Titel der eingestellten Stufe, Punktwert. Der Regler fehlte hier komplett -- die Stufe eines
+// vergangenen Tages liess sich also ueberhaupt nicht nachtragen, obwohl der Klick-Handler
+// (data-level-date) und das Neuzeichnen des Tagesblatts dafuer laengst vorhanden waren. Und der
+// Titel stand immer auf der Idealstufe, auch wenn der Tag auf der kleinen Version lief.
 function renderDaySheetHabits(dateObj) {
   const key = localDateKey(dateObj);
   const habits = dayHabitsList(dateObj);
   if (!habits.length) return '<div class="empty-hint">Keine Gewohnheiten an diesem Tag fällig.</div>';
   return habits.map(h => {
     const rawValue = h.history[key];
-    const doneToday = h.type === "weight" ? (rawValue !== undefined && rawValue !== null) : !!rawValue;
+    const doneToday = habitDoneOn(h, key);
+    const shownTitle = habitTitleOn(h, key);
     const checkHtml = h.type === "weight"
       ? `<button class="atlas-check${doneToday ? " checked" : ""}" style="pointer-events:none;" tabindex="-1" aria-hidden="true">${doneToday ? splatSvg(h.id) : ""}</button>`
-      : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" data-date="${key}" aria-label="${escapeHtml(h.title)}: ${doneToday ? "erledigt, zum Zurücknehmen antippen" : "offen, zum Abhaken antippen"}">${doneToday ? splatSvg(h.id) : ""}</button>`;
+      : `<button class="atlas-check${doneToday ? " checked" : ""}" data-habit="${h.id}" data-date="${key}" aria-label="${escapeHtml(shownTitle)}: ${doneToday ? "erledigt, zum Zurücknehmen antippen" : "offen, zum Abhaken antippen"}">${doneToday ? splatSvg(h.id) : ""}</button>`;
     const weightInputHtml = h.type === "weight"
       ? `<span class="wert-mit-einheit"><input type="number" step="0.1" min="0" inputmode="decimal" class="input" style="width:62px; height:34px; padding:6px 8px; text-align:right;" data-weight-habit="${h.id}" data-date="${key}" aria-label="${escapeHtml(h.title)}: Gewicht in Kilogramm" value="${rawValue !== undefined && rawValue !== null ? rawValue : ""}"><span class="wert-einheit">kg</span></span>`
       : "";
+    // Punktzahl nur, wenn sie etwas sagt -- dieselbe Regel wie in der Heute-Liste.
+    const fullPoints = h.points ?? 1;
+    const levelPoints = habitLevelOn(h, key) === "minimal" ? fullPoints * HABIT_MINIMAL_FACTOR : fullPoints;
+    const pointsHtml = (levelPoints === 1 && fullPoints === 1)
+      ? ""
+      : `<div class="item-meta">${formatPoints(levelPoints)} Punkt${levelPoints === 1 ? "" : "e"}${
+        levelPoints !== fullPoints ? ` <span style="color:var(--color-text-muted);">statt ${formatPoints(fullPoints)}</span>` : ""}</div>`;
     return `
       <div class="atlas-row${doneToday ? " done" : ""}">
         ${checkHtml}
         <div style="flex:1; min-width:0;">
-          <div class="item-title">${escapeHtml(h.title)}</div>
+          <div class="item-title">${escapeHtml(shownTitle)}</div>
+          ${pointsHtml}
         </div>
         ${weightInputHtml}
+        ${levelSwitchHtml(h, key)}
       </div>
     `;
   }).join("");
@@ -671,7 +695,7 @@ function openDaySheet(dateKey) {
   const pct = dayCompletionPct(d);
   const weekday = d.toLocaleDateString("de-DE", { weekday: "long" });
   const dateLabel = formatDatum(dateKey);
-  const levelLabel = pct === null ? "Keine Gewohnheiten an diesem Tag fällig." : `${pct}% der Aufgaben erledigt`;
+  const levelLabel = pct === null ? "Keine Gewohnheiten an diesem Tag fällig." : `${pct}% der Punkte erreicht`;
   openModal(`
     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
       <h2 style="font-size:var(--text-2xl); margin:0;">${weekday}, ${dateLabel}</h2>
