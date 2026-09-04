@@ -319,12 +319,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* ============================================================
    Untere Tab-Leiste (aus Atlas.dc.html)
    ============================================================ */
-/* Statt der Tab-Leiste nur noch ein runder Home-Knopf (Erdball) zurueck zum Globus-Menue. */
-.tabs {
-  position: fixed; left: 0; right: 0; bottom: calc(26px + env(safe-area-inset-bottom));
-  display: flex; justify-content: center; z-index: 40; pointer-events: none;
-}
-.home-anchor { width: 60px; height: 60px; }
+/* Die Tab-Leiste ist entfallen: navigiert wird ueber den Ring (.atlas-ring, weiter unten). */
 
 /* ---------- Abweichung / Arbeitsschicht ---------- */
 .deviation-input-row { display: flex; gap: 8px; margin-bottom: 8px; }
@@ -750,49 +745,83 @@ textarea.input { min-height: 90px; resize: vertical; }
   justify-content: center;
   touch-action: none;
 }
-/* Breites goldenes Band, auf dem die Symbole sitzen (wie in der Skizze) -- genauso breit wie die
-   Klickflaechen. Die Box ist 2*ring-r + ring-w gross, dadurch liegt die Bandmitte exakt auf --ring-r. */
-.globe-stage::before {
-  content: "";
+/* ============================================================================================
+   NAVIGATIONS-RING
+   ============================================================================================
+   Eine Ebene ueber der ganzen App. Es ist immer DERSELBE Ring -- nur sein Mittelpunkt (--cy)
+   wandert, gesteuert aus atlas-start.js:
+
+     p = 0.0  ANDEUTUNG   Mittelpunkt weit unter dem Bildschirm, nur ein Bogen schaut heraus
+     p = 0.5  HALB        Mittelpunkt knapp unter dem Rand, obere Haelfte im Bild (fuenf Symbole)
+     p = 1.0  HAUPTMENUE  Mittelpunkt auf dem Globus, voller Kreis
+
+   Die Box ist 2R gross und wird um -50% ihrer Hoehe verschoben, damit --cy wirklich der
+   Mittelpunkt ist. Die Symbole sitzen auf dem Radius R. */
+.atlas-ring {
+  position: fixed;
+  left: 50%;
+  top: 0;
+  width: calc(2 * var(--R, 214px));
+  height: calc(2 * var(--R, 214px));
+  z-index: 1000;                        /* ueber dem Homemenue (998) */
+  transform: translate(-50%, calc(var(--cy, 200vh) - 50%));
+  touch-action: none;
+  will-change: transform;
+}
+/* Abdunklung des Tab-Inhalts, sobald der Ring hereinkommt. Traegt kein eigenes Aussehen, nur
+   Tiefe: der Inhalt tritt zurueck, der Ring kommt nach vorn -- sonst laufen die Beschriftungen
+   der Symbole gegen die Zeilen der App. Liegt unter dem Homemenue (998): sobald das im
+   Hauptmenue deckt, wird die Abdunklung ohnehin abgeschaltet, statt eine bildschirmfuellende
+   Weichzeichnung dauerhaft mitlaufen zu lassen. */
+.ring-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 997;
+  background: rgba(8, 11, 15, calc(0.62 * var(--p, 0)));
+  backdrop-filter: blur(calc(7px * var(--p, 0)));
+  -webkit-backdrop-filter: blur(calc(7px * var(--p, 0)));
+  opacity: var(--scrim-on, 0);
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+/* Nur im Zwischenzustand faengt sie Tipps ab -- ein Tipp auf den Inhalt schliesst den Ring. */
+.ring-scrim.fangend { pointer-events: auto; }
+
+/* In der Andeutung ist der Ring reine Deko: sonst laege seine 2R breite Flaeche als tote
+   Zone ueber dem unteren Bildschirmrand und wuerde dort (touch-action:none) sogar das
+   Scrollen abfangen. Angefasst wird dann nur der mittige Greifer. */
+.atlas-ring.deko { pointer-events: none; }
+/* Bis der Startbildschirm weg ist unsichtbar -- sonst laege der Ring ueber dem Splash (999). */
+.atlas-ring.is-boot { opacity: 0; pointer-events: none; }
+
+/* Breites Glasband, auf dem die Symbole sitzen. Volle Kreisflaeche statt ausgestanztem Ring:
+   die Milchglas-Unschaerfe liegt damit auch HINTER dem Globus, nicht nur auf dem Symbolband --
+   genau wie frueher, als das Band noch an der Globus-Buehne hing. Es wird dichter, je weiter
+   der Ring hereinkommt. */
+.ring-band {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: calc(2 * var(--ring-r) + var(--ring-w));
-  height: calc(2 * var(--ring-r) + var(--ring-w));
+  width: calc(2 * var(--R, 214px) + var(--ring-w));
+  height: calc(2 * var(--R, 214px) + var(--ring-w));
   transform: translate(-50%, -50%);
   border-radius: 50%;
   pointer-events: none;
-  background: rgba(52, 58, 68, 0.34);
+  background: rgba(52, 58, 68, calc(0.20 + 0.16 * var(--p, 0)));
   backdrop-filter: blur(6px) saturate(1.3);
   -webkit-backdrop-filter: blur(6px) saturate(1.3);
   box-shadow: var(--kante-innen), var(--erhebung-2);
-  /* Volle Kreisflaeche statt ausgestanztem Ring: die Milchglas-Unschaerfe liegt damit auch HINTER
-     dem Globus, nicht nur auf dem Symbolband. */
 }
-.globe-ring {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.globe-ring.has-hole {
-  -webkit-mask-image: radial-gradient(circle closest-side, #000 94%, transparent 100%), linear-gradient(#000 0 0);
-  -webkit-mask-size: var(--hole-d, 0px) var(--hole-d, 0px), 100% 100%;
-  -webkit-mask-position: var(--hole-x, 0px) var(--hole-y, 0px), 0 0;
-  -webkit-mask-repeat: no-repeat, no-repeat;
-  -webkit-mask-composite: xor;
-  mask-image: radial-gradient(circle closest-side, #000 94%, transparent 100%), linear-gradient(#000 0 0);
-  mask-size: var(--hole-d, 0px) var(--hole-d, 0px), 100% 100%;
-  mask-position: var(--hole-x, 0px) var(--hole-y, 0px), 0 0;
-  mask-repeat: no-repeat, no-repeat;
-  mask-composite: exclude;
-}
+
+.ring-slots { position: absolute; inset: 0; pointer-events: none; }
+
 .ring-btn {
   position: absolute;
   left: 50%;
   top: 50%;
   width: 66px;
   height: 60px;
-  margin: -30px 0 0 -32px;
+  margin: -30px 0 0 -33px;
   pointer-events: auto;
   display: flex;
   flex-direction: column;
@@ -808,259 +837,108 @@ textarea.input { min-height: 90px; resize: vertical; }
   letter-spacing: 0.01em;
   line-height: 1;
   cursor: pointer;
-  touch-action: manipulation;
-  transition: transform 0.15s ease, opacity 0.15s ease;
-  transform: rotate(var(--angle)) translate(var(--ring-r)) rotate(calc(-1 * var(--angle)));
+  touch-action: none;
+  /* 1. auf den Bahnwinkel drehen (die Ringdrehung --rot kommt dazu)  2. auf den Radius schieben
+     3. zurueckdrehen, damit das Symbol aufrecht steht  4. mit der Oeffnung mitwachsen */
+  transform:
+    rotate(calc(var(--angle) + var(--rot, 0deg)))
+    translate(var(--R, 214px))
+    rotate(calc(-1 * (var(--angle) + var(--rot, 0deg))))
+    scale(var(--sym-scale, 1));
 }
 .ring-btn:active { opacity: 0.75; }
-.ring-btn svg { display: block; }
-.ring-btn span { white-space: nowrap; opacity: 0.92; }
-/* ---------- Die Blase (Liquid Glass) ----------
-   Zwei klar getrennte Zustaende, nach Vorgabe:
+.ring-btn svg { display: block; opacity: 0.94; }
+.ring-btn span {
+  white-space: nowrap;
+  opacity: calc(var(--label-op, 0) * 0.95);
+  transition: opacity 0.16s ease;
+}
+/* Was gerade in der Kimme steht, hebt sich ab. */
+.ring-btn.gewaehlt { color: #fff; }
+.ring-btn.gewaehlt svg {
+  opacity: 1;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--color-accent-500) 55%, transparent));
+}
 
-   RUHE  -- wie der aktive Reiter auf dem Referenzbild: eine schlichte, etwas hellere graue
-            Kreisflaeche. Kein Glanzrand, kein Farbsaum, keine Lupe, kein Schatten. Sie sagt nur
-            "hier stehst du".
-   BEWEGUNG (.is-liquid / .is-dragging) -- daraus waechst die eigentliche Blase:
-            innen fast klar (man liest hindurch), darunter 2x vergroessert und am Rand verdraengt
-            (.ring-lens), 1 mm breiter Oelfilm-Saum mit hellem Glanzrand darueber, und sie waechst
-            zusaetzlich ueber den Ring hinaus.
-
-   Farblage des Saums (conic-gradient: 0deg = oben, im Uhrzeigersinn):
-   rechts magenta/orange, unten violett, links cyan/gruen. */
-.ring-handle {
-  position: fixed;
-  left: 0;
+/* ---------- Die Kimme: fester Auswahlpunkt auf 12 Uhr ----------
+   Sie dreht sich NICHT mit. Der Ring laeuft unter ihr durch -- was hier steht, ist gewaehlt.
+   Das ist die fruehere Wasserblase in ihrer neuen Aufgabe (Tims Entscheidung 2026-09-05).
+   Groesse aus der Ringgeometrie statt als abgeschriebene Zahl: vom Symbolmittelpunkt bis zur
+   Aussenkante des Bands sind es --ring-w/2, davon je Seite etwas Abstand ab. */
+.ring-kimme {
+  position: absolute;
+  left: 50%;
   top: 0;
-  /* Ruhegroesse aus der Ringgeometrie statt als abgeschriebene Zahl: das Symbol sitzt in der
-     Mitte des Bands, vom Symbolmittelpunkt bis zur Aussenkante des Rings sind es --ring-w/2.
-     Davon je Seite 1.5mm Abstand abziehen ergibt --ring-w - 3mm (bei 70px Band also ~58.7px).
-     Bleibt damit auch richtig, falls das Band spaeter breiter oder schmaler wird. */
-  width: calc(var(--ring-w) - 3mm);
-  height: calc(var(--ring-w) - 3mm);
-  z-index: 1000;   /* ueber dem Homemenue (998) und dem Splash (999) */
-  pointer-events: auto;
+  width: calc(var(--ring-w) - 11px);
+  height: calc(var(--ring-w) - 11px);
+  margin: calc((var(--ring-w) - 11px) / -2) 0 0 calc((var(--ring-w) - 11px) / -2);
   border-radius: 50%;
-  --lens-zoom: 1.35;                   /* Vergroesserung der Lupe */
-  cursor: grab;
-  touch-action: none;
-  overflow: hidden;
-  isolation: isolate;
-  /* Ruhezustand: flaeche, mehr nicht. */
+  pointer-events: none;
   background: rgba(255, 255, 255, 0.10);
-  box-shadow: none;
-  transform: translate(var(--hx, -999px), var(--hy, -999px)) translate(-50%, -50%)
-             rotate(var(--rot, 0deg))
-             scale(calc(var(--sy, 1) * var(--grow, 1)), calc(var(--sx, 1) * var(--grow, 1)))
-             rotate(calc(-1 * var(--rot, 0deg)));
-  transition: transform 0.42s cubic-bezier(0.34, 1.22, 0.44, 1),
-              box-shadow 0.28s ease, background 0.28s ease,
-              backdrop-filter 0.28s ease, opacity 0.25s ease;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 0 0 1px rgba(0, 0, 0, 0.20),
+    var(--erhebung-2);
+  opacity: var(--kimme-op, 0);
+  transform: scale(var(--kimme-scale, 1));
+  transition: opacity 0.18s ease, transform 0.28s cubic-bezier(0.34, 1.22, 0.44, 1);
 }
+/* Beim Einrasten kurz aufquellen -- die Rueckmeldung "der rastet jetzt hier ein". */
+.atlas-ring.rastet .ring-kimme { transform: scale(1.14); }
 
-/* Die Linse: eine nicht anklickbare Kopie des Symbolrings, die exakt ueber dem echten Ring liegt
-   und um den Blasenmittelpunkt herum vergroessert wird. Weil sie an den RING geheftet ist und
-   nicht an die Blase, wandert sie beim Ziehen durch die Blase hindurch -- genau wie bei echtem
-   Glas. Das Original darunter bleibt sichtbar; innerhalb der Blase verdeckt die Kopie es. */
-.ring-lens {
-  position: absolute;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0;
-  transition: opacity 0.26s ease;
-  /* Der Container vergroessert selbst nicht mehr -- das tun die drei Zonen darin. */
+/* ---------- Greifbereich am unteren Rand ----------
+   Liegt bewusst NICHT ganz am Rand, sondern ueber der iOS-Home-Leiste: sonst kaempft die
+   Wischgeste gegen das Betriebssystem. Nur in der Andeutung faengt er Zeiger ab -- weiter
+   offen wuerde er sonst die Dreh-Geste des Rings fressen. */
+.ring-grip {
+  position: fixed;
+  /* Bewusst nur MITTIG und nicht ueber die volle Breite: ueber die ganze Breite waeren die
+     unteren ~96 px eine tote Zone, in der waehrend des Scrollens keine Zeile mehr antippbar
+     ist. Gewischt wird ohnehin von unten Mitte. */
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(240px, 64vw);
+  bottom: 0;
+  height: calc(88px + env(safe-area-inset-bottom, 0px));
+  z-index: 999;
+  touch-action: none;
+  background: transparent;
 }
-
-/* ---------- Tropfenlinse ----------
-   .ring-lens fuellt genau die Blase: dort haengt der Verzerrungsfilter, damit seine Karte immer
-   mittig und blasengross liegt, egal wo die Blase gerade steht. Vorher lag hier die Ringkopie
-   selbst und wurde per scale() vergroessert -- gleichmaessig, also wie flaches Glas.
-   Drei gestaffelte Zoomstufen waren der Zwischenschritt und hatten an jeder Stufengrenze eine
-   sichtbare Kante; der Filter macht denselben Verlauf stetig. */
-.ring-lens {
-  position: absolute;
-  /* Doppelt so gross gezeichnet und wieder halbiert. Der Verzerrungsfilter rastert seine Eingabe
-     einmal und schiebt danach nur noch Bildpunkte -- eine 1,75-fache Vergroesserung ist deshalb
-     echtes Hochrechnen und wird weich. Wird die Vorlage vorher in doppelter Aufloesung gezeichnet,
-     liegt die Vergroesserung wieder im Bereich des Vorhandenen und bleibt scharf.
-     transform-origin: 0 0 -- damit die Halbierung den Kasten exakt auf die Blase zurueckbringt. */
-  left: 0;
-  top: 0;
-  width: 200%;
-  height: 200%;
-  transform: scale(0.5);
-  transform-origin: 0 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0;
-  transition: opacity 0.26s ease;
-  filter: url(#tropfenBrechung);
-  /* Beschneidet sich selbst auf den Kreis, statt sich auf das overflow:hidden der Blase zu
-     verlassen. WebKit wendet den runden Beschnitt des Elternelements NICHT auf Kinder an, die
-     eine eigene Compositing-Ebene haben -- und die hat die Linse, seit der Filter darauf liegt.
-     Auf dem iPhone lief sie deshalb ueber den Kreis hinaus bis an die eckigen Kastengrenzen, die
-     Blase sah aus wie ein abgerundetes Viereck. In Chromium faellt das nicht auf.
-     50 % im doppelt grossen Kasten ergeben nach der Halbierung genau den Blasenradius. */
-  clip-path: circle(50%);
-}
-/* Hebt die Halbierung von .ring-lens fuer den Inhalt wieder auf. Dadurch bleibt die doppelte
-   Zeichenaufloesung eine reine Angelegenheit der aeusseren Ebene, und der Inhalt rechnet weiter
-   in normalen Koordinaten -- die beiden Skalierungen brauchen naemlich verschiedene Bezugspunkte
-   (die Halbierung die Ecke, das Herausrechnen von --grow die Blasenmitte), und das geht in einer
-   einzigen transform-Angabe nicht. */
-.lens-zoom {
-  position: absolute;
-  inset: 0;
-  transform: scale(2);
-  transform-origin: 0 0;
-}
-.lens-inhalt {
-  position: absolute;
-  /* Die Blase waechst beim Ziehen (--grow) und skaliert als Elternelement ihren Inhalt mit --
-     herausrechnen, damit die Ringkopie deckungsgleich ueber dem echten Ring bleibt. Die
-     gerichtete Dehnung (--sx/--sy) bleibt bewusst drin: dadurch verschmiert der Inhalt beim
-     schnellen Ziehen mit. */
-  transform: scale(calc(1 / var(--grow, 1)));
-  /* Bezugspunkt setzt app.js auf die Blasenmitte. */
-}
-.ring-handle.is-lensing .ring-lens { opacity: 1; }
-.ring-lens .ring-btn {
-  position: absolute;
-  pointer-events: none;
-  /* Die Kopien sollen sofort an ihrer Ringposition stehen. Ohne das erben sie die
-     transform-Transition von .ring-btn und wuerden bei jedem Neuaufbau erst hineinfahren. */
-  transition: none;
-  /* Im Glas wirkt alles heller und kontrastreicher als daneben. */
-  color: #fff;
-  filter: brightness(1.12) contrast(1.05);
-}
-
-.ring-handle::before,
-.ring-handle::after {
+.ring-grip.aus { pointer-events: none; }
+/* Der feine Strich als Einladung, wie eine Home-Leiste. Verschwindet, sobald der Ring kommt. */
+.ring-grip::after {
   content: "";
   position: absolute;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 2;
-  opacity: 0;                       /* in Ruhe komplett weg */
-  transition: opacity 0.28s ease;
-}
-/* Brechungskante mit Farbzerlegung -- als Haarlinie ganz aussen, 1,4 px.
-   Die Farben sind zurueck, aber die Breite entscheidet, was man sieht: als 1 mm breites Band
-   lesen sie sich als Seifenhaut (Interferenz), als Haarlinie am aeussersten Rand als Dispersion.
-   Und dort gehoeren sie auch physikalisch hin: die Zerlegung in Farben ist am Rand eines Tropfens
-   am staerksten, wo die Strahlen am flachsten durchs Glas laufen -- in der Flaeche sieht man sie
-   praktisch nicht.
-   In dieselbe Linie faellt die uebrige Randoptik: die helle Austrittskante dort, wo das Licht
-   austritt, und das dunkle Band der Totalreflexion gegenueber. */
-.ring-handle::before {
-  inset: 0;
-  padding: 1.4px;
-  background: conic-gradient(from 205deg,
-    rgba(255,255,255,0.00)   0deg,
-    rgba(120,200,255,0.78)  16deg,    /* kalt -- Blau bricht am staerksten */
-    rgba(255,255,255,0.72)  46deg,    /* helle Austrittskante */
-    rgba(255,190,130,0.70)  74deg,    /* warm, direkt daneben: die Zerlegung selbst */
-    rgba(255,255,255,0.10) 108deg,
-    rgba(0,0,0,0.30)       152deg,    /* Totalreflexion: dunkles Band am streifenden Rand */
-    rgba(0,0,0,0.10)       206deg,
-    rgba(150,120,255,0.72) 236deg,    /* violett */
-    rgba(255,170,120,0.68) 262deg,    /* orange */
-    rgba(255,255,255,0.40) 292deg,
-    rgba(120,220,255,0.60) 322deg,    /* kalt */
-    rgba(255,255,255,0.00) 360deg);
-  /* Kaum Unschaerfe -- sonst laeuft die Haarlinie zu einem Band auseinander und ist wieder Haut
-     statt Kante. Ein Hauch bleibt, damit sie nicht auf dem Pixelraster ausfranst. */
-  filter: blur(0.35px);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-}
-/* Randabdunklung. Bewusst aus der Mitte geruecht, der Lichtquelle gegenueber: bei einem echten
-   Tropfen ist der Rand nicht rundum gleich dunkel, sondern dort am dunkelsten, wo das Licht
-   streifend einfaellt und total reflektiert wird. */
-.ring-handle::after {
-  inset: 0;
-  background: radial-gradient(circle at 38% 32%, transparent 62%, rgba(0,0,0,0.20) 100%);
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 7px);
+  width: 104px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.20);
+  opacity: calc(1 - 2.4 * var(--p, 0));
+  transition: opacity 0.14s linear;
 }
 
-/* Aus der ruhenden Flaeche wird die Blase. */
-.ring-handle.is-liquid::before { opacity: 1; }
-.ring-handle.is-liquid::after { opacity: 1; }
-.ring-handle.is-liquid {
-  /* Innen fast klar -- nur eine Spur Aufhellung oben links, wo das Licht einfaellt. */
-  /* Praktisch klar: in der Vorlage sieht man die Leistenkante durch die Blase hindurchlaufen
-     und ueber der Leiste den schwarzen Hintergrund. Nur ein Hauch Aufhellung oben links. */
-  background:
-    /* Kein Glanzpunkt: ausdruecklich nicht gewuenscht. Was den Tropfen traegt, ist die Brechung
-       am Rand und das ungleichmaessige Vergroesserungsprofil, nicht ein aufgesetztes Licht.
-       Der Koerper bleibt fast klar -- Wasser faerbt nicht. */
-    radial-gradient(125% 105% at 32% 20%, rgba(255,255,255,0.07), rgba(255,255,255,0.01) 45%, rgba(255,255,255,0.02) 100%);
-  /* Kein saturate mehr: das faerbte den Untergrund kraeftiger und liess die Blase getoent wirken.
-     Wasser bricht und hellt auf, es saettigt nicht. */
-  backdrop-filter: brightness(1.07) contrast(1.03);
-  -webkit-backdrop-filter: brightness(1.07) contrast(1.03);
-  /* Rund. Die leicht in die Laenge gezogene Tropfenform war physikalisch begruendbar, hat aber
-     unruhig gewirkt -- bei den Groessenwechseln (Antippen, Ziehen) beult die abweichende Rundung
-     sichtbar. Ein Kreis bleibt in jeder Groesse ein Kreis. */
-  border-radius: 50%;
-  /* Feine helle Kante statt Leuchtrand -- in der Vorlage ist sie kaum mehr als ein Haarstrich. */
-  box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,0.34),
-    inset 0 2px 5px rgba(255,255,255,0.26),
-    inset 0 -3px 6px rgba(255,255,255,0.12),
-    0 8px 22px rgba(0,0,0,0.42);
-}
-/* Beim Ziehen quillt sie zusaetzlich auf und ragt ueber den Ring hinaus. */
-/* Beim Ziehen quillt sie deutlich auf und ragt sichtbar ueber das Band hinaus. Der Faktor haelt
-   die Bewegungsgroesse bei ~93px, wo sie vorher schon stimmte -- die Ruhegroesse ist kleiner
-   geworden, also muss die Aufblaehung entsprechend groesser sein (58.7 * 1.59 = 93.3).
-   Auf die Lupe wirkt das nicht: --grow wird in .ring-lens wieder herausgerechnet. */
-.ring-handle.is-dragging { --grow: 1.59; cursor: grabbing; }
-
-/* Antippen = Finger in Fluessigkeit: der Tropfen quillt kurz in ALLE Richtungen auf und faellt
-   dann zurueck. Bewusst gleichmaessig (sx = sy), im Gegensatz zum gerichteten Ziehen. */
-.ring-handle.is-tap { --sx: 1.22; --sy: 1.22; }
-/* Zerplatzen wie eine Seifenblase: kurz aufblaehen und dabei verschwinden. Bewusst ueber die
-   vorhandenen Skalier-Variablen statt per Keyframes -- sonst wuerde eine transform-Animation mit
-   der Positionierung (die ebenfalls transform nutzt) kollidieren. */
-.ring-handle.is-pop { --sx: 1.5; --sy: 1.5; opacity: 0; }
-.ring-handle.is-invisible { opacity: 0; }
-/* Bis der Startbildschirm weg ist bleibt sie unsichtbar (sonst laege sie ueber dem Splash). */
-.ring-handle.is-boot { opacity: 0; pointer-events: none; }
-/* Der Griff liegt auf z-index 1000, der Dialog auf 50. Ohne diese Regel schwebt die Kugel ueber
-   dem offenen Tagesblatt, verdeckt dort eine Zeile und faengt deren Tipp ab -- genau die Zeile
-   liess sich dann nicht mehr abhaken. Waehrend ein Dialog offen ist, navigiert man ohnehin nicht. */
-body.dialog-offen .ring-handle {
+/* Ring und Greifer liegen ueber dem Inhalt; ein offener Dialog gewinnt trotzdem. Ohne diese
+   Regel schwebte frueher die Kugel ueber dem Tagesblatt, verdeckte eine Zeile und fing deren
+   Tipp ab. Ohne Uebergang, aus demselben Grund wie an den Stellen in atlas-start.js: haengt das
+   Ausblenden an einer Transition und die laeuft nicht (Seite nicht gezeichnet), bliebe der Ring
+   ueber dem Dialog stehen. */
+body.dialog-offen .atlas-ring,
+body.dialog-offen .ring-grip {
   opacity: 0 !important;
   pointer-events: none !important;
-  /* Ohne Uebergang, aus demselben Grund wie an den beiden Stellen in atlas-start.js: haengt
-     das Aus-/Einblenden an einer Transition und die laeuft nicht (Tab im Hintergrund, Seite
-     nicht gezeichnet), bleibt die Kugel auf ihrem Startwert stehen -- also sichtbar ueber dem
-     Dialog. Ein laufender Uebergang schlaegt in der Kaskade sogar !important. */
   transition: none !important;
 }
-/* !important aus demselben Grund wie eine Zeile weiter unten bei .is-scrolling: revealHandle()
-   setzt die Deckkraft als Sicherheitsnetz direkt am Element (inline). Ohne !important kommt
-   keine Klasse dagegen an -- die Kugel blieb sichtbar ueber dem Dialog stehen. */
-/* Unten traegt die Blase das Globus-Symbol (Zurueck zum Hauptmenue). */
-.ring-handle.has-icon {
-  display: flex; align-items: center; justify-content: center;
-  /* Exakt dieselbe Farbe wie die Ringsymbole (.ring-btn) -- es ist dasselbe Bedienelement in
-     seinem anderen Zustand. Vorher stand hier das helle Gold (accent-200), wodurch der
-     Zurueck-Knopf waermer wirkte als alles, wozu er zurueckfuehrt. */
-  color: #eef3f8;
-}
-.ring-handle.has-icon .ring-lens { display: none; }
-.ring-handle.has-icon svg { display: block; }
-/* Fuer den lautlosen Sprung ans Ringsymbol: sonst wuerde die Blase sichtbar dorthin fliegen. */
-/* Auch die Pseudo-Elemente: die tragen ihre eigene Deckkraft-Transition (Oelfilm-Saum und
-   Randabdunklung). Ohne sie hier mitzunehmen greift das Sicherheitsnetz nur halb -- die Blase
-   saesse sofort richtig, haette aber noch den Glassaum des vorherigen Zustands um sich. */
-.ring-handle.no-anim,
-.ring-handle.no-anim::before,
-.ring-handle.no-anim::after { transition: none !important; }
+
+/* Das Homemenue traegt seinen eigenen deckenden Grund (background + .home-mesh + Vignette).
+   Seine Deckkraft folgt der zweiten Haelfte der Bewegung: bis zum Halb-Zustand ist der Ring ein
+   Aufsatz ueber dem Tab, ab dort uebernimmt das Hauptmenue. Frueher hing das an .home-hidden --
+   das kannte nur an und aus und konnte den Zwischenweg nicht abbilden. */
+.home-menu { opacity: var(--home-op, 1); }
+.home-menu.aus { opacity: 0; pointer-events: none; visibility: hidden; }
+
 
 /* Vignette ueber dem GESAMTEN Homemenue (nicht nur um die Globus-Buehne): als Rechteck um den Globus
    endete die Abdunklung vorher an dessen Kanten und erzeugte zwei sichtbare gerade Linien oben/unten. */
@@ -1072,10 +950,25 @@ body.dialog-offen .ring-handle {
   pointer-events: none;
   background: radial-gradient(circle at 50% 45%, transparent 26%, rgba(12, 15, 20, 0.5) 62%, rgba(9, 11, 15, 0.88) 100%);
 }
+/* Der Globus sitzt IN der Ring-Ebene, mittig auf dem Ringmittelpunkt -- damit liegt er UEBER
+   dem Glasband. Laege er wie frueher dahinter, zeichnete ihn dessen backdrop-filter weich.
+   Er wandert dadurch mit dem Ring und tritt in der zweiten Haelfte der Bewegung auf: bis zum
+   Halb-Zustand ist der Ring ein Aufsatz ueber dem Tab, erst danach wird daraus das Hauptmenue.
+   Die Groesse haengt am Ringradius (2R = Kantenlaenge der Ringbox), nicht mehr an der Buehne. */
 .globe-model {
-  height: 57%;
-  width: 57%;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* 76 % von 2R trifft dieselbe Groesse wie frueher 57 % der Buehne -- die Bezugsbox hat
+     gewechselt (Buehne min(94vw,560px) -> Ringbox 2R), der Globus soll gleich gross bleiben. */
+  height: 76%;
+  width: 76%;
   --poster-color: transparent;
+  transform: translate(-50%, -50%) scale(calc(0.30 + 0.70 * var(--p, 0)));
+  opacity: var(--globe-op, 0);
+  /* Erst im fertigen Hauptmenue darf der Globus Zeiger annehmen -- sonst faengt sein Canvas
+     Gesten ab, die eigentlich dem Ring gelten. */
+  pointer-events: var(--globe-pe, none);
   /* Ohne touch-action:none wertet der Browser das Wischen zeitweise als Seiten-Scroll und die
      Drehung "haengt" -- war bei einem frueheren Umbau verloren gegangen. */
   touch-action: none;
@@ -1519,40 +1412,7 @@ body.dialog-offen .ring-handle {
 }
 .gym-satz-pause:active { color: var(--color-accent-300); border-color: var(--color-accent-600); }
 
-/* ---------- Home-Blase im Ruhezustand ----------
-   Vorher stand sie in einmalig berechneten Pixelkoordinaten (--hx/--hy aus centerOf(homeAnchor)).
-   Beim Scrollen und beim Ein-/Ausklappen der iOS-Adressleiste wanderte der Anker, die Blase nicht —
-   sie landete mitten über dem Inhalt. Hier bindet sie fest an denselben Punkt wie die Tab-Leiste. */
-.ring-handle.at-home {
-  left: 50%;
-  top: auto;
-  bottom: calc(26px + env(safe-area-inset-bottom));
-  transform: translate(-50%, 0)
-             scale(calc(var(--sy, 1) * var(--grow, 1)), calc(var(--sx, 1) * var(--grow, 1)));
-}
-/* In Ruhe ist die Blase ein Bedienelement, keine Glasscheibe. Vorher lag sie mit 10 % Weiss und
-   ohne Unschaerfe ueber dem Inhalt -- der Text darunter schien hindurch und las sich als Schleier
-   ueber der Schrift statt als schwebender Knopf. Jetzt bekommt sie eine eigene, weitgehend
-   deckende Flaeche mit Unschaerfe dahinter.
-   Nur der wirklich ruhende Zustand: sobald angefasst wird, kommt .is-liquid dazu und die
-   Glasbehandlung von oben gilt wieder. */
-.ring-handle.at-home:not(.is-liquid) {
-  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
-  backdrop-filter: blur(14px) saturate(1.15);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
-  box-shadow: var(--kante-innen), var(--erhebung-2);
-}
-/* Waehrend des Scrollens tritt sie zurueck, damit sie beim Lesen keine Zeile dauerhaft verdeckt,
-   und kommt zurueck, sobald das Scrollen steht. Bewusst NUR ueber die Deckkraft: Position und
-   Transformation bleiben unangetastet, damit sie nicht wieder zwischen zwei Zustaenden haengen
-   bleiben kann. Die ausgeschlossenen Klassen sind die Zustaende, in denen etwas anderes die
-   Deckkraft fuehrt -- sonst wuerde diese Regel sie dort ueberstimmen. */
-.ring-handle.at-home.is-scrolling:not(.is-invisible):not(.is-pop):not(.is-boot):not(.is-dragging) {
-  /* !important, weil revealHandle() die Deckkraft als Sicherheitsnetz direkt am Element setzt
-     (die Blase ist schon zweimal unsichtbar haengen geblieben, deshalb steht das dort inline).
-     Eine Klasse allein kaeme dagegen nicht an. */
-  opacity: 0.18 !important;
-}
+
 
 /* ---------- Mehrere Pausen gleichzeitig ---------- */
 .gym-timer-liste { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
@@ -1634,9 +1494,9 @@ body.dialog-offen .ring-handle {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  /* Der Oelfilm-Saum und die Lupe sind reine Bewegungseffekte -- ohne Uebergang wirken sie als
-     hartes Aufblitzen. Dann lieber ganz weg. */
-  .ring-handle::before, .ring-lens { display: none; }
+  /* Das Aufquellen der Kimme beim Einrasten ist ein reiner Bewegungseffekt -- ohne Uebergang
+     waere es ein hartes Aufblitzen. Dann lieber gar nicht. */
+  .atlas-ring.rastet .ring-kimme { transform: scale(1); }
 }
 
 /* ---------- Leerzustand ----------

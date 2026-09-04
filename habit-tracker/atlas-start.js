@@ -383,528 +383,416 @@ if (splashEl) {
   setTimeout(ausblenden, MAX_MS);
 }
 
-// ---------- Die ruhende Blase tritt beim Scrollen zurueck ----------
-// Sie haengt an der Bildschirmposition, nicht am Inhalt -- was gerade unter ihr steht, liegt
-// darunter. Waehrend des Scrollens blendet sie deshalb ab und kommt zurueck, sobald es steht.
-// Bewusst ueber eine Klasse, die AUSSCHLIESSLICH die Deckkraft aendert: Position und
-// Transformation bleiben unangetastet, damit die Blase nicht wieder in einem Zwischenzustand
-// stehen bleiben kann (siehe die Timer-Kette, die dafuer schon einmal ausgebaut wurde). Der
-// Zeitgeber nimmt die Klasse in jedem Fall wieder weg -- dauerhaft blass werden kann sie nicht.
-(() => {
-  const handle = document.getElementById("ringHandle");
-  if (!handle) return;
-  let zurueck;
-  addEventListener("scroll", () => {
-    handle.classList.add("is-scrolling");
-    clearTimeout(zurueck);
-    zurueck = setTimeout(() => handle.classList.remove("is-scrolling"), 320);
-  }, { passive: true });
-})();
-
-// ---------- Homemenü: 3D-Globus-Navigation ----------
-// Drehung (Auto-Rotation + Wisch-Ziehen) übernimmt <model-viewer> selbst (siehe camera-controls/
-// auto-rotate-Attribute in index.html). Der Globus dient nur noch zum Drehen -- die Tab-Auswahl
-// läuft ausschließlich über den Ring. Die früheren unsichtbaren Kontinent-Tippflächen lagen mit
-// pointer-events:auto über der Kugel und haben die Wischgeste je nach Ansatzpunkt abgefangen,
-// wodurch das Drehen sporadisch hängen blieb.
+// ---------- Navigations-Ring ----------
+// Es ist immer DERSELBE Ring -- nur sein Mittelpunkt wandert. Ein Oeffnungsgrad p fuehrt alles:
+//
+//   p = 0.0  ANDEUTUNG   Mittelpunkt weit unter dem Bildschirm, nur ein Bogen mit kleinen
+//                        Symbolen schaut ueber den unteren Rand.
+//   p = 0.5  HALB        obere Ringhaelfte im Bild, fuenf Symbole in voller Groesse mit
+//                        Beschriftung. Der Tab-Inhalt bleibt dahinter stehen -- man wechselt
+//                        den Tab, ohne ins Hauptmenue zu muessen.
+//   p = 1.0  HAUPTMENUE  Mittelpunkt auf dem Globus, voller Kreis, Globus-Menue sichtbar.
+//
+// "Einmal hochwischen" und "nochmal hochwischen" sind damit dieselbe Bewegung mit drei
+// Rastpunkten: man kann in einem Zug durchziehen oder auf halbem Weg umkehren.
+//
+// Ausgewaehlt ist immer, was auf 12 Uhr unter der Kimme steht. Beim Loslassen rastet der Ring
+// dorthin ein und oeffnet den Tab.
 (() => {
   const homeMenu = document.getElementById("homeMenu");
+  const ring     = document.getElementById("atlasRing");
+  const grip     = document.getElementById("ringGrip");
+  const kimme    = document.getElementById("ringKimme");
   const globeModel = document.getElementById("globeModel");
-  if (!homeMenu) return;
+  const scrim    = document.getElementById("ringScrim");
+  const stage    = homeMenu && homeMenu.querySelector(".globe-stage");
+  if (!homeMenu || !ring || !grip || !stage) return;
 
-  function goToTab(tabName) {
-    homeMenu.classList.add("home-hidden");
-    switchTab(tabName);
-  }
-
-  // Ring-Knöpfe + Wassertropfen-Griff. Der Tropfen markiert immer den gewählten Tab und lässt sich
-  // am Ring entlangziehen; beim Loslassen rastet er auf das nächstgelegene Symbol. Antippen eines
-  // Symbols bewegt den Tropfen ebenfalls dorthin. In beiden Fällen dreht sich der Globus zuerst
-  // sichtbar auf den zugehörigen Kontinent (camera-orbit, model-viewer interpoliert weich), danach
-  // öffnet der Tab -- Auto-Rotation wird dabei abgeschaltet, sonst dreht sie sofort wieder weg.
-  const ringButtons = Array.from(homeMenu.querySelectorAll(".ring-btn"));
-  const ringHandle = document.getElementById("ringHandle");
-  let liquidTimer = null;
-  let tapTimer = null;
-  const ringSlots = ringButtons.map(btn => ({
+  const slots = Array.from(ring.querySelectorAll(".ring-btn")).map(btn => ({
     btn,
-    tab: btn.dataset.tab,
+    tab:   btn.dataset.tab,
     angle: parseFloat(btn.style.getPropertyValue("--angle")),
-    lat: parseFloat(btn.dataset.lat),
-    lon: parseFloat(btn.dataset.lon)
+    lat:   parseFloat(btn.dataset.lat),
+    lon:   parseFloat(btn.dataset.lon)
   }));
+  if (!slots.length) return;
 
-  // Die Blase liegt ausserhalb des Menues und wird deshalb in Bildschirmkoordinaten gesetzt.
-  // Ringposition = Mittelpunkt des jeweiligen Symbols (robuster als den Radius nachzurechnen).
-  const homeAnchor = document.getElementById("homeAnchor");
-  let handleMode = "ring";   // "ring" = am Symbolring, "home" = unten als Zurueck-Knopf
+  const RUHIG = matchMedia("(prefers-reduced-motion: reduce)");
 
-  function centerOf(el) {
-    const r = el.getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-  }
-  function setHandlePos(x, y, rotDeg) {
-    if (!ringHandle) return;
-    ringHandle.style.setProperty("--hx", `${x}px`);
-    ringHandle.style.setProperty("--hy", `${y}px`);
-    if (rotDeg != null) ringHandle.style.setProperty("--rot", `${rotDeg}deg`);
-    alignLens(x, y);
+  let p = 1;        // Start: Hauptmenue, wie bisher
+  let rot = 0;      // Drehung des Rings in Grad
+  let R = 214;      // Ringradius, gemessen
+  let cyAndeutung = 0, cyHalb = 0, cyHome = 0;
+
+  // ---------- Messen ----------
+  // Der Mittelpunkt im Hauptmenue wird an der Globus-Buehne abgenommen, nicht gerechnet: so
+  // liegt der Ring immer genau um den Globus, egal wie die Buehne gerade skaliert.
+  const messfuehler = document.createElement("div");
+  messfuehler.style.cssText = "position:fixed;left:0;bottom:0;width:0;" +
+    "height:env(safe-area-inset-bottom,0px);pointer-events:none;visibility:hidden;";
+  document.body.appendChild(messfuehler);
+
+  function messen() {
+    const vh = window.innerHeight;
+    R = Math.min(window.innerWidth * 0.35, 214);
+    ring.style.setProperty("--R", R + "px");
+
+    const sicher = messfuehler.getBoundingClientRect().height || 0;
+
+    // ANDEUTUNG: die Oberkante des Symbolbands schaut PEEK px ueber den unteren Rand.
+    const PEEK = 34;
+    cyAndeutung = vh + sicher + R - PEEK;
+    // HALB: Mittelpunkt knapp unter dem Rand -> genau die obere Haelfte im Bild, also fuenf
+    // Symbole (das gewaehlte plus zwei je Seite). Tiefer waeren es nur drei, und dann sieht
+    // man von den ANDEREN Tabs zu wenig -- worum es in diesem Zustand ja gerade geht.
+    cyHalb = vh + R * 0.05;
+    // HAUPTMENUE: Mitte des Globus.
+    const r = stage.getBoundingClientRect();
+    cyHome = r.height ? r.top + r.height / 2 : vh * 0.47;
+
+    zeichnen();
   }
 
-  // ---------- Linsenwirkung ----------
-  // Eine nicht anklickbare Kopie aller Ringsymbole liegt in der Blase und wird per left/top exakt
-  // ueber den echten Symbolen gehalten. Weil sie am RING klebt und nicht an der Blase, wandert sie
-  // beim Ziehen durch die Blase hindurch, statt mitgeschleift zu werden -- das war der Fehler der
-  // frueheren Version ("sie saugt das Symbol ein"). overflow:hidden der Blase schneidet sie auf
-  // die Blasenform zu, die Vergroesserung passiert um den Blasenmittelpunkt.
-  let lensLayer = null;
-  // Ein echter Tropfen vergroessert nicht ueberall gleich: in der Mitte am staerksten, zum Rand
-  // hin faellt es stetig ab, ganz aussen staucht sich das Bild sogar. Der Versuch, das mit drei
-  // gestaffelten Zoomstufen nachzubauen, hatte an jeder Stufengrenze eine sichtbare Kante -- das
-  // ist der Bauart geschuldet und nicht wegzustellen.
-  // Jetzt macht es ein Verzerrungsfilter (siehe #tropfenBrechung in index.html): eine Karte, die
-  // fuer jeden Punkt angibt, um wie viel er verschoben wird. Der Verlauf ist stetig, also gibt es
-  // nichts mehr, woran eine Kante entstehen koennte.
-  // Aufbau: .ring-lens fuellt genau die Blase (dort sitzt der Filter, damit die Karte immer
-  // mittig und blasengross liegt), darin liegt die Ringkopie an ihrer Ringposition.
-  function buildLens() {
-    if (!ringHandle || lensLayer) return;
-    const ring = homeMenu.querySelector(".globe-ring");
-    if (!ring) return;
-    lensLayer = document.createElement("div");
-    lensLayer.className = "ring-lens";
-    lensLayer.setAttribute("aria-hidden", "true");
-    const zoom = document.createElement("div");
-    zoom.className = "lens-zoom";
-    const inhalt = document.createElement("div");
-    inhalt.className = "lens-inhalt";
-    ringButtons.forEach(btn => {
-      const copy = btn.cloneNode(true);
-      copy.removeAttribute("data-tab");
-      copy.removeAttribute("aria-label");
-      copy.setAttribute("tabindex", "-1");
-      inhalt.appendChild(copy);
-    });
-    zoom.appendChild(inhalt);
-    lensLayer.appendChild(zoom);
-    ringHandle.appendChild(lensLayer);
+  // Stueckweise Interpolation ueber die drei Rastpunkte.
+  function cyFuer(t) {
+    if (t <= 0.5) return cyAndeutung + (cyHalb - cyAndeutung) * (t / 0.5);
+    return cyHalb + (cyHome - cyHalb) * ((t - 0.5) / 0.5);
   }
-  // Die Kopie deckungsgleich ueber den echten Ring legen -- in Blasen-Koordinaten, weil sie ein
-  // Kind der Blase ist. Bezugspunkt der Vergroesserung ist die Blasenmitte, damit sie sich wie
-  // eine Lupe verhaelt und nicht wie ein skaliertes Bild.
-  let lensRect = null;
-  function refreshLensRect() {
-    const ring = homeMenu.querySelector(".globe-ring");
-    const r = ring && ring.getBoundingClientRect();
-    lensRect = (r && r.width) ? r : null;
-  }
-  function alignLens(hx, hy) {
-    if (!lensLayer) return;
-    if (!lensRect) refreshLensRect();
-    const rr = lensRect;
-    if (!rr) return;
-    // --ring-r/--ring-w stehen auf .globe-stage. Die Blase haengt am <body> und erbt sie nicht --
-    // ohne sie wird translate(var(--ring-r)) ungueltig, das komplette transform faellt weg und
-    // alle Kopien landen uebereinander in der Ringmitte. Also ausdruecklich uebernehmen.
-    const stageEl = homeMenu.querySelector(".globe-stage");
-    if (stageEl) {
-      const st = getComputedStyle(stageEl);
-      lensLayer.style.setProperty("--ring-r", st.getPropertyValue("--ring-r"));
-      lensLayer.style.setProperty("--ring-w", st.getPropertyValue("--ring-w"));
+
+  // ---------- Zeichnen ----------
+  // Eine einzige Stelle, die den sichtbaren Zustand aus p und rot herstellt. Idempotent:
+  // ein zweiter Aufruf repariert jeden Zwischenstand.
+  function zeichnen() {
+    const t = Math.max(0, Math.min(1, p));
+    ring.style.setProperty("--cy", cyFuer(t).toFixed(1) + "px");
+    ring.style.setProperty("--rot", rot.toFixed(2) + "deg");
+    ring.style.setProperty("--p", t.toFixed(3));
+
+    // Symbole wachsen von der Andeutung bis zum Halb-Zustand auf volle Groesse, danach bleiben
+    // sie. Die Beschriftung kommt im selben Abschnitt dazu.
+    const oeffnung = Math.min(1, t / 0.5);
+    ring.style.setProperty("--sym-scale", (0.60 + 0.40 * oeffnung).toFixed(3));
+    ring.style.setProperty("--label-op", (Math.max(0, oeffnung - 0.45) / 0.55).toFixed(3));
+    ring.style.setProperty("--kimme-op", oeffnung.toFixed(3));
+
+    grip.style.setProperty("--p", t.toFixed(3));
+    // Der Greifer faengt nur in der Andeutung Zeiger ab -- sonst frisst er die Dreh-Geste.
+    grip.classList.toggle("aus", t > 0.08);
+    // ... und umgekehrt: solange nur die Andeutung steht, faengt der Ring selbst nichts ab.
+    ring.classList.toggle("deko", t < 0.08);
+
+    if (scrim) {
+      scrim.style.setProperty("--p", t.toFixed(3));
+      // Im fertigen Hauptmenue deckt das Homemenue ohnehin alles ab -- dann abschalten, statt
+      // eine bildschirmfuellende Weichzeichnung dauerhaft mitlaufen zu lassen.
+      scrim.style.setProperty("--scrim-on", t > 0.02 && t < 0.995 ? "1" : "0");
+      scrim.classList.toggle("fangend", t > 0.06 && t < 0.94);
     }
 
-    const hw = ringHandle.offsetWidth / 2, hh = ringHandle.offsetHeight / 2;
-    const left = hw + (rr.left - hx);
-    const top = hh + (rr.top - hy);
-    const inhalt = lensLayer.querySelector(".lens-inhalt");
-    if (inhalt) {
-      inhalt.style.left = `${left}px`;
-      inhalt.style.top = `${top}px`;
-      inhalt.style.width = `${rr.width}px`;
-      inhalt.style.height = `${rr.height}px`;
-      // Das Herausrechnen von --grow muss um die BLASENMITTE geschehen, nicht um die Mitte der
-      // Ringkopie -- sonst wandert die Kopie beim Aufquellen unter der Blase weg.
-      // Die doppelte Zeichenaufloesung spielt hier bewusst keine Rolle: .lens-zoom hebt die
-      // Halbierung von .ring-lens auf, der Inhalt rechnet dadurch in normalen Koordinaten.
-      inhalt.style.transformOrigin = `${hw - left}px ${hh - top}px`;
+    // Das Hauptmenue blendet in der zweiten Haelfte auf; bis dahin ist es ganz aus der
+    // Treffererkennung genommen (visibility), sonst faengt der Globus dort Zeiger ab.
+    const homeOp = Math.max(0, (t - 0.5) / 0.5);
+    homeMenu.style.setProperty("--home-op", homeOp.toFixed(3));
+    homeMenu.classList.toggle("aus", homeOp <= 0.001);
+    // Der Globus liegt in der Ring-Ebene (ueber dem Glasband) und tritt mit dem Hauptmenue auf.
+    ring.style.setProperty("--globe-op", homeOp.toFixed(3));
+    ring.style.setProperty("--globe-pe", t > 0.92 ? "auto" : "none");
+
+    markiereGewaehlten();
+  }
+
+  // ---------- Auswahl ----------
+  function winkelAbstand(a, b) { return Math.abs(((a - b) % 360 + 540) % 360 - 180); }
+
+  function nachstenSlotZu(rotWert) {
+    let best = slots[0], bestD = 1e9;
+    for (const s of slots) {
+      const d = winkelAbstand(s.angle + rotWert, -90);
+      if (d < bestD) { bestD = d; best = s; }
     }
-    // Die Verschiebung der Karte ist als Anteil des Radius kodiert; der Filter rechnet in Pixeln.
-    // Also muss die Staerke mit der Blase mitwachsen, sonst wird die Brechung schwaecher, je
-    // groesser der Tropfen beim Ziehen wird. 0.3 = 2 x DMAX aus dem Erzeugerskript der Karte.
-    const versatz = document.getElementById("tropfenVersatz");
-    const karte = document.querySelector("#tropfenBrechung feImage");
-    if (versatz) {
-      const sichtbarerRadius = ringHandle.getBoundingClientRect().width / 2;
-      // 1.3 = 2 x DMAX aus dem Erzeugerskript der Karte. Die Auslenkung ist dort als Anteil des
-      // Radius kodiert, der Filter rechnet in Pixeln -- also muss die Staerke mit der Blase
-      // mitwachsen, sonst wird die Brechung schwaecher, je groesser der Tropfen beim Ziehen wird.
-      // x2, weil die Linse in doppelter Aufloesung gezeichnet wird: im Kasten des Filters ist
-      // alles doppelt so gross, also muss die Auslenkung es auch sein.
-      versatz.setAttribute("scale", (sichtbarerRadius * 1.3 * 2).toFixed(2));
-    }
-    // Der Filterbereich reicht bewusst ueber die Blase hinaus: bei 0,62 am Rand holt sich die
-    // Randzone Bildpunkte von bis zu 1,61 Radien aus der Mitte, also von weit ausserhalb der
-    // Blase -- ohne Rand waere dort nichts zu holen und der Saum liefe leer.
-    // Die Karte selbst muss dabei aber weiterhin genau auf der Blase liegen, nicht auf dem
-    // groesseren Filterbereich. Ihre Masse stehen deshalb ausdruecklich hier, in Pixeln.
-    if (karte) {
-      const b = ringHandle.offsetWidth * 2, hgh = ringHandle.offsetHeight * 2;
-      karte.setAttribute("x", "0");
-      karte.setAttribute("y", "0");
-      karte.setAttribute("width", String(b));
-      karte.setAttribute("height", String(hgh));
-    }
+    return best;
+  }
+  function gewaehlterSlot() { return nachstenSlotZu(rot); }
 
-    // Nur stanzen, solange das Glas wirklich da ist. Sonst bliebe nach dem Ausblenden ein
-    // Symbol unsichtbar, weil die Maske einfach stehen bliebe.
-    if (ringHandle.classList.contains("is-lensing")) punchRingHole(hx, hy, rr);
-    else clearRingHole();
+  // Die Rotation, bei der `slot` auf 12 Uhr steht -- und zwar die, die dem aktuellen Wert am
+  // naechsten liegt, damit der Ring nicht den langen Weg ueber 360 Grad nimmt.
+  function rotFuer(slot, nahBei) {
+    const soll = -90 - slot.angle;
+    const basis = nahBei == null ? rot : nahBei;
+    return basis + (((soll - basis + 540) % 360) - 180);
   }
 
-  // Ohne Loch stuende jede Beschriftung doppelt da: klein im Original, gross in der Lupe darueber.
-  // Echtes Glas ersetzt, was darunter liegt -- also wird der echte Ring genau unter der Blase
-  // ausgeblendet. Nur die drei Zahlen wechseln pro Bild, die Maske selbst bleibt stehen.
-  function punchRingHole(hx, hy, rr) {
-    const ring = homeMenu.querySelector(".globe-ring");
-    if (!ring) return;
-    const d = ringHandle.getBoundingClientRect().width;   // sichtbarer Durchmesser inkl. --grow
-    if (!d) return;
-    ring.classList.add("has-hole");
-    ring.style.setProperty("--hole-d", `${d}px`);
-    ring.style.setProperty("--hole-x", `${hx - rr.left - d / 2}px`);
-    ring.style.setProperty("--hole-y", `${hy - rr.top - d / 2}px`);
-  }
-  // Ohne Glas kein Loch -- sonst fehlte ein Symbol, sobald die Lupe aus ist.
-  function clearRingHole() {
-    const ring = homeMenu.querySelector(".globe-ring");
-    if (ring) ring.classList.remove("has-hole");
-  }
-  function placeAtSlot(slot) {
-    // WICHTIG: die Ruheverankerung aufheben. Die Klasse "at-home" ueberschreibt left/top/bottom
-    // und transform per CSS; bleibt sie stehen, ignoriert die Blase jede --hx/--hy-Angabe und
-    // klebt unten fest, waehrend der Code sie laengst am Ring waehnt.
-    if (ringHandle) ringHandle.classList.remove("at-home");
-    const c = centerOf(slot.btn);
-    // Dehnung soll entlang der Ringbahn wirken -> Tangente steht senkrecht auf dem Radius.
-    setHandlePos(c.x, c.y, slot.angle + 90);
-  }
-  function placeAtHome() {
-    // Die Position kommt im Ruhezustand aus dem CSS (.ring-handle.at-home); hier nur noch die
-    // Verankerung sicherstellen, damit Scrollen und die iOS-Adressleiste sie nicht verschieben.
-    if (ringHandle) ringHandle.classList.add("at-home");
-    if (!homeAnchor) return;
-    const c = centerOf(homeAnchor);
-    setHandlePos(c.x, c.y, 90);   // Rueckfall, falls das CSS nicht greift
-  }
-
-  // Kuerzester Winkelabstand auf dem Kreis (beruecksichtigt den Sprung bei 360/0 Grad).
-  function angleDistance(a, b) {
-    return Math.abs(((a - b) % 360 + 540) % 360 - 180);
-  }
-
-  function moveHandleTo(slot) {
-    if (!ringHandle) return;
-    ringHandle.classList.remove("no-anim", "is-invisible", "at-home");
-    // Antippen = Finger in Fluessigkeit: kurz gleichmaessig aufquellen, dann zurueckfallen.
-    ringHandle.classList.add("is-liquid", "is-tap", "is-lensing");
-    ringHandle.style.setProperty("--angle", `${slot.angle}deg`);
-    handleMode = "ring";
-    placeAtSlot(slot);
-    clearTimeout(tapTimer); clearTimeout(liquidTimer);
-    tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 230);
-    liquidTimer = setTimeout(() => { ringHandle.classList.remove("is-liquid", "is-lensing"); clearRingHole(); }, 460);
-  }
-
-  // Beim Oeffnen eines Tabs wandert die Blase nach unten und wird dort zum Zurueck-Knopf.
-  const GLOBE_ICON = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none">' +
-    '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>' +
-    '<ellipse cx="12" cy="12" rx="4" ry="9" stroke="currentColor" stroke-width="1.3"/>' +
-    '<path d="M3.2 9.2H20.8M3.2 14.8H20.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
-
-  // ---------- Zustandsfuehrung der Blase ----------
-  // EIN Ort, der die Blase vollstaendig in einen bekannten Zustand versetzt. Synchron, ohne
-  // Zeitschalter, idempotent: ein zweiter Aufruf repariert jeden Zwischenstand. Alles Zierende
-  // (Aufquellen, Zerplatzen) wird danach nur noch obendrauf gelegt und ist nie tragend.
-  const BLASE_ZIER = ["is-liquid", "is-tap", "is-pop", "is-lensing", "is-invisible"];
-
-  function setzeBlase(modus) {
-    if (!ringHandle) return;
-    clearTimeout(tapTimer); clearTimeout(liquidTimer);
-    // Uebergaenge fuer den Sprung abschalten — ein unterbrochener Uebergang war die Ursache
-    // dafuer, dass die Blase auf halbem Weg stehenblieb.
-    ringHandle.classList.add("no-anim");
-    ringHandle.classList.remove(...BLASE_ZIER);
-    ringHandle.style.opacity = "1";
-    clearRingHole();
-
-    if (modus === "home") {
-      handleMode = "home";
-      ringHandle.classList.add("has-icon", "at-home");
-      ringHandle.innerHTML = GLOBE_ICON;   // unten zeigt die Blase das Globus-Symbol
-      lensLayer = null;
-      placeAtHome();
-    } else {
-      handleMode = "ring";
-      ringHandle.classList.remove("has-icon");
-      ringHandle.classList.remove("at-home");
-      ringHandle.innerHTML = "";           // am Ring leer — das Symbol liegt dort schon darunter
-      lensLayer = null;
-      buildLens();
-      refreshLensRect();
-      const cur = ringSlots.find(sl => sl.tab === document.body.dataset.tab) || ringSlots[0];
-      if (cur) placeAtSlot(cur);
-    }
-
-    // Uebergaenge im naechsten Bild wieder zulassen, mit Zeitlimit als Netz, falls kein Bild
-    // gezeichnet wird (Tab im Hintergrund).
-    const wiederAnimieren = () => ringHandle.classList.remove("no-anim");
-    requestAnimationFrame(() => requestAnimationFrame(wiederAnimieren));
-    setTimeout(wiederAnimieren, 150);
-  }
-
-  // ---------- Der Weg zwischen zwei Zustaenden ----------
-  // setzeBlase() setzt den Zielzustand synchron und ohne Uebergang -- das ist die Lehre aus den
-  // beiden Malen, an denen die Blase zwischen zwei Positionen haengen geblieben ist. Sichtbar
-  // gesprungen ist sie dadurch aber auch.
-  // Diese Funktion holt die Bewegung zurueck, ohne das Risiko: der Endzustand steht bereits im
-  // DOM, animiert wird nur die Differenz von der alten Position dorthin. Bricht die Animation ab,
-  // laeuft sie nicht an oder wird sie unterbrochen, steht die Blase trotzdem richtig.
-  // Bewusst ueber "translate" und nicht ueber "transform": transform traegt hier Position,
-  // Drehung und Dehnung aus CSS-Variablen -- eine Animation darauf wuerde das alles ersetzen.
-  // "translate" ist eine eigene Eigenschaft und legt sich obendrauf.
-  const RUHIGE_BEWEGUNG = matchMedia("(prefers-reduced-motion: reduce)");
-  function blaseGleitenLassen(vorher) {
-    if (!ringHandle || !vorher || RUHIGE_BEWEGUNG.matches) return;
-    if (typeof ringHandle.animate !== "function") return;
-    const jetzt = ringHandle.getBoundingClientRect();
-    const dx = vorher.left - jetzt.left;
-    const dy = vorher.top - jetzt.top;
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-    const lauf = ringHandle.animate(
-      [{ translate: `${dx}px ${dy}px` }, { translate: "0px 0px" }],
-      { duration: 420, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" }
-    );
-    // SICHERHEITSNETZ, und zwar ein notwendiges: die Dokumentzeit steht still, solange die Seite
-    // nicht gezeichnet wird (Tab im Hintergrund, App weggewischt). Die Animation bleibt dann bei
-    // Zeit 0 stehen -- also auf dem ERSTEN Bild, und das ist die alte Position. Ohne dieses Netz
-    // haengt die Blase genau so fest, wie sie hier schon zweimal festhing; gemessen 482 px neben
-    // ihrem Platz, waehrend der Code sie laengst am Ring waehnte.
-    // Zeitgeber laufen auch ohne Zeichnen weiter. cancel() nimmt die Animation heraus, danach
-    // gilt wieder der DOM-Zustand -- und der ist die ganze Zeit ueber der richtige.
-    const abbrechen = () => { try { lauf.cancel(); } catch (e) { /* schon beendet */ } };
-    setTimeout(abbrechen, 700);
-    // Der Zeitgeber allein reicht nicht: in einer versteckten Seite werden auch Zeitgeber
-    // gedrosselt (auf eine Sekunde und mehr). Deshalb zusaetzlich genau auf das Ereignis hoeren,
-    // das die Dokumentzeit anhaelt -- wird die Seite versteckt, wird die Animation sofort
-    // weggenommen und der richtige DOM-Zustand gilt wieder.
-    document.addEventListener("visibilitychange", function weg() {
-      if (document.visibilityState !== "hidden") return;
-      abbrechen();
-      document.removeEventListener("visibilitychange", weg);
-    });
-  }
-
-  // Die Zierde: kurz aufquellen, danach von selbst zurueckfallen. Setzt keinen Zustand.
-  function blaseAntippen() {
-    if (!ringHandle) return;
-    ringHandle.classList.add("is-liquid", "is-tap");
-    clearTimeout(tapTimer); clearTimeout(liquidTimer);
-    tapTimer = setTimeout(() => ringHandle.classList.remove("is-tap"), 260);
-    liquidTimer = setTimeout(() => ringHandle.classList.remove("is-liquid"), 560);
-  }
-
-  function sendHandleHome() {
-    const vorher = ringHandle && ringHandle.getBoundingClientRect();
-    setzeBlase("home");
-    blaseGleitenLassen(vorher);
-    blaseAntippen();
-  }
-
-  // Vorher lag zwischen Antippen und Tab eine feste Wartezeit von 850 ms, in der nichts passierte
-  // ausser dass sich der Globus drehte -- danach wechselte alles auf einen Schlag. Zusammen mit dem
-  // 400-ms-Ausblenden des Menues waren das 1,25 s vom Tippen bis zum benutzbaren Tab, mit einer
-  // toten Dreiviertelsekunde am Anfang. Jetzt startet der Wechsel nach 260 ms; die Globusdrehung
-  // laeuft hinter dem ausblendenden Menue weiter, statt ihn aufzuhalten.
-  const WARTEN_BIS_TAB = 260;
-  function activateSlot(slot) {
-    moveHandleTo(slot);
-    if (globeModel && !isNaN(slot.lat) && !isNaN(slot.lon)) {
+  let zuletztGewaehlt = null;
+  function markiereGewaehlten() {
+    const s = gewaehlterSlot();
+    if (s === zuletztGewaehlt) return;
+    zuletztGewaehlt = s;
+    slots.forEach(x => x.btn.classList.toggle("gewaehlt", x === s));
+    // Der Globus dreht live mit, sobald ein neues Symbol oben steht -- aber nur, wenn er
+    // ueberhaupt sichtbar ist, sonst arbeitet er im Verborgenen gegen die Bildrate.
+    if (globeModel && p > 0.55 && !isNaN(s.lat)) {
       globeModel.autoRotate = false;
-      globeModel.cameraOrbit = `${slot.lon}deg ${90 - slot.lat}deg 105%`;
-      setTimeout(() => { goToTab(slot.tab); sendHandleHome(); }, WARTEN_BIS_TAB);
-    } else {
-      goToTab(slot.tab); sendHandleHome();
+      globeModel.cameraOrbit = `${s.lon}deg ${90 - s.lat}deg 105%`;
     }
   }
 
-  ringSlots.forEach(slot => slot.btn.addEventListener("click", () => activateSlot(slot)));
+  // ---------- Federn ----------
+  let zielP = p, zielRot = rot, laeuft = false;
+  let vRot = 0;                                  // Winkelgeschwindigkeit, Grad je ms
 
-  // Im Home-Modus ist die Blase der Zurueck-Knopf; im Ring-Modus faengt der Drag-Handler den Klick ab.
-  if (ringHandle) {
-    ringHandle.addEventListener("click", () => {
-      if (handleMode !== "home") return;
-      homeMenu.classList.remove("home-hidden");
-      if (globeModel) globeModel.autoRotate = true;
-      // Ein einziger, vollstaendiger Zustandswechsel statt dreier verschachtelter Zeitschalter.
-      const vorher = ringHandle.getBoundingClientRect();
-      setzeBlase("ring");
-      blaseGleitenLassen(vorher);
-      blaseAntippen();
-    });
+  function federLauf() {
+    laeuft = true;
+    let letzte = performance.now();
+    const schritt = jetzt => {
+      const dt = Math.min(34, jetzt - letzte); letzte = jetzt;
+      let fertig = true;
+
+      if (Math.abs(zielP - p) > 0.0008) {
+        p += (zielP - p) * (1 - Math.pow(0.0009, dt / 16)); fertig = false;
+      } else p = zielP;
+
+      const d = ((zielRot - rot + 540) % 360) - 180;
+      if (Math.abs(d) > 0.06) {
+        rot += d * (1 - Math.pow(0.0022, dt / 16)); fertig = false;
+      } else rot = zielRot;
+
+      zeichnen();
+      if (fertig) { laeuft = false; return; }
+      requestAnimationFrame(schritt);
+    };
+    requestAnimationFrame(schritt);
   }
 
-  // Startposition setzen, sobald das Layout steht, und bei Groessenaenderung nachziehen.
-  // Zusaetzlich Sicherheitsnetz: welcher Zustand richtig ist, ergibt sich daraus, ob das
-  // Globus-Menue sichtbar ist — nicht aus einer Variablen, die aus dem Tritt geraten kann.
-  function repositionHandle() {
-    if (!ringHandle) return;
-    lensRect = null;                      // Layout hat sich geaendert -> neu vermessen
-    // Sollzustand ergibt sich allein daraus, ob das Globus-Menue sichtbar ist. Weicht irgendetwas
-    // davon ab — der Modus, die Verankerung oder das Symbol in der Blase —, wird der ganze
-    // Zustand neu gesetzt statt nur die Position nachgezogen.
-    const menueOffen = !homeMenu.classList.contains("home-hidden");
-    const soll = menueOffen ? "ring" : "home";
-    const stimmt = handleMode === soll
-      && ringHandle.classList.contains("at-home") === (soll === "home")
-      && ringHandle.classList.contains("has-icon") === (soll === "home");
-    if (!stimmt) { setzeBlase(soll); return; }
-    if (handleMode === "home") { placeAtHome(); return; }
-    const cur = ringSlots.find(sl => sl.tab === document.body.dataset.tab) || ringSlots[0];
-    if (cur) placeAtSlot(cur);
+  // SICHERHEITSNETZ. Die Feder haengt an requestAnimationFrame, und das steht still, solange die
+  // Seite nicht gezeichnet wird (App weggewischt, Bildschirm aus, Seite im Hintergrund).
+  // Gemessen: in einer verborgenen Ansicht kommt KEIN einziges Bild, waehrend Zeitgeber normal
+  // weiterlaufen. Ohne Netz bliebe der Ring auf halbem Weg stehen -- halb offen, halb gedreht --
+  // und die App waere bedienbar, aber falsch. Genau dieser Fehler hat die alte Wasserblase
+  // zweimal erwischt. Zeitgeber laufen weiter, also setzt einer den Zielzustand hart.
+  let netzTimer = null;
+  function hartSetzen() {
+    clearTimeout(netzTimer); netzTimer = null;
+    p = zielP; rot = zielRot; laeuft = false;
+    zeichnen();
   }
-  // Mehrfach anstossen: direkt, nach dem Layout und nach dem Splash -- so sitzt die Blase auch dann
-  // richtig, wenn ein einzelner Zeitpunkt (z.B. rAF) ausfaellt oder das Layout noch nicht steht.
-  // Erst einblenden, wenn der Startbildschirm verschwunden ist -- danach sitzt sie am Ring.
-  function revealHandle(force) {
-    if (!ringHandle) return;
-    const splash = document.getElementById("splashScreen");
-    // Sobald der Splash ausblendet reicht -- NICHT darauf warten, dass er aus dem DOM faellt: das
-    // haengt an einem transitionend-Ereignis, und laeuft das nicht durch, bliebe die Blase fuer
-    // immer unsichtbar. Zusaetzlich unten ein hartes Sicherheitsnetz.
-    if (splash && !force && !splash.classList.contains("splash-hidden")) {
-      setTimeout(revealHandle, 150);
+  function netzSpannen() {
+    clearTimeout(netzTimer);
+    netzTimer = setTimeout(() => {
+      const offenP   = Math.abs(zielP - p) > 0.002;
+      const offenRot = Math.abs(((zielRot - rot + 540) % 360) - 180) > 0.2;
+      if (offenP || offenRot) hartSetzen();
+    }, 700);
+  }
+  // Wird die Seite versteckt, ist ohnehin klar, dass keine Bilder mehr kommen.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") hartSetzen();
+  });
+
+  function setzeZiel(neuP, neuRot) {
+    zielP = neuP;
+    if (neuRot != null) zielRot = neuRot;
+    if (RUHIG.matches) { hartSetzen(); return; }
+    if (!laeuft) federLauf();
+    netzSpannen();
+  }
+
+  // ---------- Einrasten und oeffnen ----------
+  const WARTEN_BIS_TAB = 240;
+  function einrastenUndWaehlen(projiziert) {
+    const ziel = nachstenSlotZu(projiziert);
+    setzeZiel(zielP, rotFuer(ziel, rot));
+    ring.classList.add("rastet");
+    setTimeout(() => ring.classList.remove("rastet"), 260);
+    if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) {} }
+    return ziel;
+  }
+  // Einrasten, kurz stehen lassen, dann den Tab oeffnen und den Ring auf die Andeutung
+  // zuruecknehmen. Die Wartezeit laesst das Einrasten sichtbar werden, bevor alles wechselt.
+  function waehlenUndOeffnen(projiziert) {
+    const ziel = einrastenUndWaehlen(projiziert);
+    setTimeout(() => {
+      if (typeof switchTab === "function" && ziel.tab !== document.body.dataset.tab) {
+        switchTab(ziel.tab);
+      }
+      setzeZiel(0, null);
+    }, WARTEN_BIS_TAB);
+  }
+
+  function naechsteStufe(wert) {
+    const stufen = [0, 0.5, 1];
+    let best = stufen[0], bestD = 1e9;
+    for (const s of stufen) { const d = Math.abs(s - wert); if (d < bestD) { bestD = d; best = s; } }
+    return best;
+  }
+
+  // ---------- Gesten ----------
+  // Ein Zeiger, zwei moegliche Bedeutungen. Welche es ist, entscheidet sich nach den ersten
+  // Pixeln und bleibt dann fest. Gemessen wird AN DER RINGGEOMETRIE, nicht an den
+  // Bildschirmachsen: tangential (am Bogen entlang) = drehen, radial (auf den Mittelpunkt zu
+  // oder von ihm weg) = schliessen bzw. oeffnen. Nach Bildschirmachsen ginge das schief --
+  // links und rechts am Ring verlaeuft der Bogen fast senkrecht, ein Drehen dort waere als
+  // Hochwischen missverstanden worden.
+  let zeiger = null;
+
+  function ringMitte() { return { x: window.innerWidth / 2, y: cyFuer(p) }; }
+  function zeigerWinkel(e) {
+    const c = ringMitte();
+    return Math.atan2(e.clientY - c.y, e.clientX - c.x) * 180 / Math.PI;
+  }
+
+  function start(e) {
+    if (zeiger) return;
+    // Die beiden Richtungen beim Aufsetzen einfrieren: der Mittelpunkt wandert waehrend der
+    // Geste, die Bedeutung der Fingerrichtung soll sich dabei nicht mitdrehen.
+    const c = ringMitte();
+    const rx = e.clientX - c.x, ry = e.clientY - c.y;
+    const len = Math.hypot(rx, ry) || 1;
+    zeiger = {
+      id: e.pointerId,
+      x0: e.clientX, y0: e.clientY,
+      modus: null,
+      p0: p,
+      radial:     { x:  rx / len, y: ry / len },   // + = nach aussen
+      tangential: { x: -ry / len, y: rx / len },   // am Bogen entlang
+      letzterWinkel: zeigerWinkel(e),
+      letzteZeit: performance.now(),
+      bewegt: 0
+    };
+    vRot = 0;
+    zielP = p; zielRot = rot;          // laufende Federn anhalten
+    try { e.target.setPointerCapture(e.pointerId); } catch (err) {}
+  }
+
+  function bewegen(e) {
+    if (!zeiger || e.pointerId !== zeiger.id) return;
+    const dx = e.clientX - zeiger.x0;
+    const dy = e.clientY - zeiger.y0;
+    zeiger.bewegt = Math.max(zeiger.bewegt, Math.hypot(dx, dy));
+
+    const radial = dx * zeiger.radial.x + dy * zeiger.radial.y;
+    const tang   = dx * zeiger.tangential.x + dy * zeiger.tangential.y;
+
+    if (!zeiger.modus) {
+      if (Math.hypot(dx, dy) < 7) return;
+      // Aus der Andeutung heraus ist Drehen nicht sinnvoll -- die Symbole sind dort nur ein
+      // Hinweis, kein lesbares Menue. Da ist jede Bewegung "oeffnen". Sonst gewinnt die
+      // groessere Komponente; der Faktor gibt dem Drehen einen kleinen Vorsprung, weil der
+      // Ring in erster Linie ein Rad ist.
+      zeiger.modus = (p < 0.08 || Math.abs(radial) > Math.abs(tang) * 1.15) ? "oeffnen" : "drehen";
+    }
+
+    if (zeiger.modus === "oeffnen") {
+      // 420 px Fingerweg nach aussen = der volle Weg von der Andeutung ins Hauptmenue.
+      let neu = zeiger.p0 + radial / 420;
+      if (neu > 1) neu = 1 + (neu - 1) * 0.22;      // ueber die Enden hinaus zaeh werden lassen
+      if (neu < 0) neu = neu * 0.22;
+      p = Math.max(-0.08, Math.min(1.08, neu));
+      zeichnen();
+    } else {
+      const w = zeigerWinkel(e);
+      const d = ((w - zeiger.letzterWinkel + 540) % 360) - 180;
+      const jetzt = performance.now();
+      const dt = Math.max(1, jetzt - zeiger.letzteZeit);
+      vRot = vRot * 0.72 + (d / dt) * 0.28;         // geglaettete Winkelgeschwindigkeit
+      rot += d;
+      zeiger.letzterWinkel = w;
+      zeiger.letzteZeit = jetzt;
+      zeichnen();
+    }
+  }
+
+  function ende(e) {
+    if (!zeiger || e.pointerId !== zeiger.id) return;
+    const z = zeiger; zeiger = null;
+
+    if (!z.modus && z.bewegt < 7) return;          // reiner Tipp -- der Klick-Handler uebernimmt
+
+    if (z.modus === "oeffnen") {
+      const tempo = p - z.p0;                      // > 0 = nach oben gezogen
+      const stufen = [0, 0.5, 1];
+      let ziel;
+      if (Math.abs(tempo) > 0.16) {
+        // deutlicher Wisch -> eine Stufe in Wischrichtung, von der Ausgangsstufe aus
+        const start = stufen.indexOf(naechsteStufe(z.p0));
+        ziel = stufen[Math.max(0, Math.min(2, start + (tempo > 0 ? 1 : -1)))];
+      } else {
+        ziel = naechsteStufe(p);
+      }
+      setzeZiel(ziel, null);
+      if (globeModel) globeModel.autoRotate = ziel >= 0.99;
       return;
     }
-    // Ohne Uebergang einblenden: haengt das Einblenden an einer Transition und die laeuft nicht,
-    // bliebe die Blase unsichtbar (genau dieser Fehler ist hier schon zweimal aufgetreten).
-    ringHandle.classList.add("no-anim");
-    repositionHandle();
-    ringHandle.classList.remove("is-boot");
-    ringHandle.style.opacity = "1";
-    setTimeout(() => ringHandle.classList.remove("no-anim"), 50);
-  }
-  revealHandle();
-  setTimeout(() => revealHandle(true), 3600);
 
-  // Die Linse wurde bisher nur in setzeBlase("ring") gebaut -- und das laeuft beim ersten Start
-  // nie. Die allererste Auswahl setzte also is-lensing, ohne dass eine Linse existierte: keine
-  // Vergroesserung, bis man einmal in einen Tab und wieder zurueck war.
-  buildLens();
-  refreshLensRect();
-
-  repositionHandle();
-  setTimeout(repositionHandle, 0);
-  setTimeout(repositionHandle, 300);
-  setTimeout(repositionHandle, 3200);
-  window.addEventListener("load", repositionHandle);
-  window.addEventListener("resize", repositionHandle);
-  window.addEventListener("orientationchange", () => setTimeout(repositionHandle, 200));
-
-  if (ringHandle) {
-    const stage = homeMenu.querySelector(".globe-stage");
-    let handleDragging = false;
-    let targetAngle = 0;
-
-    // Mittelpunkt und Radius aus der echten Lage eines Symbols ableiten -- so bleibt es korrekt,
-    // egal wie die Buehne gerade skaliert.
-    function ringGeom() {
-      if (!ringSlots.length) return null;
-      const r = stage.getBoundingClientRect();
-      if (!r.width) return null;
-      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      const c0 = centerOf(ringSlots[0].btn);
-      return { cx, cy, r: Math.hypot(c0.x - cx, c0.y - cy) };
-    }
-
-    function pointerAngle(e) {
-      const r = stage.getBoundingClientRect();
-      const dx = e.clientX - (r.left + r.width / 2);
-      const dy = e.clientY - (r.top + r.height / 2);
-      return Math.atan2(dy, dx) * 180 / Math.PI;
-    }
-
-    // Der Tropfen folgt dem Finger nicht starr, sondern zieht traege nach (Lerp). Der Rueckstand
-    // zum Finger bestimmt die Dehnung -- schnell gezogen = laenger und schmaler, genau wie ein
-    // echter Tropfen, der an der Oberflaeche haengt und hinterherlaeuft.
-    function dragFrame() {
-      if (!handleDragging) return;
-      const cur = parseFloat(ringHandle.style.getPropertyValue("--angle")) || targetAngle;
-      let lag = ((targetAngle - cur + 540) % 360) - 180;
-      const next = cur + lag * 0.34;                     // Nachziehen (groesser = folgt schneller)
-      // Der Rueckstand faellt durch das schnellere Folgen kleiner aus. Damit die Dehnung gleich
-      // stark bleibt, wird der Bezugswert im selben Verhaeltnis mitgezogen (14 * 0.22/0.34 ~ 9).
-      const pull = Math.min(1, Math.abs(lag) / 9);       // 0..1 Rueckstand
-      ringHandle.style.setProperty("--angle", `${next}deg`);
-      ringHandle.style.setProperty("--sy", (1 + pull * 0.45).toFixed(3));
-      ringHandle.style.setProperty("--sx", (1 - pull * 0.18).toFixed(3));
-      const g = ringGeom();
-      if (g) setHandlePos(g.cx + Math.cos(next * Math.PI / 180) * g.r,
-                          g.cy + Math.sin(next * Math.PI / 180) * g.r, next + 90);
-      requestAnimationFrame(dragFrame);
-    }
-
-    ringHandle.addEventListener("pointerdown", e => {
-      if (handleMode !== "ring") return;   // unten ist sie Zurueck-Knopf, kein Schieberegler
-      handleDragging = true;
-      targetAngle = pointerAngle(e);
-      buildLens();
-      refreshLensRect();
-      ringHandle.classList.add("is-lensing");
-      requestAnimationFrame(dragFrame);
-      clearTimeout(liquidTimer);
-      ringHandle.classList.add("is-dragging", "is-liquid");
-      try { ringHandle.setPointerCapture(e.pointerId); } catch (err) {}
-      e.preventDefault();
-    });
-    ringHandle.addEventListener("pointermove", e => {
-      if (!handleDragging) return;
-      targetAngle = pointerAngle(e);
-    });
-    function endHandleDrag(e) {
-      if (!handleDragging) return;
-      handleDragging = false;
-      ringHandle.classList.remove("is-dragging");
-      ringHandle.style.removeProperty("--sy");
-      ringHandle.style.removeProperty("--sx");
-      try { ringHandle.releasePointerCapture(e.pointerId); } catch (err) {}
-      // Nach der FINGER-Position einrasten, nicht nach der (absichtlich nachhinkenden) Tropfen-
-      // position -- sonst landet man bei schnellem Ziehen auf dem Symbol, das man gerade verlassen hat.
-      const current = targetAngle;
-      let nearest = ringSlots[0];
-      ringSlots.forEach(slot => {
-        if (angleDistance(slot.angle, current) < angleDistance(nearest.angle, current)) nearest = slot;
-      });
-      activateSlot(nearest);
-    }
-    ringHandle.addEventListener("pointerup", endHandleDrag);
-    ringHandle.addEventListener("pointercancel", endHandleDrag);
+    // Drehen beendet: mit etwas Schwung weiterprojizieren, dann einrasten.
+    // Der Wurf ist bewusst BEGRENZT. Ohne Grenze macht ein kurzer, schneller Wisch aus dem Ring
+    // ein Gluecksrad -- und bei sehr dichten Ereignissen (dt gegen 0) wird die gemessene
+    // Geschwindigkeit ohnehin unsinnig gross. Hoechstens eine Rastweite extra: ein
+    // entschlossener Wisch springt genau ein Symbol weiter, nie drei.
+    const MAX_WURF = 46;                           // Grad, knapp ueber einer Rastweite (40)
+    const projiziert = rot + Math.max(-MAX_WURF, Math.min(MAX_WURF, vRot * 105));
+    if (p > 0.15) waehlenUndOeffnen(projiziert);
+    else setzeZiel(0, rotFuer(nachstenSlotZu(projiziert), rot));
   }
 
-  // orientation als statisches HTML-Attribut wird von model-viewer nur reaktiv angewendet, wenn sich
-  // der Property-Wert NACH dem Laden echt ändert (interner Guard "wenn noch nicht geladen,
-  // überspringen" + Lits eigene Änderungserkennung reagiert nicht, wenn der neue Wert exakt dem
-  // schon gesetzten String entspricht). Deshalb hier nach dem "load"-Event erst auf einen anderen
-  // Wert und im nächsten Frame erst auf den Zielwert gesetzt -- garantiert eine echte, erkannte
-  // Änderung nach dem Laden statt eines wirkungslosen "gleicher Wert nochmal"-Assignments.
-  const TARGET_ORIENTATION = "23.5deg 0deg 0deg";
-  if (globeModel) {
-    const applyOrientation = () => {
-      globeModel.orientation = "0deg 0deg 0deg";
-      requestAnimationFrame(() => { globeModel.orientation = TARGET_ORIENTATION; });
-    };
-    if (globeModel.loaded) applyOrientation();
-    else globeModel.addEventListener("load", applyOrientation, { once: true });
+  ring.addEventListener("pointerdown", e => { start(e); e.preventDefault(); });
+  grip.addEventListener("pointerdown", e => { start(e); e.preventDefault(); });
+  addEventListener("pointermove", bewegen, { passive: true });
+  addEventListener("pointerup", ende);
+  addEventListener("pointercancel", ende);
+
+  // Antippen eines Symbols: dreht es nach oben und waehlt es. Bleibt bewusst erhalten -- der
+  // Ring ist ein Rad, aber ein sichtbares Ziel direkt zu treffen muss weiter moeglich sein.
+  slots.forEach(s => s.btn.addEventListener("click", ev => {
+    ev.stopPropagation();
+    if (p < 0.15) return;                          // in der Andeutung sind die Symbole nur Deko
+    waehlenUndOeffnen(rotFuer(s, rot));
+  }));
+
+  // Ein Tipp auf den abgedunkelten Inhalt nimmt den Ring wieder zurueck.
+  if (scrim) scrim.addEventListener("click", () => {
+    if (p > 0.06 && p < 0.94) setzeZiel(0, null);
+  });
+
+  // Tastatur: links/rechts dreht, Eingabe oeffnet, Escape nimmt eine Stufe zurueck.
+  addEventListener("keydown", e => {
+    if (document.body.classList.contains("dialog-offen")) return;
+    if (e.key === "Escape" && p > 0.02) {
+      setzeZiel(naechsteStufe(Math.max(0, p - 0.5)), null);
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      if (p < 0.15) return;
+      const i = slots.indexOf(nachstenSlotZu(zielRot));
+      const n = slots[(i + (e.key === "ArrowRight" ? 1 : -1) + slots.length) % slots.length];
+      setzeZiel(zielP, rotFuer(n, zielRot));
+    } else if (e.key === "Enter" && p > 0.15) {
+      // Nach dem ZIEL der Drehung, nicht nach der laufenden Zwischenstellung: waehrend die
+      // Feder noch laeuft, stuende unter der Kimme sonst noch das vorige Symbol.
+      waehlenUndOeffnen(zielRot);
+    }
+  });
+
+  // ---------- Start ----------
+  addEventListener("resize", messen);
+  addEventListener("orientationchange", () => setTimeout(messen, 200));
+  window.addEventListener("load", messen);
+  messen();
+  // Mehrfach anstossen, wie schon bei der alten Blase: so sitzt der Ring auch dann richtig,
+  // wenn ein einzelner Zeitpunkt ausfaellt oder das Layout noch nicht steht.
+  setTimeout(messen, 0);
+  setTimeout(messen, 300);
+  setTimeout(messen, 3200);
+
+  // Erst zeigen, wenn der Startbildschirm weg ist -- sonst laege der Ring ueber dem Splash.
+  function ringZeigen(erzwingen) {
+    const splash = document.getElementById("splashScreen");
+    if (splash && !erzwingen && !splash.classList.contains("splash-hidden")) {
+      setTimeout(ringZeigen, 150);
+      return;
+    }
+    messen();
+    ring.classList.remove("is-boot");
   }
+  ringZeigen();
+  setTimeout(() => ringZeigen(true), 3600);   // hartes Netz, falls der Splash nie meldet
 })();
 
 // Swipe vom linken Bildschirmrand nach rechts = eine Roadmap-Ebene zurück (wie iOS Zurück-Geste).

@@ -32,7 +32,7 @@
     background: #12161d;
   }
 </style>
-<link rel="stylesheet" href="style.css?v=109">
+<link rel="stylesheet" href="style.css?v=110">
 <script type="module" src="vendor/model-viewer.min.js"></script>
 </head>
 <body>
@@ -282,80 +282,15 @@
            Kaltstart mit app.js und dem Stylesheet um die Leitung -- sichtbar ist der Globus zu dem
            Zeitpunkt ohnehin nicht, er liegt hinter dem Ladebildschirm. Der Dateiname steht in
            data-src. -->
-      <model-viewer
-        id="globeModel"
-        class="globe-model"
-        data-src="assets/atlas_globe_v18.glb?v=1"
-        alt="Atlas-Globus"
-        loading="eager"
-        reveal="auto"
-        camera-controls
-        disable-zoom
-        disable-pan
-        auto-rotate
-        rotation-per-second="6deg"
-        interaction-prompt="none"
-        orientation="23.5deg 0deg 0deg"
-        camera-orbit="0deg 90deg 105%"
-        min-camera-orbit="auto auto 105%"
-        max-camera-orbit="auto auto 105%"
-        orbit-sensitivity="0.35"
-        camera-target="0m 0m 0m"
-        environment-image="neutral"
-        exposure="1.1"
-        shadow-intensity="0"
-      >
-        <!-- Der eigene Fortschrittsbalken von model-viewer wird ersetzt: er lief als dunkler
-             Streifen quer durch den Ring, sobald man den Globus laden sah. Sichtbar sein soll er
-             ohnehin nie -- der Ladebildschirm wartet auf ihn. Der leere Halter bleibt trotzdem,
-             falls die Wartezeit einmal in die Obergrenze laeuft. -->
-        <div slot="progress-bar" style="display:none;"></div>
-      </model-viewer>
-      <!-- Navigations-Ring um den Globus. Bewusst normale HTML-Buttons AUSSERHALB des 3D-Canvas:
-           damit ist das Antippen zuverlässig (model-viewers eigene Dreh-Geste kann Touches auf der
-           Kugel selbst abfangen). Jeder Knopf trägt zusätzlich data-lat/data-lon seines Kontinents --
-           beim Antippen dreht sich der Globus erst sichtbar dorthin (camera-orbit), dann öffnet der
-           zugehörige Tab. Der Wassertropfen steht für den Ozean -> Projekte. -->
-      <div class="globe-ring">
-        <button class="ring-btn" style="--angle:-90deg" data-tab="heute" data-lat="50" data-lon="15" aria-label="Europa – Heute">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 9L10 3L17 9V16.5C17 17.3 16.3 18 15.5 18H4.5C3.7 18 3 17.3 3 16.5V9Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-        <span>Heute</span>
-        </button>
-        <button class="ring-btn" style="--angle:-50deg" data-tab="finanzen" data-lat="45" data-lon="90" aria-label="Asien – Finanzen">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.3" stroke="currentColor" stroke-width="1.4"/><path d="M10 6V14M7.6 8.4C7.6 7.4 8.6 6.8 10 6.8C11.4 6.8 12.4 7.5 12.4 8.5C12.4 10.8 7.6 9.3 7.6 11.6C7.6 12.6 8.6 13.3 10 13.3C11.4 13.3 12.4 12.7 12.4 11.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span>Finanzen</span>
-        </button>
-        <button class="ring-btn" style="--angle:-10deg" data-tab="analyse" data-lat="-25" data-lon="135" aria-label="Australien – Analyse">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3.5 16.5V11M10 16.5V5M16.5 16.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>Analyse</span>
-        </button>
-        <button class="ring-btn" style="--angle:30deg" data-tab="gebete" data-lat="0" data-lon="20" aria-label="Afrika – Gebete">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2.5V17.5M4 8H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>Gebete</span>
-        </button>
-        <button class="ring-btn" style="--angle:70deg" data-tab="zielbereiche" data-lat="-15" data-lon="-60" aria-label="Südamerika – Roadmap">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.3" stroke="currentColor" stroke-width="1.4"/><path d="M13 6.5L11 10.2L7 13.5L9 9.8L13 6.5Z" fill="currentColor"/></svg>
-        <span>Roadmap</span>
-        </button>
-        <button class="ring-btn" style="--angle:110deg" data-tab="todo" data-lat="45" data-lon="-100" aria-label="Nordamerika – ToDo">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 5H16M4 10H16M4 15H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>ToDo</span>
-        </button>
-        <button class="ring-btn" style="--angle:150deg" data-tab="projekte" data-lat="0" data-lon="-150" aria-label="Ozean – Projekte">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2.5 5.5C2.5 4.8 3.1 4.2 3.8 4.2H7.8L9.3 6H16.2C16.9 6 17.5 6.6 17.5 7.3V14.5C17.5 15.2 16.9 15.8 16.2 15.8H3.8C3.1 15.8 2.5 15.2 2.5 14.5V5.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-        <span>Projekte</span>
-        </button>
-        <button class="ring-btn" style="--angle:190deg" data-tab="gym" data-lat="64" data-lon="-45" aria-label="Gym">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 7.5v5M5.5 5.5v9M14.5 5.5v9M17 7.5v5M5.5 10h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          <span>Gym</span>
-        </button>
-        <button class="ring-btn" style="--angle:230deg" data-tab="ich" data-lat="80" data-lon="0" aria-label="Nordpol – Ich">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6.2" r="3.1" stroke="currentColor" stroke-width="1.4"/><path d="M3.8 17.2c0-3.4 2.8-5.6 6.2-5.6s6.2 2.2 6.2 5.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-          <span>Ich</span>
-        </button>
-        <!-- Wassertropfen als Schieberegler-Griff: sitzt immer auf dem aktuell offenen Tab und laesst
-             sich am Ring entlangziehen, um zu wechseln (rastet beim Loslassen auf das naechste Symbol). -->
-      </div>
+      <!-- Der Globus steht NICHT mehr hier, sondern in der Ring-Ebene (#atlasRing): das
+           Glasband des Rings liegt jetzt darueber und wuerde ihn sonst mit seiner
+           Milchglas-Unschaerfe weichzeichnen. Diese Buehne bleibt als leerer Platzhalter
+           stehen -- sie legt fest, WO der Globus sitzt, und daran misst atlas-start.js
+           den Ringmittelpunkt fuers Hauptmenue. -->
+      <!-- Der Navigations-Ring liegt NICHT mehr hier: er ist eine eigene Ebene ueber der ganzen
+           App geworden (#atlasRing weiter unten) und wandert zwischen Andeutung, Halb-Zustand und
+           Hauptmenue. Hier bleibt nur der Globus stehen -- der Ring legt sich im Hauptmenue
+           passgenau um ihn. -->
     </div>
     <div class="home-tagline home-tagline-bottom">Keep pushing.</div>
   </div>
@@ -672,14 +607,101 @@
     </section>
   </main>
 
-  <!-- Statt der Tab-Leiste nur noch ein Knopf: zurueck zum Erdball-Homemenue. -->
-  <!-- Nur noch Positions-Anker: die Wasserblase selbst sitzt hier und dient als Zurueck-Knopf. -->
-  <nav class="tabs"><div id="homeAnchor" class="home-anchor" aria-hidden="true"></div></nav>
+  <!-- Die Tab-Leiste ist ganz entfallen: navigiert wird ueber den Ring (#atlasRing). -->
 </div>
 
-<!-- Wasserblase: liegt bewusst AUSSERHALB des Homemenues, damit sie beim Oeffnen eines Tabs nach
-     unten wandern und dort als Zurueck-Knopf sichtbar bleiben kann. -->
-<div class="ring-handle is-boot" id="ringHandle" role="button" aria-label="Menue" tabindex="0"></div>
+<!-- ============================================================================================
+     NAVIGATIONS-RING. Eine Ebene ueber der ganzen App, in drei Zustaenden -- es ist immer
+     DERSELBE Ring, nur sein Mittelpunkt wandert:
+
+       p = 0.0  ANDEUTUNG   Mittelpunkt weit unter dem Bildschirm, nur ein schmaler Bogen mit
+                            kleinen Symbolen schaut ueber den unteren Rand.
+       p = 0.5  HALB        Ring ragt ins Bild, Symbole in voller Groesse mit Beschriftung, der
+                            Tab-Inhalt bleibt dahinter stehen -- Tab wechseln ohne Umweg.
+       p = 1.0  HAUPTMENUE  Mittelpunkt auf dem Globus, voller Kreis, Globus-Menue sichtbar.
+
+     Dadurch sind "einmal hochwischen" und "nochmal hochwischen" dieselbe Bewegung mit drei
+     Rastpunkten: man kann in einem Zug durchziehen oder auf halbem Weg umkehren.
+     ============================================================================================ -->
+<!-- Der Inhalt tritt zurueck, sobald der Ring hereinkommt: er bleibt lesbar dahinter
+     stehen, draengt sich aber nicht mehr vor die Symbole. Ein Tipp darauf schliesst
+     den Ring wieder. -->
+<div class="ring-scrim" id="ringScrim"></div>
+<div class="ring-grip" id="ringGrip" aria-hidden="true"></div>
+<div class="atlas-ring is-boot" id="atlasRing">
+  <div class="ring-band" aria-hidden="true"></div>
+  <model-viewer
+        id="globeModel"
+        class="globe-model"
+        data-src="assets/atlas_globe_v18.glb?v=1"
+        alt="Atlas-Globus"
+        loading="eager"
+        reveal="auto"
+        camera-controls
+        disable-zoom
+        disable-pan
+        auto-rotate
+        rotation-per-second="6deg"
+        interaction-prompt="none"
+        orientation="23.5deg 0deg 0deg"
+        camera-orbit="0deg 90deg 105%"
+        min-camera-orbit="auto auto 105%"
+        max-camera-orbit="auto auto 105%"
+        orbit-sensitivity="0.35"
+        camera-target="0m 0m 0m"
+        environment-image="neutral"
+        exposure="1.1"
+        shadow-intensity="0"
+      >
+        <!-- Der eigene Fortschrittsbalken von model-viewer wird ersetzt: er lief als dunkler
+             Streifen quer durch den Ring, sobald man den Globus laden sah. Sichtbar sein soll er
+             ohnehin nie -- der Ladebildschirm wartet auf ihn. Der leere Halter bleibt trotzdem,
+             falls die Wartezeit einmal in die Obergrenze laeuft. -->
+        <div slot="progress-bar" style="display:none;"></div>
+      </model-viewer>
+  <div class="ring-slots" id="ringSlots" role="tablist" aria-label="Bereiche">
+      <button class="ring-btn" style="--angle:-90deg" data-tab="heute" data-lat="50" data-lon="15" aria-label="Europa – Heute">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 9L10 3L17 9V16.5C17 17.3 16.3 18 15.5 18H4.5C3.7 18 3 17.3 3 16.5V9Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      <span>Heute</span>
+      </button>
+      <button class="ring-btn" style="--angle:-50deg" data-tab="finanzen" data-lat="45" data-lon="90" aria-label="Asien – Finanzen">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.3" stroke="currentColor" stroke-width="1.4"/><path d="M10 6V14M7.6 8.4C7.6 7.4 8.6 6.8 10 6.8C11.4 6.8 12.4 7.5 12.4 8.5C12.4 10.8 7.6 9.3 7.6 11.6C7.6 12.6 8.6 13.3 10 13.3C11.4 13.3 12.4 12.7 12.4 11.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <span>Finanzen</span>
+      </button>
+      <button class="ring-btn" style="--angle:-10deg" data-tab="analyse" data-lat="-25" data-lon="135" aria-label="Australien – Analyse">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3.5 16.5V11M10 16.5V5M16.5 16.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>Analyse</span>
+      </button>
+      <button class="ring-btn" style="--angle:30deg" data-tab="gebete" data-lat="0" data-lon="20" aria-label="Afrika – Gebete">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2.5V17.5M4 8H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>Gebete</span>
+      </button>
+      <button class="ring-btn" style="--angle:70deg" data-tab="zielbereiche" data-lat="-15" data-lon="-60" aria-label="Südamerika – Roadmap">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.3" stroke="currentColor" stroke-width="1.4"/><path d="M13 6.5L11 10.2L7 13.5L9 9.8L13 6.5Z" fill="currentColor"/></svg>
+      <span>Roadmap</span>
+      </button>
+      <button class="ring-btn" style="--angle:110deg" data-tab="todo" data-lat="45" data-lon="-100" aria-label="Nordamerika – ToDo">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 5H16M4 10H16M4 15H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>ToDo</span>
+      </button>
+      <button class="ring-btn" style="--angle:150deg" data-tab="projekte" data-lat="0" data-lon="-150" aria-label="Ozean – Projekte">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2.5 5.5C2.5 4.8 3.1 4.2 3.8 4.2H7.8L9.3 6H16.2C16.9 6 17.5 6.6 17.5 7.3V14.5C17.5 15.2 16.9 15.8 16.2 15.8H3.8C3.1 15.8 2.5 15.2 2.5 14.5V5.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <span>Projekte</span>
+      </button>
+      <button class="ring-btn" style="--angle:190deg" data-tab="gym" data-lat="64" data-lon="-45" aria-label="Gym">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 7.5v5M5.5 5.5v9M14.5 5.5v9M17 7.5v5M5.5 10h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Gym</span>
+      </button>
+      <button class="ring-btn" style="--angle:230deg" data-tab="ich" data-lat="80" data-lon="0" aria-label="Nordpol – Ich">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6.2" r="3.1" stroke="currentColor" stroke-width="1.4"/><path d="M3.8 17.2c0-3.4 2.8-5.6 6.2-5.6s6.2 2.2 6.2 5.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <span>Ich</span>
+      </button>
+  </div>
+  <!-- Die Kimme: fester Auswahlpunkt auf 12 Uhr. Sie dreht sich NICHT mit -- der Ring laeuft
+       unter ihr durch, gewaehlt ist, was hier steht. Das ist die fruehere Wasserblase in ihrer
+       neuen Aufgabe (Tims Entscheidung 2026-09-05: bleibt fest auf 12 Uhr). -->
+  <div class="ring-kimme" id="ringKimme" aria-hidden="true"></div>
+</div>
 
 <!-- MODAL / BOTTOM SHEET -->
 <div id="modalOverlay" class="modal-overlay hidden">
@@ -706,6 +728,6 @@
 <script src="atlas-gym.js?v=2"></script>
 <script src="atlas-finanzen.js?v=2"></script>
 <script src="atlas-ich.js?v=4"></script>
-<script src="atlas-start.js?v=3"></script>
+<script src="atlas-start.js?v=4"></script>
 </body>
 </html>
