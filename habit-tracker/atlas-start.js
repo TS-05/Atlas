@@ -596,6 +596,55 @@ if (splashEl) {
     netzSpannen();
   }
 
+  // ---------- Nachlauf ----------
+  // Beim Loslassen laeuft das Rad noch ein Stueck aus, statt sofort auf das naechste Symbol zu
+  // springen. Ohne das fuehlt es sich an wie ein Schalter, nicht wie ein Rad. Kurz aber, und
+  // nicht wie ein Gluecksrad: die Geschwindigkeit faellt exponentiell (Halbierung etwa alle
+  // 120 ms), und drei harte Grenzen kappen den Auslauf -- Zeit, Weg und Restgeschwindigkeit.
+  // Erst danach wird eingerastet und der Tab geoeffnet.
+  const NACHLAUF_REIBUNG = 0.99424;   // je ms; halbiert die Geschwindigkeit in rund 120 ms
+  const NACHLAUF_MIN_V   = 0.03;      // Grad/ms -- darunter gilt das Rad als stehend
+  const NACHLAUF_MAX_MS  = 620;       // laenger laeuft es nie aus
+  const NACHLAUF_MAX_WEG = 150;       // Grad, also hoechstens knapp vier Rastweiten
+  const NACHLAUF_MAX_V   = 1.0;       // Grad/ms; kappt unsinnige Messwerte bei dt gegen 0
+  let schwung = null;
+
+  function schwungAbbrechen() {
+    if (!schwung) return;
+    clearTimeout(schwung.netz);
+    schwung = null;
+  }
+
+  function schwungEnde() {
+    if (!schwung) return;
+    clearTimeout(schwung.netz);
+    schwung = null;
+    zielRot = rot;                     // von der ausgelaufenen Stellung aus einrasten
+    if (p > 0.15) waehlenUndOeffnen(rot);
+    else setzeZiel(0, rotFuer(nachstenSlotZu(rot), rot));
+  }
+
+  function schwungLauf() {
+    let letzte = performance.now();
+    const schritt = jetzt => {
+      if (!schwung) return;
+      const dt = Math.min(34, jetzt - letzte); letzte = jetzt;
+      rot += schwung.v * dt;
+      schwung.zeit += dt;
+      schwung.weg  += Math.abs(schwung.v * dt);
+      schwung.v    *= Math.pow(NACHLAUF_REIBUNG, dt);
+      zeichnen();
+      if (Math.abs(schwung.v) < NACHLAUF_MIN_V
+          || schwung.zeit > NACHLAUF_MAX_MS
+          || schwung.weg  > NACHLAUF_MAX_WEG) { schwungEnde(); return; }
+      requestAnimationFrame(schritt);
+    };
+    requestAnimationFrame(schritt);
+    // Dasselbe Netz wie bei den Federn: kommen keine Bilder, laeuft der Nachlauf nicht an und
+    // das Rad bliebe ungerastet zwischen zwei Symbolen stehen.
+    schwung.netz = setTimeout(() => { if (schwung) schwungEnde(); }, NACHLAUF_MAX_MS + 150);
+  }
+
   // ---------- Einrasten und oeffnen ----------
   const WARTEN_BIS_TAB = 240;
   function einrastenUndWaehlen(projiziert) {
@@ -633,6 +682,7 @@ if (splashEl) {
   // links und rechts am Ring verlaeuft der Bogen fast senkrecht, ein Drehen dort waere als
   // Hochwischen missverstanden worden.
   let zeiger = null;
+  let letzteZiehGeste = 0;   // Zeitpunkt, an dem zuletzt eine Zieh-Geste endete
 
   function ringMitte() { return { x: window.innerWidth / 2, y: cyFuer(p) }; }
   function zeigerWinkel(e) {
@@ -642,6 +692,13 @@ if (splashEl) {
 
   function start(e) {
     if (zeiger) return;
+    schwungAbbrechen();                // ein laufendes Rad laesst sich anfassen und festhalten
+    // WICHTIG: das Sicherheitsnetz entschaerfen, solange ein Finger unten ist. Es merkt sich
+    // beim Spannen einen Zielzustand und setzt ihn nach 700 ms hart. Waehrend einer Geste
+    // wandern p und rot am Ziel vorbei -- das Netz sah das als "haengengeblieben" und riss den
+    // Ring mitten im Ziehen auf den Ausgangswert zurueck. Genau das war das gelegentliche
+    // Zucken. Gefuehrt wird waehrend der Geste ohnehin direkt, da braucht es kein Netz.
+    clearTimeout(netzTimer); netzTimer = null;
     // Die beiden Richtungen beim Aufsetzen einfrieren: der Mittelpunkt wandert waehrend der
     // Geste, die Bedeutung der Fingerrichtung soll sich dabei nicht mitdrehen.
     const c = ringMitte();
@@ -707,6 +764,10 @@ if (splashEl) {
 
     if (!z.modus && z.bewegt < 7) return;          // reiner Tipp -- der Klick-Handler uebernimmt
 
+    // Ab hier war es eine Zieh-Geste -- egal ob gedreht oder geoeffnet. Der Klick, den der
+    // Browser gleich hinterherschickt, gehoert noch dazu und darf nicht als Tipp gelten.
+    letzteZiehGeste = performance.now();
+
     if (z.modus === "oeffnen") {
       const tempo = p - z.p0;                      // > 0 = nach oben gezogen
       const stufen = [0, 0.5, 1];
@@ -723,15 +784,17 @@ if (splashEl) {
       return;
     }
 
-    // Drehen beendet: mit etwas Schwung weiterprojizieren, dann einrasten.
-    // Der Wurf ist bewusst BEGRENZT. Ohne Grenze macht ein kurzer, schneller Wisch aus dem Ring
-    // ein Gluecksrad -- und bei sehr dichten Ereignissen (dt gegen 0) wird die gemessene
-    // Geschwindigkeit ohnehin unsinnig gross. Hoechstens eine Rastweite extra: ein
-    // entschlossener Wisch springt genau ein Symbol weiter, nie drei.
-    const MAX_WURF = 46;                           // Grad, knapp ueber einer Rastweite (40)
-    const projiziert = rot + Math.max(-MAX_WURF, Math.min(MAX_WURF, vRot * 105));
-    if (p > 0.15) waehlenUndOeffnen(projiziert);
-    else setzeZiel(0, rotFuer(nachstenSlotZu(projiziert), rot));
+    // Das Rad laeuft jetzt noch kurz aus (siehe Nachlauf oben) und rastet erst danach ein.
+    // War beim Loslassen praktisch keine Geschwindigkeit mehr da, wird sofort eingerastet --
+    // ein Auslauf ueber null Grad sieht nur nach Verzoegerung aus.
+    const v0 = Math.max(-NACHLAUF_MAX_V, Math.min(NACHLAUF_MAX_V, vRot));
+    if (Math.abs(v0) < NACHLAUF_MIN_V) {
+      if (p > 0.15) waehlenUndOeffnen(rot);
+      else setzeZiel(0, rotFuer(nachstenSlotZu(rot), rot));
+      return;
+    }
+    schwung = { v: v0, zeit: 0, weg: 0, netz: null };
+    schwungLauf();
   }
 
   ring.addEventListener("pointerdown", e => { start(e); e.preventDefault(); });
@@ -742,14 +805,24 @@ if (splashEl) {
 
   // Antippen eines Symbols: dreht es nach oben und waehlt es. Bleibt bewusst erhalten -- der
   // Ring ist ein Rad, aber ein sichtbares Ziel direkt zu treffen muss weiter moeglich sein.
+  //
+  // Der Browser schickt nach jeder Zeiger-Geste noch ein click hinterher, auch nach einem
+  // Ziehen. Endete der Finger ueber einem Symbol, waehlte dieser Klick ein ZWEITES, anderes
+  // Ziel als das Einrasten -- die beiden haben sich dann gegenseitig ueberschrieben. Deshalb
+  // wird ein Klick verworfen, der einer Zieh-Geste unmittelbar folgt.
+  const KLICK_SPERRE_MS = 400;
+  function ausZiehGeste() { return performance.now() - letzteZiehGeste < KLICK_SPERRE_MS; }
+
   slots.forEach(s => s.btn.addEventListener("click", ev => {
     ev.stopPropagation();
+    if (ausZiehGeste()) return;
     if (p < 0.15) return;                          // in der Andeutung sind die Symbole nur Deko
     waehlenUndOeffnen(rotFuer(s, rot));
   }));
 
   // Ein Tipp auf den abgedunkelten Inhalt nimmt den Ring wieder zurueck.
   if (scrim) scrim.addEventListener("click", () => {
+    if (ausZiehGeste()) return;
     if (p > 0.06 && p < 0.94) setzeZiel(0, null);
   });
 
