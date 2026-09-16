@@ -1810,3 +1810,107 @@ body.dialog-offen {
 
 .ich-habit-wahl { display: flex; flex-direction: column; gap: var(--space-2); max-height: 46vh; overflow-y: auto; margin-bottom: var(--space-4); }
 .ich-habit-wahl .checkbox-row { min-height: 44px; color: var(--color-text); font-size: var(--text-md); }
+
+/* ============================================================
+   Abitur — Langplan (atlas-abitur.js)
+   ============================================================ */
+.abi-abstand { margin-top: 26px; }
+.abi-sub { font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.4; }
+.abi-num { font-variant-numeric: tabular-nums; }
+.abi-gross { font-size: var(--text-2xl); font-weight: 500; }
+
+.abi-hero { display: grid; grid-template-columns: 124px 1fr; gap: 16px; align-items: center; padding: 18px 14px; border-radius: var(--radius-lg); }
+.abi-ring { position: relative; width: 124px; height: 124px; }
+.abi-ring svg { display: block; width: 100%; height: 100%; }
+.abi-ring-mitte { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 22px; }
+.abi-ring-zahl { font-size: var(--text-4xl); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+.abi-ring-text { font-size: var(--text-3xs); color: var(--color-text-muted); margin-top: 4px; line-height: 1.25; }
+.abi-hero-info { display: flex; flex-direction: column; gap: 8px; min-width: 0; position: relative; }
+.abi-hero-ziel { font-size: var(--text-lg); line-height: 1.3; }
+.abi-slots { display: grid; grid-template-columns: 1fr; gap: 6px; }
+.abi-slot { background: color-mix(in srgb, var(--color-text) 5%, transparent); border-radius: var(--radius-md); padding: 6px 10px; }
+.abi-slot span { display: block; font-size: var(--text-3xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
+.abi-slot b { display: block; font-weight: 500; font-size: var(--text-sm); line-height: 1.3; }
+.abi-banner { font-size: var(--text-xs); line-height: 1.4; padding: 6px 10px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent-200); }
+.abi-banner.ferien { background: color-mix(in srgb, oklch(0.72 0.06 220) 16%, transparent); color: oklch(0.80 0.06 220); }
+@media (max-width: 360px) { .abi-hero { grid-template-columns: 1fr; justify-items: center; } .abi-hero-info { width: 100%; } }
+
+.abi-woche { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.abi-tag { background: var(--color-surface); border: 1.5px solid transparent; border-radius: var(--radius-md); padding: 10px 2px 8px; display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
+.abi-tag.heute { border-color: var(--color-accent-400); }
+.abi-wd { font-size: var(--text-xs); color: var(--color-neutral-400); }
+.abi-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--text-2xs); font-weight: 600; font-variant-numeric: tabular-nums; }
+.abi-dot.voll { background: var(--color-accent-500); color: var(--color-bg); }
+.abi-dot.min { border: 1.5px solid var(--color-accent-600); color: var(--color-accent-300); }
+.abi-dot.frei { border: 1.5px dashed var(--color-neutral-700); color: var(--color-text-muted); }
+.abi-fix { font-size: 9px; line-height: 1.2; color: var(--color-text-muted); min-height: 2.4em; padding: 0 2px; max-width: 100%; overflow-wrap: anywhere; hyphens: auto; }
+.abi-legende { margin: 8px 0 0; font-size: var(--text-xs); }
+
+.abi-leisten { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.abi-leisten .abi-leiste:first-child { grid-column: 1 / -1; }
+.abi-leiste .progress-outer { margin: 4px 0 2px; }
+.abi-leiste-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: var(--text-sm); }
+.abi-fachkopf { margin-bottom: 10px; }
+.abi-fachkopf .progress-outer { margin: 6px 0 0; }
+
+.abi-strahl-box { overflow-x: auto; scrollbar-width: none; padding: 12px 14px; }
+.abi-strahl-box::-webkit-scrollbar { display: none; }
+.abi-strahl { position: relative; min-width: 620px; height: 116px; }
+.abi-achse { position: absolute; left: 0; right: 0; top: 54px; height: 6px; border-radius: 3px; background: var(--color-neutral-800); overflow: hidden; }
+.abi-gelaufen { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--color-accent-700), var(--color-accent-400)); }
+.abi-ferien { position: absolute; top: 50px; height: 14px; border-radius: 4px; background: color-mix(in srgb, oklch(0.72 0.06 220) 30%, transparent); }
+.abi-monat { position: absolute; top: 76px; transform: translateX(-50%); font-size: var(--text-3xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
+.abi-mark { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+.abi-mark span { font-size: var(--text-3xs); white-space: nowrap; color: var(--color-neutral-400); }
+.abi-mark i { width: 2px; height: 22px; margin-top: 3px; border-radius: 1px; background: var(--color-accent-600); }
+.abi-mark.abi span { color: var(--color-accent-300); font-weight: 600; }
+.abi-mark.abi i { width: 3px; height: 26px; background: var(--color-accent-300); }
+.abi-mark.unten { top: 92px; }
+.abi-mark.unten i { display: none; }
+.abi-jetzt { position: absolute; top: 44px; width: 2px; height: 26px; transform: translateX(-50%); border-radius: 1px; background: var(--color-text); box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+
+.abi-liste { background: var(--color-surface); border-radius: var(--radius-lg); gap: 0; overflow: hidden; }
+.abi-liste > .btn-block { margin: 0; border-top: 1px solid var(--color-divider); border-radius: 0; }
+.abi-chip { flex-shrink: 0; width: 60px; text-align: center; font-size: var(--text-3xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; }
+.abi-chip.abi { background: linear-gradient(135deg, var(--color-accent-500), var(--color-accent-700)); color: var(--color-bg); }
+.abi-chip.sa { background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-accent-300); }
+.abi-chip.ka { background: color-mix(in srgb, var(--color-text) 8%, transparent); color: var(--color-neutral-400); }
+.abi-chip.sem { background: color-mix(in srgb, oklch(0.74 0.09 150) 16%, transparent); color: oklch(0.78 0.09 150); }
+.abi-chip.frei { background: color-mix(in srgb, oklch(0.72 0.06 220) 16%, transparent); color: oklch(0.80 0.06 220); }
+.abi-chip.privat { background: color-mix(in srgb, oklch(0.70 0.14 35) 14%, transparent); color: oklch(0.76 0.13 35); }
+.abi-rechts { flex-shrink: 0; text-align: right; }
+.abi-tage { font-size: var(--text-lg); font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.abi-tage.offen { font-size: var(--text-sm); color: var(--color-text-muted); }
+.abi-datum { font-size: var(--text-2xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.atlas-row.abi-vorbei { opacity: 0.45; }
+.atlas-row.abi-done .item-title { color: var(--color-text-muted); }
+
+.abi-bis { flex-shrink: 0; font-size: var(--text-2xs); white-space: nowrap; color: var(--color-accent-300); font-variant-numeric: tabular-nums; }
+.abi-bis.erledigt { color: var(--color-text-muted); }
+.abi-bis.ueberfaellig { color: oklch(0.76 0.13 35); }
+
+.abi-fachwahl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+.abi-fachbtn { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 4px; cursor: pointer; font: inherit; font-size: var(--text-sm); color: var(--color-neutral-400); background: var(--color-surface); border: 1.5px solid transparent; border-radius: var(--radius-md); }
+.abi-fachbtn span { font-size: var(--text-2xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.abi-fachbtn.aktiv { color: var(--color-text); border-color: var(--color-accent-500); }
+.abi-fachbtn.aktiv span { color: var(--color-accent-300); }
+.abi-fachbtn:focus-visible { outline: 2px solid var(--color-accent-400); outline-offset: 1px; }
+
+.abi-phase { align-items: flex-start; }
+.abi-nr { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--color-neutral-800); display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.atlas-row.abi-aktiv { background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 11%, transparent), transparent 75%); }
+.atlas-row.abi-aktiv .abi-nr { border-color: transparent; background: var(--color-accent-500); color: var(--color-bg); font-weight: 600; }
+.abi-typ { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px; font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; vertical-align: 1px; }
+.abi-typ.druck { background: color-mix(in srgb, oklch(0.70 0.14 35) 16%, transparent); color: oklch(0.76 0.13 35); }
+.abi-typ.ferien { background: color-mix(in srgb, oklch(0.72 0.06 220) 16%, transparent); color: oklch(0.80 0.06 220); }
+
+.abi-hinweise { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.abi-hinweis b { display: block; font-weight: 500; font-size: var(--text-md); }
+.abi-hinweis p { margin: 2px 0 0; font-size: var(--text-sm); color: var(--color-neutral-400); line-height: 1.45; }
+.abi-hinweis.warn b::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; vertical-align: 1px; background: oklch(0.70 0.14 35); }
+.abi-regeln p { font-size: var(--text-sm); color: var(--color-neutral-400); line-height: 1.5; margin: 0 0 8px; }
+.abi-regeln p:last-child { margin-bottom: 0; }
+.abi-regeln b { color: var(--color-text); font-weight: 500; }
+
+/* Verweis auf den Plan in der Tagesroutine */
+.btn.abi-link { font-size: var(--text-2xs); padding: 0 4px; height: auto; vertical-align: baseline; }

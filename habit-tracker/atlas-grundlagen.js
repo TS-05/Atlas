@@ -233,7 +233,7 @@ function budgetRingHtml(spent, limit, size = 40, maskIdx = 0, erreichenIstGut = 
 }
 
 // ---------- Tabs ----------
-const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "projekte", "gym", "ich", "analyse"];
+const TAB_ORDER = ["heute", "todo", "finanzen", "zielbereiche", "gebete", "projekte", "gym", "ich", "abitur", "analyse"];
 const TAB_ROT = [-6, 10, 5, -12, 7, 9, -4];
 const TAB_SCALE = [1.05, 0.92, 1, 1.1, 0.95, 1.03, 1.02];
 const tabBtns = Array.from(document.querySelectorAll(".tab-btn"));
@@ -299,7 +299,8 @@ renderTabIndicator(0, "settled");
 const QUICK_ADD_BTN_IDS = {
   heute: ["addRoutineBtn", "addHabitBtn", "deviationAddWrap", "addExamBtn"],
   todo: ["addTaskBtn"],
-  finanzen: ["addIncomeSourceBtn", "addAccountBtn", "addSavingsGoalBtn"]
+  finanzen: ["addIncomeSourceBtn", "addAccountBtn", "addSavingsGoalBtn"],
+  abitur: ["abiTermineUebernehmenBtn"]
 };
 let quickAddVisible = false;
 let bereicheSearchVisible = false;
@@ -399,7 +400,7 @@ document.getElementById("headerPlusBtn").addEventListener("click", () => {
     // Auf ToDo gibt es genau ein Ziel — hier war das Plus vorher ein Moduswechsel, der erst einen
     // zweiten Knopf einblendete. Zwei Tipps fuer die haeufigste Aktion der App.
     openTaskModal();
-  } else if (tab === "heute" || tab === "finanzen") {
+  } else if (tab === "heute" || tab === "finanzen" || tab === "abitur") {
     // Dort gibt es mehrere Ziele (Routine, Gewohnheit, Abweichung, Klassenarbeit), deshalb bleibt
     // das Einblenden der jeweiligen Knoepfe der richtige Weg.
     quickAddVisible = !quickAddVisible;

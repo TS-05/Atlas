@@ -406,8 +406,22 @@ function renderRoutineChain() {
       if (override) {
         noteHtml = `<div class="routine-step-note">Ganztägig lernen für <strong>${escapeHtml(override.subject.title)}</strong> — Klassenarbeit am ${override.date}</div>`;
       } else {
-        const subj = subjectOfDay(now);
-        noteHtml = `<div class="routine-step-note">Heutiges Hauptfach: <strong>${subj ? escapeHtml(subj.title) : "–"}</strong>${quickAddVisible ? ' <button class="btn btn-ghost" style="font-size:var(--text-2xs); padding:0 4px; height:auto;" data-change-subject="1">ändern</button>' : ""}</div>`;
+        const aendern = quickAddVisible ? ' <button class="btn btn-ghost" style="font-size:var(--text-2xs); padding:0 4px; height:auto;" data-change-subject="1">ändern</button>' : "";
+        // Solange der Abi-Plan laeuft und kein Fach von Hand gesetzt ist, sagt der Plan, was dran
+        // ist -- die Rotation durch alle neun Faecher kennt weder Phasen noch Pruefungstermine.
+        const abi = !state.subjectOverride[localDateKey(now)] && typeof abiPlanFuer === "function" ? abiPlanFuer(now) : null;
+        if (abi) {
+          const nb = abi.phase.n ? ` · 30 Min. ${escapeHtml(abi.phase.n.replace(" · ", " oder "))}` : "";
+          const inhalt = abi.stufe === "frei" && !abi.ferien
+            ? "Heute frei laut Abi-Plan"
+            : abi.stufe === "min" || abi.stufe === "druck"
+              ? `${abi.stufe === "druck" ? "60" : "30"} Min.: <strong>${escapeHtml(abi.phase.h)}</strong>`
+              : `<strong>${escapeHtml(abi.phase.h)}</strong>${nb}`;
+          noteHtml = `<div class="routine-step-note">${inhalt} <button class="btn btn-ghost abi-link" data-open-abitur="1">Plan</button>${aendern}</div>`;
+        } else {
+          const subj = subjectOfDay(now);
+          noteHtml = `<div class="routine-step-note">Heutiges Hauptfach: <strong>${subj ? escapeHtml(subj.title) : "–"}</strong>${aendern}</div>`;
+        }
       }
     }
 

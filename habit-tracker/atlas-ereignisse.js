@@ -144,6 +144,7 @@ function renderAll() {
   renderGym();
   renderPrayers();
   renderIch();
+  renderAbitur();
   renderWeekStats();
   updateNotifPermissionUI();
   // Muss NACH den Listen laufen: die Sichtbarkeit der Hinzufuegen-Knoepfe haengt davon ab, ob eine
