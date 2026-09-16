@@ -401,12 +401,12 @@ if (splashEl) {
 (() => {
   const homeMenu = document.getElementById("homeMenu");
   const ring     = document.getElementById("atlasRing");
-  const grip     = document.getElementById("ringGrip");
+  const homeBtn  = document.getElementById("ringHome");
   const kimme    = document.getElementById("ringKimme");
   const globeModel = document.getElementById("globeModel");
   const scrim    = document.getElementById("ringScrim");
   const stage    = homeMenu && homeMenu.querySelector(".globe-stage");
-  if (!homeMenu || !ring || !grip || !stage) return;
+  if (!homeMenu || !ring || !homeBtn || !stage) return;
 
   const slots = Array.from(ring.querySelectorAll(".ring-btn")).map(btn => ({
     btn,
@@ -475,9 +475,8 @@ if (splashEl) {
     ring.style.setProperty("--label-op", (Math.max(0, oeffnung - 0.45) / 0.55).toFixed(3));
     ring.style.setProperty("--kimme-op", oeffnung.toFixed(3));
 
-    grip.style.setProperty("--p", t.toFixed(3));
-    // Der Greifer faengt nur in der Andeutung Zeiger ab -- sonst frisst er die Dreh-Geste.
-    grip.classList.toggle("aus", t > 0.08);
+    // Der Knopf zurueck ins Hauptmenue steht nur, solange der Ring weg ist.
+    homeBtn.classList.toggle("aus", t > 0.08);
     // ... und umgekehrt: solange nur die Andeutung steht, faengt der Ring selbst nichts ab.
     ring.classList.toggle("deko", t < 0.08);
 
@@ -798,7 +797,6 @@ if (splashEl) {
   }
 
   ring.addEventListener("pointerdown", e => { start(e); e.preventDefault(); });
-  grip.addEventListener("pointerdown", e => { start(e); e.preventDefault(); });
   addEventListener("pointermove", bewegen, { passive: true });
   addEventListener("pointerup", ende);
   addEventListener("pointercancel", ende);
@@ -819,6 +817,15 @@ if (splashEl) {
     if (p < 0.15) return;                          // in der Andeutung sind die Symbole nur Deko
     waehlenUndOeffnen(rotFuer(s, rot));
   }));
+
+  // Knopf rechts unten: direkt ins Hauptmenue, der aktuelle Tab steht dabei unter der Kimme.
+  // Ersetzt das Hochwischen vom unteren Rand, das auf dem iPhone mit der Home-Geste kollidierte.
+  homeBtn.addEventListener("click", () => {
+    if (p > 0.08) return;
+    const aktuell = slots.find(s => s.tab === document.body.dataset.tab);
+    setzeZiel(1, aktuell ? rotFuer(aktuell, rot) : null);
+    if (globeModel) globeModel.autoRotate = true;
+  });
 
   // Ein Tipp auf den abgedunkelten Inhalt nimmt den Ring wieder zurueck.
   if (scrim) scrim.addEventListener("click", () => {

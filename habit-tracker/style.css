@@ -886,39 +886,38 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* Beim Einrasten kurz aufquellen -- die Rueckmeldung "der rastet jetzt hier ein". */
 .atlas-ring.rastet .ring-kimme { transform: scale(1.14); }
 
-/* ---------- Greifbereich am unteren Rand ----------
-   Liegt bewusst NICHT ganz am Rand, sondern ueber der iOS-Home-Leiste: sonst kaempft die
-   Wischgeste gegen das Betriebssystem. Nur in der Andeutung faengt er Zeiger ab -- weiter
-   offen wuerde er sonst die Dreh-Geste des Rings fressen. */
-.ring-grip {
+/* In den Tabs ist vom Ring nichts mehr zu sehen (seit 2026-09-16): der Bogen am unteren Rand
+   lud zum Hochwischen ein, und das kollidierte mit der iOS-Home-Geste. Er blendet erst auf,
+   wenn der Ring hereinkommt. */
+.atlas-ring { opacity: clamp(0, calc(var(--p, 0) * 6), 1); }
+
+/* ---------- Knopf zurueck ins Hauptmenue ----------
+   Rechts unten, ueber der Home-Leiste. Nur in den Tabs sichtbar -- im Hauptmenue ist er
+   ueberfluessig. */
+.ring-home {
   position: fixed;
-  /* Bewusst nur MITTIG und nicht ueber die volle Breite: ueber die ganze Breite waeren die
-     unteren ~96 px eine tote Zone, in der waehrend des Scrollens keine Zeile mehr antippbar
-     ist. Gewischt wird ohnehin von unten Mitte. */
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(240px, 64vw);
-  bottom: 0;
-  height: calc(88px + env(safe-area-inset-bottom, 0px));
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  width: 54px;
+  height: 54px;
   z-index: 999;
-  touch-action: none;
-  background: transparent;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: #eef3f8;
+  background: rgba(52, 58, 68, 0.62);
+  backdrop-filter: blur(10px) saturate(1.3);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow: var(--kante-innen), var(--erhebung-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.16s ease, transform 0.16s ease;
 }
-.ring-grip.aus { pointer-events: none; }
-/* Der feine Strich als Einladung, wie eine Home-Leiste. Verschwindet, sobald der Ring kommt. */
-.ring-grip::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 7px);
-  width: 104px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.20);
-  opacity: calc(1 - 2.4 * var(--p, 0));
-  transition: opacity 0.14s linear;
-}
+.ring-home:active { transform: scale(0.92); }
+.ring-home:focus-visible { outline: 2px solid var(--color-accent-500); outline-offset: 3px; }
+.ring-home.aus { opacity: 0; pointer-events: none; }
 
 /* Ring und Greifer liegen ueber dem Inhalt; ein offener Dialog gewinnt trotzdem. Ohne diese
    Regel schwebte frueher die Kugel ueber dem Tagesblatt, verdeckte eine Zeile und fing deren
@@ -926,7 +925,7 @@ textarea.input { min-height: 90px; resize: vertical; }
    Ausblenden an einer Transition und die laeuft nicht (Seite nicht gezeichnet), bliebe der Ring
    ueber dem Dialog stehen. */
 body.dialog-offen .atlas-ring,
-body.dialog-offen .ring-grip {
+body.dialog-offen .ring-home {
   opacity: 0 !important;
   pointer-events: none !important;
   transition: none !important;
