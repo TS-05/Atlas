@@ -417,7 +417,7 @@ function renderAbitur() {
 
 // Uebernimmt die fest terminierten Pruefungen in state.exams, damit "Heute" rechtzeitig auf
 // ganztaegiges Lernen umschaltet. Nur Faecher, die es gibt, nur kuenftige, nichts doppelt.
-function abiTermineUebernehmen() {
+function abiTermineEintragen() {
   const heute = localDateKey(new Date());
   const norm = t => (t || "").trim().toLowerCase();
   let neu = 0;
@@ -428,9 +428,22 @@ function abiTermineUebernehmen() {
     state.exams.push({ id: uid(), subjectId: fach.id, date: t.d });
     neu++;
   });
+  return neu;
+}
+function abiTermineUebernehmen() {
+  const neu = abiTermineEintragen();
   saveData();
   showToast(neu ? `${neu} Prüfung${neu === 1 ? "" : "en"} übernommen` : "Alle Prüfungen stehen schon drin");
   renderAll();
+}
+
+// Einmalig (2026-09-16, auf Tims Wunsch): die festen Pruefungstermine beim ersten Start mit dem
+// Abitur-Bereich selbst eintragen, statt auf den Knopf zu warten. Danach nie wieder automatisch --
+// wer einen Termin loescht, bekommt ihn nicht zurueck.
+if (!state.abitur.termineUebernommen) {
+  const neu = abiTermineEintragen();
+  state.abitur.termineUebernommen = localDateKey(new Date());
+  if (saveData() && neu) setTimeout(() => showToast(`${neu} Prüfungstermine aus dem Abi-Plan eingetragen`), 1500);
 }
 
 document.addEventListener("click", e => {
