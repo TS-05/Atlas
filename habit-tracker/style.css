@@ -1832,7 +1832,7 @@ body.dialog-offen {
 .abi-slot span { display: block; font-size: var(--text-3xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
 .abi-slot b { display: block; font-weight: 500; font-size: var(--text-sm); line-height: 1.3; }
 .abi-banner { font-size: var(--text-xs); line-height: 1.4; padding: 6px 10px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent-200); }
-.abi-banner.ferien { background: color-mix(in srgb, oklch(0.72 0.06 220) 16%, transparent); color: oklch(0.80 0.06 220); }
+.abi-banner.ferien { background: color-mix(in srgb, var(--abi-frei) 16%, transparent); color: var(--abi-frei); }
 @media (max-width: 360px) { .abi-hero { grid-template-columns: 1fr; justify-items: center; } .abi-hero-info { width: 100%; } }
 
 .abi-woche { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
@@ -1858,26 +1858,44 @@ body.dialog-offen {
 .abi-strahl { position: relative; min-width: 620px; height: 116px; }
 .abi-achse { position: absolute; left: 0; right: 0; top: 54px; height: 6px; border-radius: 3px; background: var(--color-neutral-800); overflow: hidden; }
 .abi-gelaufen { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--color-accent-700), var(--color-accent-400)); }
-.abi-ferien { position: absolute; top: 50px; height: 14px; border-radius: 4px; background: color-mix(in srgb, oklch(0.72 0.06 220) 30%, transparent); }
-.abi-monat { position: absolute; top: 76px; transform: translateX(-50%); font-size: var(--text-3xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
+.abi-ferien { position: absolute; top: 50px; height: 14px; border-radius: 4px; background: color-mix(in srgb, var(--abi-frei) 32%, transparent); }
+.abi-monat { position: absolute; top: 100px; transform: translateX(-50%); font-size: var(--text-3xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
 .abi-mark { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
-.abi-mark span { font-size: var(--text-3xs); white-space: nowrap; color: var(--color-neutral-400); }
-.abi-mark i { width: 2px; height: 22px; margin-top: 3px; border-radius: 1px; background: var(--color-accent-600); }
-.abi-mark.abi span { color: var(--color-accent-300); font-weight: 600; }
-.abi-mark.abi i { width: 3px; height: 26px; background: var(--color-accent-300); }
-.abi-mark.unten { top: 92px; }
-.abi-mark.unten i { display: none; }
+.abi-mark span { font-size: var(--text-3xs); white-space: nowrap; color: var(--abi-c); }
+.abi-mark i { width: 2px; height: 22px; margin-top: 3px; border-radius: 1px; background: var(--abi-c); }
+#tab-abitur .abi-mark[data-art="abi"] span { font-weight: 600; }
+#tab-abitur .abi-mark[data-art="abi"] i { width: 3px; height: 26px; }
+.abi-mark.unten { top: 66px; flex-direction: column-reverse; }
+.abi-mark.unten i { height: 10px; margin: 0 0 3px; }
+.abi-mark.vage span { opacity: 0.75; }
+.abi-mark.vage i { width: 0; background: none; border-left: 2px dotted var(--abi-c); }
 .abi-jetzt { position: absolute; top: 44px; width: 2px; height: 26px; transform: translateX(-50%); border-radius: 1px; background: var(--color-text); box-shadow: 0 0 8px rgba(255,255,255,0.5); }
 
 .abi-liste { background: var(--color-surface); border-radius: var(--radius-lg); gap: 0; overflow: hidden; }
 .abi-liste > .btn-block { margin: 0; border-top: 1px solid var(--color-divider); border-radius: 0; }
-.abi-chip { flex-shrink: 0; width: 60px; text-align: center; font-size: var(--text-3xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; }
-.abi-chip.abi { background: linear-gradient(135deg, var(--color-accent-500), var(--color-accent-700)); color: var(--color-bg); }
-.abi-chip.sa { background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-accent-300); }
-.abi-chip.ka { background: color-mix(in srgb, var(--color-text) 8%, transparent); color: var(--color-neutral-400); }
-.abi-chip.sem { background: color-mix(in srgb, oklch(0.74 0.09 150) 16%, transparent); color: oklch(0.78 0.09 150); }
-.abi-chip.frei { background: color-mix(in srgb, oklch(0.72 0.06 220) 16%, transparent); color: oklch(0.80 0.06 220); }
-.abi-chip.privat { background: color-mix(in srgb, oklch(0.70 0.14 35) 14%, transparent); color: oklch(0.76 0.13 35); }
+/* Terminarten: je eine Farbe auf aehnlicher Helligkeit, damit keine lauter ist als das Abitur.
+   Gold bleibt dem Abitur vorbehalten -- es ist die Akzentfarbe der App. */
+#tab-abitur {
+  --abi-abi: var(--color-accent-400);
+  --abi-pruefung: oklch(0.76 0.12 345);
+  --abi-sa: oklch(0.74 0.13 35);
+  --abi-ka: oklch(0.76 0.10 295);
+  --abi-sem: oklch(0.78 0.10 155);
+  --abi-frei: oklch(0.78 0.07 230);
+}
+#tab-abitur [data-art="abi"] { --abi-c: var(--abi-abi); }
+#tab-abitur [data-art="pruefung"] { --abi-c: var(--abi-pruefung); }
+#tab-abitur [data-art="sa"] { --abi-c: var(--abi-sa); }
+#tab-abitur [data-art="ka"] { --abi-c: var(--abi-ka); }
+#tab-abitur [data-art="sem"] { --abi-c: var(--abi-sem); }
+#tab-abitur [data-art="frei"] { --abi-c: var(--abi-frei); }
+
+.abi-chip { flex-shrink: 0; width: 74px; text-align: center; font-size: var(--text-3xs); font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; padding: 3px 4px; border-radius: 5px; color: var(--abi-c); background: color-mix(in srgb, var(--abi-c) 15%, transparent); }
+#tab-abitur .abi-chip[data-art="abi"] { color: var(--color-bg); background: linear-gradient(135deg, var(--color-accent-400), var(--color-accent-600)); }
+.atlas-row.abi-termin { box-shadow: inset 3px 0 0 var(--abi-c); }
+#tab-abitur .atlas-row.abi-termin[data-art="abi"] { background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 9%, transparent), transparent 70%); }
+.abi-legende-farben { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: -2px 0 10px; font-size: var(--text-xs); color: var(--color-neutral-400); }
+.abi-legende-farben i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--abi-c); }
 .abi-rechts { flex-shrink: 0; text-align: right; }
 .abi-tage { font-size: var(--text-lg); font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .abi-tage.offen { font-size: var(--text-sm); color: var(--color-text-muted); }
@@ -1902,7 +1920,7 @@ body.dialog-offen {
 .atlas-row.abi-aktiv .abi-nr { border-color: transparent; background: var(--color-accent-500); color: var(--color-bg); font-weight: 600; }
 .abi-typ { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px; font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; vertical-align: 1px; }
 .abi-typ.druck { background: color-mix(in srgb, oklch(0.70 0.14 35) 16%, transparent); color: oklch(0.76 0.13 35); }
-.abi-typ.ferien { background: color-mix(in srgb, oklch(0.72 0.06 220) 16%, transparent); color: oklch(0.80 0.06 220); }
+.abi-typ.ferien { background: color-mix(in srgb, var(--abi-frei) 16%, transparent); color: var(--abi-frei); }
 
 .abi-hinweise { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .abi-hinweis b { display: block; font-weight: 500; font-size: var(--text-md); }

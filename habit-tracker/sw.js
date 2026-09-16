@@ -3,7 +3,7 @@
 // liefert sie danach auch offline aus. Bei Netzverbindung wird der Cache im Hintergrund aktualisiert.
 // Nichts fest verdrahtet — neue/versionierte Dateinamen (z.B. app.js?v=15) landen automatisch im Cache,
 // sobald sie einmal geladen wurden.
-const CACHE_NAME = "atlas-cache-v8";
+const CACHE_NAME = "atlas-cache-v9";
 const APP_SHELL = ["./", "./index.html"];
 
 self.addEventListener("install", e => {

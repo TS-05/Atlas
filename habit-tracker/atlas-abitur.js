@@ -14,7 +14,7 @@ const ABI_START = "2026-09-16";
 const ABI_ENDE = "2027-06-03";
 const ABI_ERSTES = "2027-05-12";
 
-// art: abi | sa | ka | sem | frei | privat. `offen` = Datum steht noch nicht fest (Monat bekannt).
+// art: abi | pruefung | sa | ka | sem | frei -- nur Schulisches, jede Art mit eigener Farbe. `offen` = Datum steht noch nicht fest (Monat bekannt).
 // `fach` verbindet den Termin mit dem Fach in state.subjects (fuer "in Klassenarbeiten uebernehmen").
 const ABI_TERMINE = [
   { d: "2026-10-26", art: "sa", t: "Deutsch Schulaufgabe 1", fach: "Deutsch" },
@@ -31,15 +31,19 @@ const ABI_TERMINE = [
   { d: "2027-03-03", art: "sa", t: "Englisch Schulaufgabe 2", fach: "Englisch" },
   { d: "2027-03-15", offen: "März", art: "ka", t: "Deutsch Kurzarbeit 2", s: "Datum steht noch nicht fest" },
   { d: "2027-03-22", bis: "2027-04-02", art: "frei", t: "Osterferien" },
-  { d: "2027-04-07", offen: "Anfang April", art: "sa", t: "Englisch mündlich", s: "Group Discussion, 20 Min. Vorbereitung" },
-  { d: "2027-05-08", art: "privat", t: "Hochzeit Emu & Vika" },
+  { d: "2027-04-07", offen: "Anfang April", art: "pruefung", t: "Englisch mündlich", s: "Group Discussion, 20 Min. Vorbereitung" },
   { d: "2027-05-12", art: "abi", t: "Abitur Deutsch", fach: "Deutsch" },
   { d: "2027-05-14", art: "abi", t: "Abitur BWR", s: "Vortag ist Ochsen-Tag → freinehmen", fach: "BWR" },
   { d: "2027-05-18", bis: "2027-05-28", art: "frei", t: "Pfingstferien" },
   { d: "2027-06-01", art: "abi", t: "Abitur Englisch", fach: "Englisch" },
   { d: "2027-06-03", art: "abi", t: "Abitur Mathe", s: "abends Ochsen", fach: "Mathe" }
 ];
-const ABI_ART_LABEL = { abi: "Abitur", sa: "Prüfung", ka: "Kurzarb.", sem: "Seminar", frei: "Frei", privat: "Privat" };
+const ABI_ART_LABEL = { abi: "Abitur", pruefung: "Prüfung", sa: "Schulaufg.", ka: "Kurztest", sem: "Seminar", frei: "Ferien" };
+// Reihenfolge der Legende = Gewicht fuer die Pruefungsvorbereitung.
+const ABI_ARTEN = [
+  ["abi", "Abitur"], ["pruefung", "Mündliche Prüfung"], ["sa", "Schulaufgabe"],
+  ["ka", "Kurzarbeit / Kurztest"], ["sem", "Seminar & Schule"], ["frei", "Ferien & schulfrei"]
+];
 
 // [von, bis, Hauptslot 60 Min., Nebenslot 30 Min., Ziel, Typ]
 const ABI_PHASEN = [
@@ -56,7 +60,7 @@ const ABI_PHASEN = [
   ["2027-03-22", "2027-04-04", "Osterferien: 8 Lerntage à 2,5 Std.", "Karfreitag bis Ostermontag frei", "4 Probe-Runden Group Discussion · Mathe-Altabitur · BWR", "ferien"],
   ["2027-04-05", "2027-04-11", "Englisch mündlich", "Mathe", "Group Discussion", "druck"],
   ["2027-04-12", "2027-05-06", "Deutsch: Abi-Aufsätze, Probe-Abi", "BWR", "Deutsch und BWR sitzen bis Do 06.05."],
-  ["2027-05-07", "2027-05-14", "10.–11.05. Deutsch · 12. nachm. + 13.05. BWR", "07.–09.05. Hochzeit, nur Minimum", "Mi 12.05. Deutsch · Fr 14.05. BWR", "druck"],
+  ["2027-05-07", "2027-05-14", "10.–11.05. Deutsch · 12. nachm. + 13.05. BWR", "07.–09.05. nur Minimum", "Mi 12.05. Deutsch · Fr 14.05. BWR", "druck"],
   ["2027-05-15", "2027-05-31", "Englisch + Mathe, 3 Std./Tag", "15.–17.05. frei · Pfingstsonntag und Fronleichnam frei", "je 2 Altabiture Englisch und Mathe", "ferien"],
   ["2027-06-01", "2027-06-03", "Mathe wiederholen (01. nachm. + 02.06.)", "", "Di 01.06. Englisch · Do 03.06. Mathe", "druck"]
 ].map((p, i) => ({ nr: i + 1, von: p[0], bis: p[1], h: p[2], n: p[3], ziel: p[4], typ: p[5] || "" }));
@@ -164,7 +168,7 @@ function abiPhaseAm(key) {
   return ABI_PHASEN.find(p => key >= p.von && key <= p.bis) || null;
 }
 function abiDruckAm(key) {
-  return ABI_TERMINE.some(t => ["abi", "sa"].includes(t.art) && !t.offen && t.d >= key &&
+  return ABI_TERMINE.some(t => ["abi", "pruefung", "sa"].includes(t.art) && !t.offen && t.d >= key &&
     Math.round((abiDate(t.d) - abiDate(key)) / 86400000) <= 14);
 }
 function abiFerienAm(key) {
@@ -221,7 +225,7 @@ function renderAbitur() {
   const bisEnde = abiTage(ABI_ENDE);
   const anteil = Math.min(1, Math.max(0.012, (abiHeute() - abiDate(ABI_START)) / (abiDate(ABI_ERSTES) - abiDate(ABI_START))));
   const U = 2 * Math.PI * 62;
-  const naechste = ABI_TERMINE.filter(t => ["abi", "sa", "ka", "sem"].includes(t.art) && !t.offen && t.d >= heuteKey)
+  const naechste = ABI_TERMINE.filter(t => ["abi", "pruefung", "sa", "ka", "sem"].includes(t.art) && !t.offen && t.d >= heuteKey)
     .sort((a, b) => a.d.localeCompare(b.d))[0];
   const ringZahl = bisAbi > 0 ? bisAbi : bisEnde >= 0 ? bisEnde : "✓";
   const ringText = bisAbi > 0 ? "Tage bis zum Deutsch-Abi" : bisEnde >= 0 ? "Tage bis zum Mathe-Abi" : "geschafft";
@@ -248,14 +252,17 @@ function renderAbitur() {
   ABI_TERMINE.filter(t => t.art === "frei" && t.bis).forEach(t => {
     strahl += `<div class="abi-ferien" style="left:${pos(t.d)}%;width:${pos(t.bis) - pos(t.d)}%"></div>`;
   });
-  ["Okt", "Nov", "Dez", "Jan", "Feb", "Mär", "Apr", "Mai", "Jun"].forEach((m, i) => {
+  ["Okt", "Nov", "Dez", "Jan", "Feb", "Mär", "Apr", "Mai"].forEach((m, i) => {
     strahl += `<span class="abi-monat" style="left:${pos(localDateKey(new Date(2026, 9 + i, 1)))}%">${m}</span>`;
   });
-  [["2026-10-26", "Deu SA", ""], ["2026-12-08", "Eng SA", ""], ["2027-01-18", "Seminar", "unten"],
-   ["2027-02-02", "Deu SA", ""], ["2027-03-03", "Eng SA", ""], ["2027-04-07", "mündl.", "unten"],
-   ["2027-05-08", "Hochzeit", "unten"], ["2027-05-12", "Deu", "abi"], ["2027-05-14", "BWR", "abi unten"],
-   ["2027-06-01", "Eng", "abi"], ["2027-06-03", "Mat", "abi unten"]].forEach(([d, l, c]) => {
-    strahl += `<div class="abi-mark ${c}" style="left:${Math.min(pos(d), 98.6)}%"><span>${l}</span><i></i></div>`;
+  // [Datum, Beschriftung, Art, unten?, unsicher?] -- oben die Pruefungen, unten Seminar und
+  // Kurztests, damit sich die Beschriftungen nicht ueberlappen.
+  [["2026-10-26", "Deu SA", "sa"], ["2026-11-13", "Teilausf.", "sem", 1], ["2026-12-08", "Eng SA", "sa"],
+   ["2027-01-15", "Deu KT?", "ka", 0, 1], ["2027-01-18", "Abgabe", "sem", 1], ["2027-02-02", "Deu SA", "sa"],
+   ["2027-03-03", "Eng SA", "sa"], ["2027-03-15", "Deu KT?", "ka", 1, 1], ["2027-04-07", "mündl.?", "pruefung", 0, 1],
+   ["2027-05-12", "Deu", "abi"], ["2027-05-14", "BWR", "abi", 1],
+   ["2027-06-01", "Eng", "abi"], ["2027-06-03", "Mat", "abi", 1]].forEach(([d, l, art, unten, vage]) => {
+    strahl += `<div class="abi-mark${unten ? " unten" : ""}${vage ? " vage" : ""}" data-art="${art}" style="left:${Math.min(pos(d), 98.6)}%"><span>${l}</span><i></i></div>`;
   });
   if (heuteKey >= ABI_START && heuteKey <= ABI_ENDE) strahl += `<div class="abi-jetzt" style="left:${pos(heuteKey)}%"></div>`;
 
@@ -270,8 +277,8 @@ function renderAbitur() {
     const rechts = t.offen
       ? `<div class="abi-tage offen">offen</div><div class="abi-datum">${t.offen}</div>`
       : `<div class="abi-tage">${vorbei ? "✓" : laeuft ? (t.bis ? "läuft" : "heute") : tage + " T"}</div><div class="abi-datum">${abiKurz(t.d)}${t.bis ? " – " + abiKurz(t.bis) : ""}</div>`;
-    return `<div class="atlas-row${vorbei ? " abi-vorbei" : ""}">
-      <span class="abi-chip ${t.art}">${ABI_ART_LABEL[t.art]}</span>
+    return `<div class="atlas-row abi-termin${vorbei ? " abi-vorbei" : ""}" data-art="${t.art}">
+      <span class="abi-chip" data-art="${t.art}">${ABI_ART_LABEL[t.art]}</span>
       <div style="flex:1; min-width:0;"><div class="item-title">${escapeHtml(t.t)}</div>${t.s ? `<div class="abi-sub">${escapeHtml(t.s)}</div>` : ""}</div>
       <div class="abi-rechts">${rechts}</div></div>`;
   };
@@ -318,6 +325,7 @@ function renderAbitur() {
     <div class="panel-card abi-strahl-box"><div class="abi-strahl">${strahl}</div></div>
 
     <h2 class="metal-gold abschnitt abi-abstand">Termine</h2>
+    <div class="abi-legende-farben">${ABI_ARTEN.map(([art, name]) => `<span data-art="${art}"><i></i>${name}</span>`).join("")}</div>
     <div class="list abi-liste">${liste.map(terminZeile).join("")}
       <button class="btn btn-ghost btn-block" data-abi-termine="1">${abiTermineOffen ? "Nur kommende zeigen" : `Alle ${alle.length} Termine zeigen`}</button>
     </div>
@@ -388,7 +396,7 @@ function renderAbitur() {
     <div class="abi-hinweise">
       <div class="panel-card abi-hinweis warn"><b>Do 13.05. freinehmen</b><p>Der Tag vor dem BWR-Abi ist Ochsen-Tag. Früh fragen – ebenso Himmelfahrt Do 06.05. und Do 03.06.</p></div>
       <div class="panel-card abi-hinweis warn"><b>Verteidigung + Deutsch SA 2</b><p>Verteidigung ab ~25.01., Deutsch am Di 02.02. – die Verteidigung ab Mitte Januar üben.</p></div>
-      <div class="panel-card abi-hinweis warn"><b>Hochzeit 4 Tage vor Deutsch</b><p>Deutsch muss bis Do 06.05. sitzen. Danach nur noch wiederholen.</p></div>
+      <div class="panel-card abi-hinweis warn"><b>Deutsch sitzt bis Do 06.05.</b><p>07.–09.05. sind nur Minimum-Tage, danach bis zur Prüfung nur noch wiederholen.</p></div>
       <div class="panel-card abi-hinweis warn"><b>Treffen vor Prüfungen verschieben</b><p>So 25.10. · Mo 07.12. · Mo 01.02. · Di 11.05. · Mo 31.05.</p></div>
       <div class="panel-card abi-hinweis"><b>Noch nicht fix</b><p>Deutsch-Kurzarbeiten, Verteidigung, mündliches Englisch, übrige Fächer. Bis dahin gilt die Joker-Regel.</p></div>
       <div class="panel-card abi-hinweis"><b>Stundenplan fehlt</b><p>Sobald er da ist, rutschen die Slots an Mo, Di und Do auf die echten Schulschlusszeiten.</p></div>
