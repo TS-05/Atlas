@@ -1045,6 +1045,9 @@ function migrateIdentityV2(data) {
   data.identityV2Applied = true;
 }
 
+// Tims Schulfaecher (BOS 13), in seiner Reihenfolge
+const FAECHER = ["Mathe", "BWR", "Englisch", "Deutsch", "Französisch", "VWL", "Naturwissenschaften", "GPuG", "Religion"];
+
 let state = loadData();
 migrateToGoalNodes(state);
 repairCyclicGoalNodes(state);
@@ -1083,6 +1086,19 @@ state.prayers.forEach(p => {
   }
 });
 state.subjectOverride = state.subjectOverride || {};
+// Einmalig (2026-09-16): Faecherliste auf Tims tatsaechliche BOS-13-Faecher bringen. "BWL" wird zu
+// "BWR" umbenannt statt neu angelegt, damit eingetragene Klassenarbeiten ihr Fach behalten (sie
+// zeigen per ID darauf). Fehlende Faecher kommen dazu, die Reihenfolge folgt der Liste — sie steuert
+// auch das Fach des Tages. Selbst angelegte Faecher bleiben erhalten und haengen hinten dran.
+if (!state.subjectsV2Applied) {
+  const norm = t => (t || "").trim().toLowerCase();
+  state.subjects.forEach(f => { if (norm(f.title) === "bwl") f.title = "BWR"; });
+  const geordnet = FAECHER.map(titel =>
+    state.subjects.find(f => norm(f.title) === norm(titel)) || { id: uid(), title: titel });
+  const eigene = state.subjects.filter(f => !geordnet.includes(f));
+  state.subjects = geordnet.concat(eigene);
+  state.subjectsV2Applied = true;
+}
 // Klassenarbeiten sind reine Vorschau: Ist der Termin vorbei, wird der Eintrag beim naechsten Start
 // entfernt statt die Liste zuzumuellen. Streng "aelter als heute" — der Termin des laufenden Tages
 // bleibt den ganzen Tag stehen. (Bewusst eng gehalten: automatisches Loeschen hat in diesem Projekt
@@ -1122,7 +1138,8 @@ function seedData() {
     financeAccounts: [], financeCategories: [], financeExpenses: [], savingsGoals: [], financeIncomeSources: [], projects: [],
     // Frische Seed-Daten entsprechen bereits der aktuellen Struktur — alle Migrationen sollen hier no-op sein
     bereicheRestructureApplied: true, planungMigrationApplied: true, goalDrivenRestructureApplied: true,
-    seminararbeitRoadmapApplied: true, seminararbeitRoadmapV2Applied: true, taskEffortLevelsApplied: true, learningOrderApplied: true
+    seminararbeitRoadmapApplied: true, seminararbeitRoadmapV2Applied: true, taskEffortLevelsApplied: true, learningOrderApplied: true,
+    subjectsV2Applied: true
   };
   const c = (title, parentId = null, priority = false) => {
     const id = uid();
@@ -1183,10 +1200,7 @@ function seedData() {
   const studium = byTitle["Studium"];
   h("Lernen / Schularbeit 60–90 Min.", schule, "weekdays", { routineOrder: 6 });
   t("Bewerbungen duales Studium abschicken", studium, "2026-07-13", 3, 5);
-  s("Englisch");
-  s("Deutsch");
-  s("BWL");
-  s("Mathe");
+  FAECHER.forEach(s);
 
   // Reine Tagesroutine-Habits ohne Wissensbereich (persönlicher Alltag, kein Lernthema)
   h("Pünktlich aufstehen", null, "daily", { routineOrder: 1 });
