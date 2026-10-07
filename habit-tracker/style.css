@@ -2020,3 +2020,21 @@ body.dialog-offen {
 
 /* Rueckgaengig-Leiste federt herein. */
 .undo-bar { animation-timing-function: var(--bew-feder) !important; }
+
+/* ============================================================================================
+   FEIERN (atlas-feiern.js, seit 2026-10-07): Goldfunken beim Abhaken, Goldschimmer wenn der
+   ganze Tag geschafft ist. Eigene Ebene ueber allem, faengt keine Beruehrung ab.
+   ============================================================================================ */
+.feier-ebene { position: fixed; inset: 0; z-index: 1300; pointer-events: none; overflow: hidden; }
+.feier-funke {
+  position: absolute; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--color-accent-400);
+  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--color-accent-500) 70%, transparent);
+  will-change: transform, opacity;
+}
+.feier-funke.hell { width: 4px; height: 4px; background: var(--color-accent-100); }
+.feier-schein {
+  position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(ellipse at 50% 32%, color-mix(in srgb, var(--color-accent-400) 34%, transparent), transparent 62%);
+}
+.klang-knopf.klang-aus { opacity: 0.55; }

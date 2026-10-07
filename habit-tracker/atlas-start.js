@@ -984,11 +984,11 @@ document.addEventListener("click", e => {
   const sel = box.dataset.habit
     ? `.atlas-check[data-habit="${CSS.escape(box.dataset.habit)}"]${box.dataset.date ? `[data-date="${CSS.escape(box.dataset.date)}"]` : ""}`
     : `.atlas-check[data-task="${CSS.escape(box.dataset.task)}"]`;
-  // Zwei Bilder warten: renderAll laeuft teils selbst erst im naechsten Bild.
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  // Kurz warten, bis renderAll neu gezeichnet hat (Zeitgeber laeuft auch ohne gezeichnete Bilder).
+  setTimeout(() => {
     document.querySelectorAll(sel).forEach(el => {
       el.classList.add("bew-neu");
       setTimeout(() => el.classList.remove("bew-neu"), 600);
     });
-  }));
+  }, 30);
 }, true);
