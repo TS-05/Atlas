@@ -180,6 +180,56 @@ function ichRegionKarteHtml(region) {
     </div>`;
 }
 
+// ---------- Kern: die 3-5 wichtigsten Saetze ----------
+// Seit 2026-10-07 (Tim: "viel zu lang") zeigt die Seite nur noch Figur, den einen Satz und EIN
+// Rechteck mit den wichtigsten "Ich bin ..."-Saetzen. Alle uebrigen Saetze bleiben erhalten und
+// sind ueber "Alle Sätze" bzw. die Beschriftungen an der Figur in einem Blatt erreichbar.
+// Welche Saetze zum Kern gehoeren, markiert Tim selbst (b.kern). Solange er nichts markiert hat,
+// steht je der erste Satz dieser Bereiche dort -- Glaube zuerst, gemaess der Rangordnung.
+const ICH_KERN_MAX = 5;
+const ICH_KERN_VORGABE = ["glaube", "charakter", "familie", "beruf", "koerper"];
+
+function ichKernMarkiert() {
+  const liste = [];
+  ichRegions().slice().sort((a, b) => a.fy - b.fy).forEach(r =>
+    (r.beliefs || []).forEach(b => { if (b.kern) liste.push({ region: r, belief: b }); }));
+  return liste;
+}
+function ichKernSaetze() {
+  const markiert = ichKernMarkiert();
+  if (markiert.length) return markiert.slice(0, ICH_KERN_MAX);
+  return ICH_KERN_VORGABE
+    .map(key => ichRegions().find(r => r.key === key))
+    .filter(r => r && (r.beliefs || []).length)
+    .map(r => ({ region: r, belief: r.beliefs[0] }));
+}
+
+function ichKernHtml() {
+  const saetze = ichKernSaetze();
+  const liste = saetze.length
+    ? `<ul class="ich-kern-liste">${saetze.map(({ region, belief }) => `
+        <li><button class="ich-kern-satz" data-ich-edit="${region.id}|${belief.id}">${escapeHtml(belief.text)}</button></li>`).join("")}</ul>`
+    : `<p class="leerzustand-text">Noch kein Satz markiert.</p>`;
+  return `
+    <div class="card elev-sm ich-kern">
+      ${liste}
+      <button class="btn-inline ich-kern-alle" data-ich-alle>Alle Sätze</button>
+    </div>`;
+}
+
+// Blatt mit allen Bereichen -- die frueheren Einzelkarten, jetzt ausserhalb der Seite.
+function openIchAlleSheet(regionId) {
+  const sortiert = ichRegions().slice().sort((a, b) => a.fy - b.fy);
+  openModal(`
+    <h2 style="font-size:var(--text-2xl); margin:0 0 12px;">Alle Sätze</h2>
+    <div class="list ich-alle" style="gap:14px;">${sortiert.map(ichRegionKarteHtml).join("")}</div>
+  `, null, "sheet", { fokusFeld: false });
+  if (regionId) {
+    const karte = document.getElementById("ich-karte-" + regionId);
+    if (karte) karte.scrollIntoView({ block: "start" });
+  }
+}
+
 function renderIch() {
   const claimWrap = document.getElementById("ichClaim");
   const figurWrap = document.getElementById("ichFigure");
@@ -192,11 +242,7 @@ function renderIch() {
     : `<button class="ich-claim ich-claim-leer" id="ichClaimBtn">Der eine Satz, der über allem steht — hier eintragen.</button>`;
 
   figurWrap.innerHTML = ichFigurHtml();
-
-  // Reihenfolge der Karten: von oben nach unten wie an der Figur, damit Bild und Liste dieselbe
-  // Leserichtung haben. Nicht die Speicherreihenfolge -- die folgt den Zonen.
-  const sortiert = ichRegions().slice().sort((a, b) => a.fy - b.fy);
-  listWrap.innerHTML = sortiert.map(ichRegionKarteHtml).join("");
+  listWrap.innerHTML = ichKernHtml();
 }
 
 // ---------- Bearbeiten ----------
@@ -245,6 +291,10 @@ function openIchBeliefModal(regionId, beliefId) {
       <textarea class="input" id="mIchSatz" rows="3" placeholder="Ich bin …">${belief ? escapeHtml(belief.text) : ""}</textarea>
       <p class="hint" style="margin-top:4px;">Gegenwart, nicht Zukunft — auch da, wo es noch nicht ganz stimmt.</p>
     </div>
+    <label class="checkbox-row">
+      <input type="checkbox" id="mIchKern" ${belief && ichKernSaetze().some(k => k.belief.id === belief.id) ? "checked" : ""}>
+      <span>Gehört zu meinen wichtigsten Sätzen (höchstens ${ICH_KERN_MAX})</span>
+    </label>
     <div class="modal-actions">
       ${belief ? `<button class="btn btn-ghost" id="mDelete" style="color:var(--color-accent-300); margin-right:auto;">Löschen</button>` : ""}
       <button class="btn btn-secondary" id="mCancel">Abbrechen</button>
@@ -258,14 +308,26 @@ function openIchBeliefModal(regionId, beliefId) {
     body.querySelector("#mSave").addEventListener("click", () => {
       const text = feld.value.trim();
       if (!text) { markiereFehlendesFeld(feld, "Ohne Satz gibt es nichts zu speichern."); return; }
+      const kernBox = body.querySelector("#mIchKern");
+      // Die Vorgabe-Auswahl ist nur geliehen: sobald Tim zum ersten Mal selbst markiert, wird sie
+      // als echte Markierung uebernommen -- sonst verschwaenden die anderen Kernsaetze schlagartig.
+      if (!ichKernMarkiert().length) ichKernSaetze().forEach(k => { k.belief.kern = true; });
+      let ziel = belief;
       if (belief) {
         belief.text = text;
       } else {
         const wahl = body.querySelector("#mIchRegion");
-        const ziel = ichRegionById(wahl ? wahl.value : region.id) || region;
-        ziel.beliefs = ziel.beliefs || [];
-        ziel.beliefs.push({ id: uid(), text });
+        const zielRegion = ichRegionById(wahl ? wahl.value : region.id) || region;
+        zielRegion.beliefs = zielRegion.beliefs || [];
+        ziel = { id: uid(), text };
+        zielRegion.beliefs.push(ziel);
       }
+      if (kernBox.checked && !ziel.kern && ichKernMarkiert().length >= ICH_KERN_MAX) {
+        markiereFehlendesFeld(kernBox, `Höchstens ${ICH_KERN_MAX} Sätze — nimm vorher einen anderen heraus.`);
+        if (!belief) { const r = ichRegions().find(x => (x.beliefs || []).includes(ziel)); r.beliefs.splice(r.beliefs.indexOf(ziel), 1); }
+        return;
+      }
+      if (kernBox.checked) ziel.kern = true; else delete ziel.kern;
       saveData(); closeModal(); renderAll();
     });
   });
@@ -341,18 +403,8 @@ function openIchHabitsModal(regionId) {
 // Ich-Seite betrifft, steht damit in einer Datei.
 document.addEventListener("click", e => {
   const anker = e.target.closest("[data-ich-anker]");
-  if (anker) {
-    const karte = document.getElementById("ich-karte-" + anker.dataset.ichAnker);
-    if (karte) {
-      karte.scrollIntoView({ block: "center", behavior: "smooth" });
-      // Kurz hervorheben, damit man nach dem Springen sieht, wo man gelandet ist. Ueber eine
-      // Klasse und nicht ueber einen Inline-Stil, damit reduzierte Bewegung sie mit abschaltet.
-      karte.classList.remove("ich-karte-treffer");
-      void karte.offsetWidth;
-      karte.classList.add("ich-karte-treffer");
-    }
-    return;
-  }
+  if (anker) { openIchAlleSheet(anker.dataset.ichAnker); return; }
+  if (e.target.closest("[data-ich-alle]")) { openIchAlleSheet(null); return; }
   const claimBtn = e.target.closest("#ichClaimBtn");
   if (claimBtn) { openIchClaimModal(); return; }
 
@@ -369,7 +421,9 @@ document.addEventListener("click", e => {
   const del = e.target.closest("[data-ich-del]");
   if (del) {
     const [regionId, beliefId] = del.dataset.ichDel.split("|");
+    const imBlatt = !!del.closest(".ich-alle");
     ichDeleteBelief(regionId, beliefId);
+    if (imBlatt) openIchAlleSheet(null);           // Blatt mit dem neuen Stand neu zeichnen
     return;
   }
 

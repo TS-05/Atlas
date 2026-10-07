@@ -495,8 +495,18 @@ function dialogZiele() {
   )].filter(el => el.offsetParent !== null || el === document.activeElement);
 }
 
-function openModal(html, onMount, mode = "dialog") {
-  fokusVorDialog = document.activeElement;
+// fokusFeld: false, wenn der Dialog vor allem zum Antippen da ist (Tagesblatt zum Nachtragen).
+// Sonst landet der Fokus im ersten Eingabefeld -- dort das Gewicht -- und auf dem iPhone springt
+// bei jedem Abhaken die Tastatur auf, weil das Tagesblatt nach jedem Tipp neu geoeffnet wird.
+function openModal(html, onMount, mode = "dialog", { fokusFeld = true } = {}) {
+  // Wird ein offener Dialog nur neu gezeichnet, den Ausgangsfokus von vorher behalten -- und
+  // nicht erneut hereinfahren lassen (.frisch steuert die Oeffnen-Animation in style.css).
+  if (overlay.classList.contains("hidden")) {
+    fokusVorDialog = document.activeElement;
+    overlay.classList.add("frisch");
+    clearTimeout(openModal.frischTimer);
+    openModal.frischTimer = setTimeout(() => overlay.classList.remove("frisch"), 520);
+  }
   overlay.classList.toggle("dialog-mode", mode === "dialog");
   modalBody.innerHTML = mode === "sheet" ? '<div class="modal-grabber"></div>' + html : html;
   overlay.classList.remove("hidden");
@@ -515,17 +525,22 @@ function openModal(html, onMount, mode = "dialog") {
   // Seite dahinter festhalten. Ohne das scrollt die Liste unter dem Dialog mit, und nach dem
   // Schliessen steht man woanders als vorher. scrollTop wird gemerkt und zurueckgesetzt, weil
   // position:fixed den Stand sonst verliert.
-  gemerkterScroll = window.scrollY;
-  document.body.classList.add("dialog-offen");
-  document.body.style.top = `-${gemerkterScroll}px`;
+  // Nur beim ersten Oeffnen merken: ist der Dialog schon offen, steht die Seite fest und scrollY
+  // waere 0 -- nach dem Schliessen landete man dann oben statt dort, wo man war.
+  if (!document.body.classList.contains("dialog-offen")) {
+    gemerkterScroll = window.scrollY;
+    document.body.classList.add("dialog-offen");
+    document.body.style.top = `-${gemerkterScroll}px`;
+  }
 
   if (onMount) onMount(modalBody);
 
   // In den Dialog hinein fokussieren, sonst landet die erste Tabulatortaste in der Kopfzeile
   // dahinter. Ein Eingabefeld zuerst -- da will man ohnehin hin.
   const ziele = dialogZiele();
-  const feld = modalBody.querySelector('input:not([type="hidden"]), textarea, select');
-  (feld || ziele[0] || modalBody).focus({ preventScroll: true });
+  const feld = fokusFeld ? modalBody.querySelector('input:not([type="hidden"]), textarea, select') : null;
+  if (!fokusFeld && !modalBody.hasAttribute("tabindex")) modalBody.setAttribute("tabindex", "-1");
+  (feld || (fokusFeld ? ziele[0] : null) || modalBody).focus({ preventScroll: true });
 }
 
 

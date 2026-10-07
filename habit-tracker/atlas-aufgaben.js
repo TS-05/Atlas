@@ -353,8 +353,8 @@ function cycleTaskStatus(t) {
 // "angefangen", nicht als "erledigt" und nicht als leer.
 function inProgressSvg() {
   return `<svg width="13" height="13" viewBox="0 0 12 12" style="overflow:visible;">
-    <circle cx="6" cy="6" r="5" fill="none" stroke="url(#goldGradRing)" stroke-width="1.6"/>
-    <path d="M6 1 A5 5 0 0 0 6 11 Z" fill="url(#goldGradRing)"/>
+    <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M6 1 A5 5 0 0 0 6 11 Z" fill="currentColor"/>
   </svg>`;
 }
 // Merkt den letzten 100-%-Zustand des ToDo-Rings, um das einmalige Aufflammen vom blossen

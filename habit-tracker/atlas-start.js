@@ -421,8 +421,20 @@ if (splashEl) {
 
   let p = 1;        // Start: Hauptmenue, wie bisher
   let rot = 0;      // Drehung des Rings in Grad
-  let R = 214;      // Ringradius, gemessen
+  let R = 214;      // Ringradius im Hauptmenue/Halb-Zustand, gemessen
   let cyAndeutung = 0, cyHalb = 0, cyHome = 0;
+
+  // ECK-MODUS (Tim, 2026-10-07): ein kurzer Tipp auf den Home-Knopf oeffnet den Ring mit dem
+  // Mittelpunkt auf dem Knopf rechts unten, etwa bis zur halben Bildschirmhoehe. Gedreht und
+  // gewaehlt wird wie gewohnt, nur steht die Kimme dort schraeg links oben (-135 Grad) statt auf
+  // 12 Uhr -- auf 12 Uhr laege sie am rechten Bildschirmrand. ecke blendet die Geometrie
+  // stufenlos zwischen beiden Lagen (0 = Mitte, 1 = Ecke).
+  let ecke = 0, zielEcke = 0;
+  let cxEcke = 0, cyEcke = 0, REcke = 300;
+  const KIMME_MITTE = -90, KIMME_ECKE = -135;
+  // Fuer die Logik zaehlt das Ziel, nicht die laufende Zwischenstellung.
+  function kimmeWinkel() { return zielEcke > 0.5 ? KIMME_ECKE : KIMME_MITTE; }
+  let jetztCx = 0, jetztCy = 0, jetztR = 214;   // zuletzt gezeichnete Geometrie
 
   // ---------- Messen ----------
   // Der Mittelpunkt im Hauptmenue wird an der Globus-Buehne abgenommen, nicht gerechnet: so
@@ -435,7 +447,13 @@ if (splashEl) {
   function messen() {
     const vh = window.innerHeight;
     R = Math.min(window.innerWidth * 0.35, 214);
-    ring.style.setProperty("--R", R + "px");
+
+    // Eck-Mitte = Mitte des Home-Knopfs. Radius: bis knapp unter die halbe Hoehe, aber so, dass
+    // das Symbol auf 9 Uhr noch ganz im Bild steht.
+    const hb = homeBtn.getBoundingClientRect();
+    cxEcke = hb.width ? hb.left + hb.width / 2 : window.innerWidth - 43;
+    cyEcke = hb.height ? hb.top + hb.height / 2 : vh - 41;
+    REcke = Math.max(150, Math.min(vh * 0.45, cxEcke - 44));
 
     const sicher = messfuehler.getBoundingClientRect().height || 0;
 
@@ -464,7 +482,16 @@ if (splashEl) {
   // ein zweiter Aufruf repariert jeden Zwischenstand.
   function zeichnen() {
     const t = Math.max(0, Math.min(1, p));
-    ring.style.setProperty("--cy", cyFuer(t).toFixed(1) + "px");
+    const e = Math.max(0, Math.min(1, ecke));
+    // Im Eck-Modus gleitet der Ring beim Oeffnen schraeg aus der Ecke herein, statt von unten.
+    const herein = REcke * 0.55 * (1 - Math.min(1, t / 0.5));
+    jetztCx = window.innerWidth / 2 + (cxEcke + herein - window.innerWidth / 2) * e;
+    jetztCy = cyFuer(t) + (cyEcke + herein - cyFuer(t)) * e;
+    jetztR  = R + (REcke - R) * e;
+    ring.style.setProperty("--cx", jetztCx.toFixed(1) + "px");
+    ring.style.setProperty("--cy", jetztCy.toFixed(1) + "px");
+    ring.style.setProperty("--R", jetztR.toFixed(1) + "px");
+    ring.style.setProperty("--kimme-w", (KIMME_MITTE + (KIMME_ECKE - KIMME_MITTE) * e).toFixed(2) + "deg");
     ring.style.setProperty("--rot", rot.toFixed(2) + "deg");
     ring.style.setProperty("--p", t.toFixed(3));
 
@@ -475,8 +502,10 @@ if (splashEl) {
     ring.style.setProperty("--label-op", (Math.max(0, oeffnung - 0.45) / 0.55).toFixed(3));
     ring.style.setProperty("--kimme-op", oeffnung.toFixed(3));
 
-    // Der Knopf zurueck ins Hauptmenue steht nur, solange der Ring weg ist.
-    homeBtn.classList.toggle("aus", t > 0.08);
+    // Der Knopf zurueck ins Hauptmenue steht nur, solange der Ring weg ist -- ausser im
+    // Eck-Modus: dort ist er die Nabe des Rings (Tipp schliesst, Doppeltipp/lang = Hauptmenue).
+    homeBtn.classList.toggle("aus", t > 0.08 && e < 0.5);
+    homeBtn.classList.toggle("ecke-offen", t > 0.08 && e >= 0.5);
     // ... und umgekehrt: solange nur die Andeutung steht, faengt der Ring selbst nichts ab.
     ring.classList.toggle("deko", t < 0.08);
 
@@ -506,7 +535,7 @@ if (splashEl) {
   function nachstenSlotZu(rotWert) {
     let best = slots[0], bestD = 1e9;
     for (const s of slots) {
-      const d = winkelAbstand(s.angle + rotWert, -90);
+      const d = winkelAbstand(s.angle + rotWert, kimmeWinkel());
       if (d < bestD) { bestD = d; best = s; }
     }
     return best;
@@ -516,7 +545,7 @@ if (splashEl) {
   // Die Rotation, bei der `slot` auf 12 Uhr steht -- und zwar die, die dem aktuellen Wert am
   // naechsten liegt, damit der Ring nicht den langen Weg ueber 360 Grad nimmt.
   function rotFuer(slot, nahBei) {
-    const soll = -90 - slot.angle;
+    const soll = kimmeWinkel() - slot.angle;
     const basis = nahBei == null ? rot : nahBei;
     return basis + (((soll - basis + 540) % 360) - 180);
   }
@@ -555,6 +584,10 @@ if (splashEl) {
         rot += d * (1 - Math.pow(0.0022, dt / 16)); fertig = false;
       } else rot = zielRot;
 
+      if (Math.abs(zielEcke - ecke) > 0.0008) {
+        ecke += (zielEcke - ecke) * (1 - Math.pow(0.0015, dt / 16)); fertig = false;
+      } else ecke = zielEcke;
+
       zeichnen();
       if (fertig) { laeuft = false; return; }
       requestAnimationFrame(schritt);
@@ -571,7 +604,7 @@ if (splashEl) {
   let netzTimer = null;
   function hartSetzen() {
     clearTimeout(netzTimer); netzTimer = null;
-    p = zielP; rot = zielRot; laeuft = false;
+    p = zielP; rot = zielRot; ecke = zielEcke; laeuft = false;
     zeichnen();
   }
   function netzSpannen() {
@@ -579,7 +612,8 @@ if (splashEl) {
     netzTimer = setTimeout(() => {
       const offenP   = Math.abs(zielP - p) > 0.002;
       const offenRot = Math.abs(((zielRot - rot + 540) % 360) - 180) > 0.2;
-      if (offenP || offenRot) hartSetzen();
+      const offenEcke = Math.abs(zielEcke - ecke) > 0.002;
+      if (offenP || offenRot || offenEcke) hartSetzen();
     }, 700);
   }
   // Wird die Seite versteckt, ist ohnehin klar, dass keine Bilder mehr kommen.
@@ -683,7 +717,7 @@ if (splashEl) {
   let zeiger = null;
   let letzteZiehGeste = 0;   // Zeitpunkt, an dem zuletzt eine Zieh-Geste endete
 
-  function ringMitte() { return { x: window.innerWidth / 2, y: cyFuer(p) }; }
+  function ringMitte() { return { x: jetztCx, y: jetztCy }; }
   function zeigerWinkel(e) {
     const c = ringMitte();
     return Math.atan2(e.clientY - c.y, e.clientX - c.x) * 180 / Math.PI;
@@ -734,7 +768,9 @@ if (splashEl) {
       // Hinweis, kein lesbares Menue. Da ist jede Bewegung "oeffnen". Sonst gewinnt die
       // groessere Komponente; der Faktor gibt dem Drehen einen kleinen Vorsprung, weil der
       // Ring in erster Linie ein Rad ist.
-      zeiger.modus = (p < 0.08 || Math.abs(radial) > Math.abs(tang) * 1.15) ? "oeffnen" : "drehen";
+      // Im Eck-Modus gibt es nur Drehen: Oeffnen/Schliessen laeuft dort ueber den Knopf.
+      zeiger.modus = zielEcke > 0.5 ? "drehen"
+        : (p < 0.08 || Math.abs(radial) > Math.abs(tang) * 1.15) ? "oeffnen" : "drehen";
     }
 
     if (zeiger.modus === "oeffnen") {
@@ -761,7 +797,15 @@ if (splashEl) {
     if (!zeiger || e.pointerId !== zeiger.id) return;
     const z = zeiger; zeiger = null;
 
-    if (!z.modus && z.bewegt < 7) return;          // reiner Tipp -- der Klick-Handler uebernimmt
+    if (!z.modus && z.bewegt < 7) {                // reiner Tipp -- der Klick-Handler uebernimmt
+      // Die quadratische Ringflaeche deckt im Eck-Modus ein grosses Stueck Inhalt ab. Ein Tipp
+      // dort, aber neben das Symbolband, soll schliessen wie ein Tipp auf die Abdunklung.
+      if (zielEcke > 0.5 && !(e.target.closest && e.target.closest(".ring-btn"))) {
+        const c = ringMitte();
+        if (Math.abs(Math.hypot(e.clientX - c.x, e.clientY - c.y) - jetztR) > 40) setzeZiel(0, null);
+      }
+      return;
+    }
 
     // Ab hier war es eine Zieh-Geste -- egal ob gedreht oder geoeffnet. Der Klick, den der
     // Browser gleich hinterherschickt, gehoert noch dazu und darf nicht als Tipp gelten.
@@ -818,13 +862,48 @@ if (splashEl) {
     waehlenUndOeffnen(rotFuer(s, rot));
   }));
 
-  // Knopf rechts unten: direkt ins Hauptmenue, der aktuelle Tab steht dabei unter der Kimme.
-  // Ersetzt das Hochwischen vom unteren Rand, das auf dem iPhone mit der Home-Geste kollidierte.
-  homeBtn.addEventListener("click", () => {
-    if (p > 0.08) return;
-    const aktuell = slots.find(s => s.tab === document.body.dataset.tab);
+  // Knopf rechts unten (neu belegt 2026-10-07, Tims Wunsch):
+  //   kurzer Tipp            -> Ring im Eck-Modus oeffnen (bzw. wieder schliessen, wenn offen)
+  //   Doppeltipp / lang tippen -> ins Hauptmenue mit Globus
+  // Der erste Tipp eines Doppeltipps oeffnet schon den Eck-Ring -- so wartet der einfache Tipp
+  // nicht kuenstlich ab, ob noch ein zweiter kommt. Der zweite fuehrt dann weiter ins Menue.
+  function aktuellerSlot() { return slots.find(s => s.tab === document.body.dataset.tab); }
+
+  function eckeOeffnen() {
+    zielEcke = 1; ecke = 1;                         // bei p = 0 unsichtbar, also hart setzen
+    const aktuell = aktuellerSlot();
+    if (aktuell) { rot = rotFuer(aktuell, rot); zielRot = rot; }
+    messen();
+    setzeZiel(0.5, null);
+  }
+  function zumHauptmenue() {
+    zielEcke = 0;
+    const aktuell = aktuellerSlot();
     setzeZiel(1, aktuell ? rotFuer(aktuell, rot) : null);
     if (globeModel) globeModel.autoRotate = true;
+  }
+
+  const DOPPELTIPP_MS = 320, LANG_MS = 450;
+  let letzterTipp = 0, langTimer = null, langAusgeloest = false;
+  homeBtn.addEventListener("pointerdown", () => {
+    langAusgeloest = false;
+    clearTimeout(langTimer);
+    langTimer = setTimeout(() => {
+      langAusgeloest = true;
+      if (navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
+      zumHauptmenue();
+    }, LANG_MS);
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(typ =>
+    homeBtn.addEventListener(typ, () => clearTimeout(langTimer)));
+  homeBtn.addEventListener("contextmenu", e => e.preventDefault());
+  homeBtn.addEventListener("click", () => {
+    if (langAusgeloest) { langAusgeloest = false; return; }
+    const jetzt = performance.now();
+    if (jetzt - letzterTipp < DOPPELTIPP_MS) { letzterTipp = 0; zumHauptmenue(); return; }
+    letzterTipp = jetzt;
+    if (zielEcke > 0.5 && zielP > 0.25) setzeZiel(0, null);   // offen -> schliessen
+    else if (p <= 0.08) eckeOeffnen();
   });
 
   // Ein Tipp auf den abgedunkelten Inhalt nimmt den Ring wieder zurueck.
@@ -894,3 +973,22 @@ document.addEventListener("touchend", e => {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
+
+// ---------- Bewegung: nur das gerade angetippte Kaestchen springt ----------
+// renderAll erzeugt jede Zeile neu. Damit nach einem Haken nicht ALLE erledigten Kaestchen
+// gleichzeitig aufspringen, wird hier gemerkt, welches angetippt wurde, und genau dieses nach dem
+// Neuzeichnen markiert (.bew-neu, siehe BEWEGUNG in style.css).
+document.addEventListener("click", e => {
+  const box = e.target.closest(".atlas-check[data-habit], .atlas-check[data-task]");
+  if (!box) return;
+  const sel = box.dataset.habit
+    ? `.atlas-check[data-habit="${CSS.escape(box.dataset.habit)}"]${box.dataset.date ? `[data-date="${CSS.escape(box.dataset.date)}"]` : ""}`
+    : `.atlas-check[data-task="${CSS.escape(box.dataset.task)}"]`;
+  // Zwei Bilder warten: renderAll laeuft teils selbst erst im naechsten Bild.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.querySelectorAll(sel).forEach(el => {
+      el.classList.add("bew-neu");
+      setTimeout(() => el.classList.remove("bew-neu"), 600);
+    });
+  }));
+}, true);

@@ -690,6 +690,10 @@ function renderDaySheetHabits(dateObj) {
 }
 
 function openDaySheet(dateKey) {
+  // Nach jedem Abhaken wird das Blatt neu gezeichnet. Scrollstand merken, sonst springt es nach
+  // oben, sobald man weiter unten etwas nachtraegt.
+  const neuGezeichnet = currentDaySheetKey === dateKey && !overlay.classList.contains("hidden");
+  const scrollVorher = neuGezeichnet ? [modalBody.scrollTop, overlay.scrollTop] : null;
   currentDaySheetKey = dateKey;
   const d = dateFromKey(dateKey);
   const pct = dayCompletionPct(d);
@@ -706,7 +710,8 @@ function openDaySheet(dateKey) {
     <div class="metal-gold" style="font-size:var(--text-lg); font-family:var(--font-heading); margin-top:10px;">${levelLabel}</div>
     <p class="text-muted" style="font-size:var(--text-xs); margin:8px 0 12px;">Tippe eine Gewohnheit an, um sie für diesen Tag nachzutragen oder zu korrigieren.</p>
     <div style="display:flex; flex-direction:column; gap:8px;">${renderDaySheetHabits(d)}</div>
-  `, body => { body.querySelector("#mCloseSheet").addEventListener("click", closeModal); }, "sheet");
+  `, body => { body.querySelector("#mCloseSheet").addEventListener("click", closeModal); }, "sheet", { fokusFeld: false });
+  if (scrollVorher) { modalBody.scrollTop = scrollVorher[0]; overlay.scrollTop = scrollVorher[1]; }
 }
 
 // ---------- Aufgaben je Bereich ----------
