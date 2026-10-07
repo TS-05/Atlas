@@ -448,12 +448,12 @@ if (splashEl) {
     const vh = window.innerHeight;
     R = Math.min(window.innerWidth * 0.35, 214);
 
-    // Eck-Mitte = Mitte des Home-Knopfs. Radius: bis knapp unter die halbe Hoehe, aber so, dass
-    // das Symbol auf 9 Uhr noch ganz im Bild steht.
+    // Eck-Mitte = Mitte des Home-Knopfs. Radius: etwa die halbe Bildschirmbreite (rund 190 px auf
+    // dem iPhone). Die erste Fassung reichte bis zur halben Hoehe -- Tim, 2026-10-07: "nur zu gross".
     const hb = homeBtn.getBoundingClientRect();
     cxEcke = hb.width ? hb.left + hb.width / 2 : window.innerWidth - 43;
     cyEcke = hb.height ? hb.top + hb.height / 2 : vh - 41;
-    REcke = Math.max(150, Math.min(vh * 0.45, cxEcke - 44));
+    REcke = Math.max(150, Math.min(window.innerWidth * 0.5, 210, cxEcke - 44));
 
     const sicher = messfuehler.getBoundingClientRect().height || 0;
 
